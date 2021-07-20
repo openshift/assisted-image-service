@@ -1,0 +1,11 @@
+registry: quay.io
+build-container-image: image-service-build
+
+containers:
+  image-service-build: Dockerfile.image-service-build
+volumes:
+  - $HOME/.cache/go-build:/go/pkg/mod
+  - $HOME/.cache/golangci-lint:$HOME/.cache/golangci-lint
+env:
+  IMAGE: $IMAGE
+  GOCACHE: "/go/pkg/mod"
