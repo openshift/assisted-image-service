@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/carbonin/assisted-image-service/internal/handlers"
 	"github.com/carbonin/assisted-image-service/pkg/imagestore"
 	"github.com/kelseyhightower/envconfig"
 )
@@ -72,6 +73,7 @@ func main() {
 	}
 
 	http.HandleFunc("/images/", downloadImageHandler(is))
+	http.Handle("/health", handlers.HealthHandler())
 
 	log.Printf("Starting http handler...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
