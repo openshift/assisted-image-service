@@ -12,23 +12,7 @@ import (
 )
 
 var Options struct {
-	AssistedServiceURL string                       `envconfig:"ASSISTED_SERVICE_URL" default:"http://assisted-service:8080"`
-	Versions           map[string]map[string]string `envconfig:"RHCOS_VERSIONS"`
-}
-
-var DefaultVersions = map[string]map[string]string{
-	"4.6": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
-	},
-	"4.7": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
-	},
-	"4.8": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/pre-release/4.8.0-rc.3/rhcos-4.8.0-rc.3-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/pre-release/4.8.0-rc.3/rhcos-live-rootfs.x86_64.img",
-	},
+	AssistedServiceURL string `envconfig:"ASSISTED_SERVICE_URL" default:"http://assisted-service:8080"`
 }
 
 var clusterRegexp = regexp.MustCompile(`/images/.+`)
@@ -78,11 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
-
-	if Options.Versions == nil {
-		Options.Versions = DefaultVersions
-	}
-	is, err := imagestore.NewImageStore(Options.Versions)
+	is, err := imagestore.NewImageStore()
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
