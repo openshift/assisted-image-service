@@ -10,7 +10,10 @@ build-image:
 lint:
 	golangci-lint run -v
 
+test:
+	go test ./...
+
 run:
 	podman run --rm -v $(PWD)/data:/data:Z -p8080:8080 $(IMAGE)
 
-all: lint build-image run
+all: lint test build-image run

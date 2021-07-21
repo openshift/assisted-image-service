@@ -2,6 +2,7 @@ package imagestore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -29,12 +30,13 @@ var DefaultVersions = map[string]map[string]string{
 }
 
 type Config struct {
-	DataDir  string                       `envconfig:"DATA_DIR"`
-	Versions map[string]map[string]string `envconfig:"RHCOS_VERSIONS"`
+	DataDir  string `envconfig:"DATA_DIR"`
+	Versions string `envconfig:"RHCOS_VERSIONS"`
 }
 
 type ImageStore struct {
-	cfg *Config
+	cfg      *Config
+	versions map[string]map[string]string
 }
 
 func NewImageStore() (*ImageStore, error) {
@@ -43,16 +45,22 @@ func NewImageStore() (*ImageStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Versions == nil {
-		cfg.Versions = DefaultVersions
+	is := ImageStore{cfg: cfg}
+	if cfg.Versions == "" {
+		is.versions = DefaultVersions
+	} else {
+		err = json.Unmarshal([]byte(cfg.Versions), &is.versions)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return &ImageStore{cfg: cfg}, nil
+	return &is, nil
 }
 
 func (s *ImageStore) Populate(ctx context.Context) error {
 	errs, _ := errgroup.WithContext(ctx)
 
-	for version := range s.cfg.Versions {
+	for version := range s.versions {
 		version := version
 		errs.Go(func() error {
 			dest, err := s.pathForVersion(version)
@@ -65,7 +73,7 @@ func (s *ImageStore) Populate(ctx context.Context) error {
 				return nil
 			}
 
-			url := s.cfg.Versions[version]["iso_url"]
+			url := s.versions[version]["iso_url"]
 			log.Printf("Downloading iso for version %s from %s to %s", version, url, dest)
 			resp, err := http.Get(url)
 			if err != nil {
@@ -98,7 +106,7 @@ func (s *ImageStore) Populate(ctx context.Context) error {
 }
 
 func (s *ImageStore) pathForVersion(version string) (string, error) {
-	v, ok := s.cfg.Versions[version]
+	v, ok := s.versions[version]
 	if !ok {
 		return "", fmt.Errorf("missing version entry for %s", version)
 	}
