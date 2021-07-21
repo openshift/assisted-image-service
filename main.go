@@ -30,7 +30,7 @@ func downloadImageHandler(is *imagestore.ImageStore) func(http.ResponseWriter, *
 		clusterID, err := parseClusterID(r.URL.Path)
 		if err != nil {
 			log.Printf("failed to parse cluster ID: %v\n", err)
-			w.WriteHeader(http.StatusNotFound)
+			http.NotFound(w, r)
 			return
 		}
 
