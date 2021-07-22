@@ -29,23 +29,30 @@ var DefaultVersions = map[string]map[string]string{
 	},
 }
 
+//go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
+type ImageStore interface {
+	Populate(ctx context.Context) error
+	BaseFile(version string) (*os.File, error)
+	HaveVersion(version string) bool
+}
+
 type Config struct {
 	DataDir  string `envconfig:"DATA_DIR"`
 	Versions string `envconfig:"RHCOS_VERSIONS"`
 }
 
-type ImageStore struct {
+type rhcosStore struct {
 	cfg      *Config
 	versions map[string]map[string]string
 }
 
-func NewImageStore() (*ImageStore, error) {
+func NewImageStore() (ImageStore, error) {
 	cfg := &Config{}
 	err := envconfig.Process("image-store", cfg)
 	if err != nil {
 		return nil, err
 	}
-	is := ImageStore{cfg: cfg}
+	is := rhcosStore{cfg: cfg}
 	if cfg.Versions == "" {
 		is.versions = DefaultVersions
 	} else {
@@ -57,7 +64,7 @@ func NewImageStore() (*ImageStore, error) {
 	return &is, nil
 }
 
-func (s *ImageStore) Populate(ctx context.Context) error {
+func (s *rhcosStore) Populate(ctx context.Context) error {
 	errs, _ := errgroup.WithContext(ctx)
 
 	for version := range s.versions {
@@ -105,7 +112,7 @@ func (s *ImageStore) Populate(ctx context.Context) error {
 	return errs.Wait()
 }
 
-func (s *ImageStore) pathForVersion(version string) (string, error) {
+func (s *rhcosStore) pathForVersion(version string) (string, error) {
 	v, ok := s.versions[version]
 	if !ok {
 		return "", fmt.Errorf("missing version entry for %s", version)
@@ -117,7 +124,7 @@ func (s *ImageStore) pathForVersion(version string) (string, error) {
 	return filepath.Join(s.cfg.DataDir, filepath.Base(url)), nil
 }
 
-func (s *ImageStore) BaseFile(version string) (*os.File, error) {
+func (s *rhcosStore) BaseFile(version string) (*os.File, error) {
 	path, err := s.pathForVersion(version)
 	if err != nil {
 		return nil, err
@@ -125,7 +132,7 @@ func (s *ImageStore) BaseFile(version string) (*os.File, error) {
 	return os.Open(path)
 }
 
-func (s *ImageStore) HaveVersion(version string) bool {
+func (s *rhcosStore) HaveVersion(version string) bool {
 	_, ok := s.versions[version]
 	return ok
 }

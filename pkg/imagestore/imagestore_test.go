@@ -40,14 +40,14 @@ var _ = Context("with a data directory configured", func() {
 		It("initializes the data directory value", func() {
 			is, err := NewImageStore()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(is.cfg.DataDir).To(Equal(dataDir))
+			Expect(is.(*rhcosStore).cfg.DataDir).To(Equal(dataDir))
 		})
 
 		It("uses the default versions", func() {
 			is, err := NewImageStore()
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(is.versions).To(Equal(DefaultVersions))
+			Expect(is.(*rhcosStore).versions).To(Equal(DefaultVersions))
 		})
 
 		Context("with RHCOS_VERSIONS set", func() {
@@ -72,7 +72,7 @@ var _ = Context("with a data directory configured", func() {
 						"rootfs_url": "http://example.com/image/48.img",
 					},
 				}
-				Expect(is.versions).To(Equal(expected))
+				Expect(is.(*rhcosStore).versions).To(Equal(expected))
 			})
 		})
 	})
@@ -139,7 +139,7 @@ var _ = Context("with a data directory configured", func() {
 
 		Describe("BaseFile", func() {
 			var (
-				is *ImageStore
+				is ImageStore
 			)
 
 			BeforeEach(func() {
