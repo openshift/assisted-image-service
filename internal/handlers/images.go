@@ -7,6 +7,9 @@ import (
 	"regexp"
 
 	"github.com/carbonin/assisted-image-service/pkg/imagestore"
+	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	"github.com/slok/go-http-metrics/middleware"
+	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 )
 
 type ImageHandler struct {
@@ -23,6 +26,19 @@ func parseClusterID(path string) (string, error) {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
 	return found, nil
+}
+
+func NewImageHandler(is *imagestore.ImageStore) http.Handler {
+	metricsConfig := metrics.Config{
+		Prefix:          "assisted_image_service",
+		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
+		SizeBuckets:     []float64{100, 1e6, 5e8, 1e9, 1e10},
+	}
+	mdw := middleware.New(middleware.Config{
+		Recorder: metrics.NewRecorder(metricsConfig),
+	})
+
+	return stdmiddleware.Handler("/images/:imageID", mdw, &ImageHandler{ImageStore: is})
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
