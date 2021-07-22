@@ -124,3 +124,8 @@ func (s *ImageStore) BaseFile(version string) (*os.File, error) {
 	}
 	return os.Open(path)
 }
+
+func (s *ImageStore) HaveVersion(version string) bool {
+	_, ok := s.versions[version]
+	return ok
+}
