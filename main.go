@@ -8,6 +8,7 @@ import (
 	"github.com/carbonin/assisted-image-service/internal/handlers"
 	"github.com/carbonin/assisted-image-service/pkg/imagestore"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var Options struct {
@@ -28,9 +29,9 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", &handlers.ImageHandler{ImageStore: is})
-	http.Handle("/health", handlers.HealthHandler())
-	http.Handle("/metrics", handlers.MetricsHandler())
+	http.Handle("/images/", handlers.NewImageHandler(is))
+	http.Handle("/health", handlers.NewHealthHandler())
+	http.Handle("/metrics", promhttp.Handler())
 
 	log.Printf("Starting http handler...")
 	log.Fatal(http.ListenAndServe(":8080", nil))

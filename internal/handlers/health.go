@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func HealthHandler() http.Handler {
+func NewHealthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
