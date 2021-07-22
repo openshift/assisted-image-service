@@ -30,6 +30,7 @@ func main() {
 
 	http.Handle("/images/", &handlers.ImageHandler{ImageStore: is})
 	http.Handle("/health", handlers.HealthHandler())
+	http.Handle("/metrics", handlers.MetricsHandler())
 
 	log.Printf("Starting http handler...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
