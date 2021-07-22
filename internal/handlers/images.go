@@ -13,7 +13,7 @@ import (
 )
 
 type ImageHandler struct {
-	ImageStore *imagestore.ImageStore
+	ImageStore imagestore.ImageStore
 }
 
 var _ http.Handler = &ImageHandler{}
@@ -28,7 +28,7 @@ func parseClusterID(path string) (string, error) {
 	return found, nil
 }
 
-func NewImageHandler(is *imagestore.ImageStore) http.Handler {
+func NewImageHandler(is imagestore.ImageStore) http.Handler {
 	metricsConfig := metrics.Config{
 		Prefix:          "assisted_image_service",
 		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},

@@ -13,6 +13,13 @@ lint:
 test:
 	go test ./...
 
+generate:
+	go generate $(shell go list ./...)
+	$(MAKE) format
+
+format:
+	@goimports -w -l main.go internal pkg || /bin/true
+
 run:
 	podman run --rm -v $(PWD)/data:/data:Z -p8080:8080 $(IMAGE)
 
