@@ -49,10 +49,29 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Get info for cluster %s here\n", clusterID)
+	params := r.URL.Query()
 
-	// TODO: Make this configurable based on query params
-	f, err := h.ImageStore.BaseFile("4.8")
+	version := params.Get("version")
+	if version == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err = w.Write([]byte("'version' parameter required"))
+		if err != nil {
+			log.Printf("Failed to write response: %v\n", err)
+		}
+		return
+	}
+
+	if !h.ImageStore.HaveVersion(version) {
+		w.WriteHeader(http.StatusBadRequest)
+		message := fmt.Sprintf("version %s not found", version)
+		_, err = w.Write([]byte(message))
+		if err != nil {
+			log.Printf("Failed to write response: %v\n", err)
+		}
+		return
+	}
+
+	f, err := h.ImageStore.BaseFile(version)
 	if err != nil {
 		log.Printf("Error getting base image: err: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
