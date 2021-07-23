@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/kelseyhightower/envconfig"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -81,7 +81,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			}
 
 			url := s.versions[version]["iso_url"]
-			log.Printf("Downloading iso for version %s from %s to %s", version, url, dest)
+			log.Infof("Downloading iso for version %s from %s to %s", version, url, dest)
 			resp, err := http.Get(url)
 			if err != nil {
 				return err
@@ -104,7 +104,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			} else if count != resp.ContentLength {
 				return fmt.Errorf("Wrote %d bytes, but expected to write %d", count, resp.ContentLength)
 			}
-			log.Printf("Finished downloading for version %s", version)
+			log.Infof("Finished downloading for version %s", version)
 			return nil
 		})
 	}
