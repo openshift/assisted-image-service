@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -13,6 +14,7 @@ import (
 
 var Options struct {
 	AssistedServiceURL string `envconfig:"ASSISTED_SERVICE_URL" default:"http://assisted-service:8080"`
+	Port               string `envconfig:"PORT" default:"8080"`
 }
 
 func main() {
@@ -34,5 +36,5 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	log.Printf("Starting http handler...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", Options.Port), nil))
 }
