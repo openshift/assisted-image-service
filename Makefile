@@ -21,7 +21,11 @@ generate:
 format:
 	@goimports -w -l main.go internal pkg || /bin/true
 
-run:
-	podman run --rm -v $(PWD)/data:/data:Z -p$(PORT):$(PORT) -e PORT=$(PORT) $(IMAGE)
+run: certs
+	podman run --rm -v $(PWD)/data:/data:Z -v $(PWD)/certs:/certs:Z -p$(PORT):$(PORT) -e PORT=$(PORT) -e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt $(IMAGE)
+
+.PHONY: certs
+certs:
+	openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout certs/tls.key -out certs/tls.crt -subj "/CN=localhost"
 
 all: lint test build-image run

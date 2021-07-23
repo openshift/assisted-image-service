@@ -15,6 +15,8 @@ import (
 var Options struct {
 	AssistedServiceURL string `envconfig:"ASSISTED_SERVICE_URL" default:"http://assisted-service:8080"`
 	Port               string `envconfig:"PORT" default:"8080"`
+	HTTPSKeyFile       string `envconfig:"HTTPS_KEY_FILE"`
+	HTTPSCertFile      string `envconfig:"HTTPS_CERT_FILE"`
 }
 
 func main() {
@@ -36,5 +38,10 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	log.Printf("Starting http handler...")
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", Options.Port), nil))
+	address := fmt.Sprintf(":%s", Options.Port)
+	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
+		log.Fatal(http.ListenAndServeTLS(address, Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
+	} else {
+		log.Fatal(http.ListenAndServe(address, nil))
+	}
 }
