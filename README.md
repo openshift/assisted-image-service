@@ -8,7 +8,7 @@ It downloads a set of RHCOS images on startup based on config and responds to a 
 Build the image and run it locally using `podman`
 
 ```bash
-make build-image run
+make build run
 ```
 
 This will start the service running on port 8080 by default.
