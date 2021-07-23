@@ -3,9 +3,6 @@ PWD = $(shell pwd)
 PORT := $(or ${PORT}, 8080)
 
 build:
-	CGO_ENABLED=0 go build -o build/assisted-image-service main.go
-
-build-image:
 	podman build -f Dockerfile.image-service . -t $(IMAGE)
 
 lint:
@@ -28,4 +25,4 @@ run: certs
 certs:
 	openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout certs/tls.key -out certs/tls.crt -subj "/CN=localhost"
 
-all: lint test build-image run
+all: lint test build run
