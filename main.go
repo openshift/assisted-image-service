@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/carbonin/assisted-image-service/internal/handlers"
 	"github.com/carbonin/assisted-image-service/pkg/imagestore"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 )
 
 var Options struct {
@@ -20,6 +20,7 @@ var Options struct {
 }
 
 func main() {
+	log.SetFormatter(&log.JSONFormatter{})
 	err := envconfig.Process("cluster-image", &Options)
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
@@ -37,7 +38,7 @@ func main() {
 	http.Handle("/health", handlers.NewHealthHandler())
 	http.Handle("/metrics", promhttp.Handler())
 
-	log.Printf("Starting http handler...")
+	log.Info("Starting http handler...")
 	address := fmt.Sprintf(":%s", Options.Port)
 	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
 		log.Fatal(http.ListenAndServeTLS(address, Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))

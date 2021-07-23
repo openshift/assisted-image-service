@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 
 	"github.com/carbonin/assisted-image-service/pkg/imagestore"
+	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
@@ -44,7 +44,7 @@ func NewImageHandler(is imagestore.ImageStore) http.Handler {
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	clusterID, err := parseClusterID(r.URL.Path)
 	if err != nil {
-		log.Printf("failed to parse cluster ID: %v\n", err)
+		log.Errorf("failed to parse cluster ID: %v\n", err)
 		http.NotFound(w, r)
 		return
 	}
@@ -56,7 +56,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte("'version' parameter required"))
 		if err != nil {
-			log.Printf("Failed to write response: %v\n", err)
+			log.Errorf("Failed to write response: %v\n", err)
 		}
 		return
 	}
@@ -66,14 +66,14 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		message := fmt.Sprintf("version %s not found", version)
 		_, err = w.Write([]byte(message))
 		if err != nil {
-			log.Printf("Failed to write response: %v\n", err)
+			log.Errorf("Failed to write response: %v\n", err)
 		}
 		return
 	}
 
 	f, err := h.ImageStore.BaseFile(version)
 	if err != nil {
-		log.Printf("Error getting base image: err: %v\n", err)
+		log.Errorf("Error getting base image: err: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	fileInfo, err := f.Stat()
 	if err != nil {
-		log.Printf("Error getting file info: %v\n", err)
+		log.Errorf("Error getting file info: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
