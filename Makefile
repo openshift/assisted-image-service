@@ -1,5 +1,6 @@
 IMAGE := $(or ${IMAGE}, quay.io/ocpmetal/assisted-image-service:latest)
 PWD = $(shell pwd)
+PORT := $(or ${PORT}, 8080)
 
 build:
 	CGO_ENABLED=0 go build -o build/assisted-image-service main.go
@@ -21,6 +22,6 @@ format:
 	@goimports -w -l main.go internal pkg || /bin/true
 
 run:
-	podman run --rm -v $(PWD)/data:/data:Z -p8080:8080 $(IMAGE)
+	podman run --rm -v $(PWD)/data:/data:Z -p$(PORT):$(PORT) -e PORT=$(PORT) $(IMAGE)
 
 all: lint test build-image run
