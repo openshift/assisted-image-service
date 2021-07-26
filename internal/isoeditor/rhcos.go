@@ -40,6 +40,17 @@ type rhcosEditor struct {
 	workDir    string
 }
 
+func NewEditor(isoPath string, log logrus.FieldLogger) (Editor, error) {
+	isoTmpWorkDir, err := ioutil.TempDir("", "isoutil")
+	if err != nil {
+		return nil, err
+	}
+	return &rhcosEditor{
+		isoHandler: isoutil.NewHandler(isoPath, isoTmpWorkDir),
+		log:        log,
+	}, nil
+}
+
 // Creates the template minimal iso by removing the rootfs and adding the url
 // Returns the path to the created iso file
 func (e *rhcosEditor) CreateMinimalISOTemplate(rootFSURL string) (string, error) {
