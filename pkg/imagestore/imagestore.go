@@ -120,7 +120,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 
 			if _, err = os.Stat(minimalPath); os.IsNotExist(err) {
 				log.Infof("Creating minimal iso for version %s", version)
-				ed, err := isoeditor.NewEditor(fullPath)
+				ed, err := isoeditor.NewEditor(fullPath, s.cfg.DataDir)
 				if err != nil {
 					return fmt.Errorf("failed to creat editor for version %s: %v", version, err)
 				}

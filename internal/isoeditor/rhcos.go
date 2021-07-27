@@ -39,13 +39,14 @@ type rhcosEditor struct {
 	workDir    string
 }
 
-func NewEditor(isoPath string) (Editor, error) {
-	isoTmpWorkDir, err := ioutil.TempDir("", "isoutil")
+func NewEditor(isoPath string, dataDir string) (Editor, error) {
+	isoTmpWorkDir, err := ioutil.TempDir(dataDir, "isoutil")
 	if err != nil {
 		return nil, err
 	}
 	return &rhcosEditor{
 		isoHandler: isoutil.NewHandler(isoPath, isoTmpWorkDir),
+		workDir:    dataDir,
 	}, nil
 }
 
