@@ -70,7 +70,6 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(rootFSURL string) (string, error)
 		return "", err
 	}
 
-	log.Info("Creating minimal ISO template")
 	isoPath, err := e.create()
 	if err != nil {
 		log.WithError(err).Errorf("Failed to create minimal ISO template")
