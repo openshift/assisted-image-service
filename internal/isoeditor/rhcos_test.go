@@ -14,18 +14,11 @@ import (
 	"github.com/carbonin/assisted-image-service/internal/isoutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	testRootFSURL = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
 )
-
-func getTestLog() logrus.FieldLogger {
-	l := logrus.New()
-	l.SetOutput(ioutil.Discard)
-	return l
-}
 
 func TestIsoEditor(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -156,7 +149,6 @@ var _ = Context("with test files", func() {
 func editorForFile(iso string, workDir string) Editor {
 	return &rhcosEditor{
 		isoHandler: isoutil.NewHandler(iso, workDir),
-		log:        getTestLog(),
 	}
 }
 

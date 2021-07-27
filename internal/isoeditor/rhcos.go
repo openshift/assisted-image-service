@@ -11,7 +11,7 @@ import (
 
 	"github.com/carbonin/assisted-image-service/internal/isoutil"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -36,18 +36,16 @@ type Editor interface {
 
 type rhcosEditor struct {
 	isoHandler isoutil.Handler
-	log        logrus.FieldLogger
 	workDir    string
 }
 
-func NewEditor(isoPath string, log logrus.FieldLogger) (Editor, error) {
+func NewEditor(isoPath string) (Editor, error) {
 	isoTmpWorkDir, err := ioutil.TempDir("", "isoutil")
 	if err != nil {
 		return nil, err
 	}
 	return &rhcosEditor{
 		isoHandler: isoutil.NewHandler(isoPath, isoTmpWorkDir),
-		log:        log,
 	}, nil
 }
 
@@ -63,24 +61,24 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(rootFSURL string) (string, error)
 	}
 
 	if err := e.embedInitrdPlaceholders(); err != nil {
-		e.log.WithError(err).Warnf("Failed to embed initrd placeholders")
+		log.WithError(err).Warnf("Failed to embed initrd placeholders")
 		return "", err
 	}
 
 	if err := e.fixTemplateConfigs(rootFSURL); err != nil {
-		e.log.WithError(err).Warnf("Failed to edit template configs")
+		log.WithError(err).Warnf("Failed to edit template configs")
 		return "", err
 	}
 
-	e.log.Info("Creating minimal ISO template")
+	log.Info("Creating minimal ISO template")
 	isoPath, err := e.create()
 	if err != nil {
-		e.log.WithError(err).Errorf("Failed to minimal create ISO template")
+		log.WithError(err).Errorf("Failed to create minimal ISO template")
 		return "", err
 	}
 
 	if err := e.embedOffsetsInSystemArea(isoPath); err != nil {
-		e.log.WithError(err).Errorf("Failed to embed offsets in ISO system area")
+		log.WithError(err).Errorf("Failed to embed offsets in ISO system area")
 		return "", err
 	}
 

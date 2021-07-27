@@ -20,6 +20,7 @@ var Options struct {
 }
 
 func main() {
+	log.SetReportCaller(true)
 	log.SetFormatter(&log.JSONFormatter{})
 	err := envconfig.Process("cluster-image", &Options)
 	if err != nil {
