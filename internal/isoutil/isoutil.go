@@ -121,6 +121,11 @@ func copyAll(fs filesystem.FileSystem, fsDir string, infos []os.FileInfo, target
 				return err
 			}
 
+			if err := osFile.Sync(); err != nil {
+				osFile.Close()
+				return err
+			}
+
 			if err := osFile.Close(); err != nil {
 				return err
 			}

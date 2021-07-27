@@ -133,7 +133,14 @@ func (e *rhcosEditor) createImagePlaceholder(imagePath string, paddingLength uin
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if deferErr := f.Sync(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to sync disk image placeholder file")
+		}
+		if deferErr := f.Close(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to close disk image placeholder file")
+		}
+	}()
 
 	err = f.Truncate(int64(paddingLength))
 	if err != nil {
