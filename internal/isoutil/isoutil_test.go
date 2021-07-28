@@ -33,35 +33,16 @@ var _ = Context("with test files", func() {
 		os.RemoveAll(isoDir)
 	})
 
-	Describe("ReadFile", func() {
-		It("read existing file from ISO", func() {
-			h := NewHandler(isoFile, "").(*installerHandler)
-			reader, err := h.ReadFile("testdir/stuff")
-			Expect(err).ToNot(HaveOccurred())
-			fileContent, err := ioutil.ReadAll(reader)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(string(fileContent)).To(Equal("morecontent\n"))
-		})
-
-		It("read non-existant file from ISO", func() {
-			h := NewHandler(isoFile, "").(*installerHandler)
-			reader, err := h.ReadFile("testdir/noexist")
-			Expect(err).To(HaveOccurred())
-			Expect(reader).To(BeNil())
-		})
-	})
-
 	Describe("Extract", func() {
 		It("extracts the files from an iso", func() {
 			dir, err := ioutil.TempDir("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 
-			h := NewHandler(isoFile, dir)
-			Expect(h.Extract()).To(Succeed())
+			Expect(Extract(isoFile, dir)).To(Succeed())
 
-			validateFileContent(h.ExtractedPath("test"), "testcontent\n")
-			validateFileContent(h.ExtractedPath("testdir/stuff"), "morecontent\n")
+			validateFileContent(filepath.Join(dir, "test"), "testcontent\n")
+			validateFileContent(filepath.Join(dir, "testdir/stuff"), "morecontent\n")
 		})
 	})
 
@@ -72,8 +53,7 @@ var _ = Context("with test files", func() {
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")
 
-			h := NewHandler("", filepath.Join(filesDir, "files"))
-			Expect(h.Create(isoPath, "my-vol")).To(Succeed())
+			Expect(Create(isoPath, filepath.Join(filesDir, "files"), "my-vol")).To(Succeed())
 
 			d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
 			Expect(err).ToNot(HaveOccurred())
@@ -95,27 +75,22 @@ var _ = Context("with test files", func() {
 	})
 
 	Describe("fileExists", func() {
-		var h *installerHandler
-		BeforeEach(func() {
-			h = NewHandler("", filepath.Join(filesDir, "files")).(*installerHandler)
-		})
-
 		It("returns true when file exists", func() {
-			exists, err := h.fileExists("test")
+			exists, err := fileExists(filepath.Join(filesDir, "files/test"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeTrue())
 
-			exists, err = h.fileExists("testdir/stuff")
+			exists, err = fileExists(filepath.Join(filesDir, "files/testdir/stuff"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeTrue())
 		})
 
 		It("returns false when file does not exist", func() {
-			exists, err := h.fileExists("asdf")
+			exists, err := fileExists(filepath.Join(filesDir, "asdf"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeFalse())
 
-			exists, err = h.fileExists("missingdir/things")
+			exists, err = fileExists(filepath.Join(filesDir, "missingdir/things"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeFalse())
 		})
@@ -125,9 +100,8 @@ var _ = Context("with test files", func() {
 		It("returns true when boot files are present", func() {
 			p, err := filepath.Abs(filepath.Join(filesDir, "boot_files"))
 			Expect(err).ToNot(HaveOccurred())
-			h := NewHandler("", p).(*installerHandler)
 
-			haveBootFiles, err := h.haveBootFiles()
+			haveBootFiles, err := haveBootFiles(p)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(haveBootFiles).To(BeTrue())
 		})
@@ -135,9 +109,8 @@ var _ = Context("with test files", func() {
 		It("returns false when boot files are not present", func() {
 			p, err := filepath.Abs(filepath.Join(filesDir, "files"))
 			Expect(err).ToNot(HaveOccurred())
-			h := NewHandler("", p).(*installerHandler)
 
-			haveBootFiles, err := h.haveBootFiles()
+			haveBootFiles, err := haveBootFiles(p)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(haveBootFiles).To(BeFalse())
 		})
@@ -145,8 +118,7 @@ var _ = Context("with test files", func() {
 
 	Describe("VolumeIdentifier", func() {
 		It("returns the correct value", func() {
-			h := NewHandler(isoFile, "")
-			id, err := h.VolumeIdentifier()
+			id, err := VolumeIdentifier(isoFile)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(id).To(Equal(volumeID))
 		})
@@ -156,8 +128,8 @@ var _ = Context("with test files", func() {
 		It("returns the correct value", func() {
 			p, err := filepath.Abs(filepath.Join(filesDir, "boot_files"))
 			Expect(err).ToNot(HaveOccurred())
-			h := NewHandler("", p).(*installerHandler)
-			sectors, err := h.efiLoadSectors()
+
+			sectors, err := efiLoadSectors(p)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sectors).To(Equal(uint16(3997)))
 		})

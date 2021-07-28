@@ -15,62 +15,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate mockgen -package=isoutil -destination=mock_isoutil.go . Handler
-type Handler interface {
-	Extract() error
-	ExtractedPath(rel string) string
-	Create(outPath string, volumeLabel string) error
-	ReadFile(filePath string) (io.ReadWriteSeeker, error)
-	VolumeIdentifier() (string, error)
-	Copy(filePath string) error
-	CleanWorkDir() error
-}
-
-type installerHandler struct {
-	isoPath string
-	workDir string
-}
-
-func NewHandler(isoPath, workDir string) Handler {
-	return &installerHandler{isoPath: isoPath, workDir: workDir}
-}
-
-func (h *installerHandler) isoFS() (filesystem.FileSystem, error) {
-	d, err := diskfs.OpenWithMode(h.isoPath, diskfs.ReadOnly)
+// Extract unpacks the iso contents into the working directory
+func Extract(isoPath string, workDir string) error {
+	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fs, err := d.GetFilesystem(0)
-	if err != nil {
-		return nil, err
-	}
-
-	return fs, nil
-}
-
-// ReadFile returns a reader for a known path in the iso without extracting first
-func (h *installerHandler) ReadFile(filePath string) (io.ReadWriteSeeker, error) {
-	fs, err := h.isoFS()
-	if err != nil {
-		return nil, err
-	}
-
-	fsFile, err := fs.OpenFile(filePath, os.O_RDONLY)
-	if err != nil {
-		return nil, err
-	}
-
-	return fsFile, nil
-}
-
-func (h *installerHandler) ExtractedPath(rel string) string {
-	return filepath.Join(h.workDir, rel)
-}
-
-// Extract unpacks the iso contents into the working directory
-func (h *installerHandler) Extract() error {
-	fs, err := h.isoFS()
 	if err != nil {
 		return err
 	}
@@ -79,7 +31,7 @@ func (h *installerHandler) Extract() error {
 	if err != nil {
 		return err
 	}
-	err = copyAll(fs, "/", files, h.workDir)
+	err = copyAll(fs, "/", files, workDir)
 	if err != nil {
 		return err
 	}
@@ -135,7 +87,7 @@ func copyAll(fs filesystem.FileSystem, fsDir string, infos []os.FileInfo, target
 }
 
 // Create builds an iso file at outPath with the given volumeLabel using the contents of the working directory
-func (h *installerHandler) Create(outPath string, volumeLabel string) error {
+func Create(outPath string, workDir string, volumeLabel string) error {
 	// Use the minimum iso size that will satisfy diskfs validations here.
 	// This value doesn't determine the final image size, but is used
 	// to truncate the initial file. This value would be relevant if
@@ -152,7 +104,7 @@ func (h *installerHandler) Create(outPath string, volumeLabel string) error {
 		Partition:   0,
 		FSType:      filesystem.TypeISO9660,
 		VolumeLabel: volumeLabel,
-		WorkDir:     h.workDir,
+		WorkDir:     workDir,
 	}
 	fs, err := d.CreateFilesystem(fspec)
 	if err != nil {
@@ -169,10 +121,10 @@ func (h *installerHandler) Create(outPath string, volumeLabel string) error {
 		VolumeIdentifier: volumeLabel,
 	}
 
-	if haveFiles, err := h.haveBootFiles(); err != nil {
+	if haveFiles, err := haveBootFiles(workDir); err != nil {
 		return err
 	} else if haveFiles {
-		efiSectors, err := h.efiLoadSectors()
+		efiSectors, err := efiLoadSectors(workDir)
 		if err != nil {
 			return err
 		}
@@ -201,18 +153,19 @@ func (h *installerHandler) Create(outPath string, volumeLabel string) error {
 
 // Returns the number of sectors to load for efi boot
 // Load Sectors * 2048 should be the size of efiboot.img rounded up to a multiple of 2048
-func (h *installerHandler) efiLoadSectors() (uint16, error) {
-	efiStat, err := os.Stat(filepath.Join(h.workDir, "images/efiboot.img"))
+func efiLoadSectors(workDir string) (uint16, error) {
+	efiStat, err := os.Stat(filepath.Join(workDir, "images/efiboot.img"))
 	if err != nil {
 		return 0, err
 	}
 	return uint16(math.Ceil(float64(efiStat.Size()) / 2048)), nil
 }
 
-func (h *installerHandler) haveBootFiles() (bool, error) {
+func haveBootFiles(workDir string) (bool, error) {
 	files := []string{"isolinux/boot.cat", "isolinux/isolinux.bin", "images/efiboot.img"}
 	for _, f := range files {
-		if exists, err := h.fileExists(f); err != nil {
+		name := filepath.Join(workDir, f)
+		if exists, err := fileExists(name); err != nil {
 			return false, err
 		} else if !exists {
 			return false, nil
@@ -222,8 +175,7 @@ func (h *installerHandler) haveBootFiles() (bool, error) {
 	return true, nil
 }
 
-func (h *installerHandler) fileExists(relName string) (bool, error) {
-	name := filepath.Join(h.workDir, relName)
+func fileExists(name string) (bool, error) {
 	if _, err := os.Stat(name); os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {
@@ -232,9 +184,9 @@ func (h *installerHandler) fileExists(relName string) (bool, error) {
 	return true, nil
 }
 
-func (h *installerHandler) VolumeIdentifier() (string, error) {
+func VolumeIdentifier(isoPath string) (string, error) {
 	// Need to get the volume id from the ISO provided
-	iso, err := os.Open(h.isoPath)
+	iso, err := os.Open(isoPath)
 	if err != nil {
 		return "", err
 	}
@@ -251,35 +203,6 @@ func (h *installerHandler) VolumeIdentifier() (string, error) {
 	}
 
 	return strings.TrimSpace(string(volumeId)), nil
-}
-
-func (h *installerHandler) Copy(filePath string) error {
-	srcFile, err := os.OpenFile(h.isoPath, os.O_RDONLY, 0o664)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		dstFile.Close()
-		return err
-	}
-
-	if err := dstFile.Close(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (h *installerHandler) CleanWorkDir() error {
-	return os.RemoveAll(h.workDir)
 }
 
 func GetFileLocation(filePath, isoPath string) (uint64, error) {
