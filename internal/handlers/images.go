@@ -71,7 +71,24 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := h.ImageStore.BaseFile(version)
+	imageType := params.Get("type")
+	if imageType == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err = w.Write([]byte("'type' parameter required"))
+		if err != nil {
+			log.Errorf("Failed to write response: %v\n", err)
+		}
+		return
+	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err = w.Write([]byte("invalid value for parameter 'type'"))
+		if err != nil {
+			log.Errorf("Failed to write response: %v\n", err)
+		}
+		return
+	}
+
+	f, err := h.ImageStore.BaseFile(version, imageType)
 	if err != nil {
 		log.Errorf("Error getting base image: err: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)

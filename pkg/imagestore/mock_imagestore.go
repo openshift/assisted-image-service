@@ -36,18 +36,18 @@ func (m *MockImageStore) EXPECT() *MockImageStoreMockRecorder {
 }
 
 // BaseFile mocks base method.
-func (m *MockImageStore) BaseFile(arg0 string) (*os.File, error) {
+func (m *MockImageStore) BaseFile(arg0, arg1 string) (*os.File, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BaseFile", arg0)
+	ret := m.ctrl.Call(m, "BaseFile", arg0, arg1)
 	ret0, _ := ret[0].(*os.File)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BaseFile indicates an expected call of BaseFile.
-func (mr *MockImageStoreMockRecorder) BaseFile(arg0 interface{}) *gomock.Call {
+func (mr *MockImageStoreMockRecorder) BaseFile(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseFile", reflect.TypeOf((*MockImageStore)(nil).BaseFile), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseFile", reflect.TypeOf((*MockImageStore)(nil).BaseFile), arg0, arg1)
 }
 
 // HaveVersion mocks base method.

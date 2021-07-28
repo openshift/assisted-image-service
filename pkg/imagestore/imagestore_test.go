@@ -153,7 +153,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("returns the correct file", func() {
-				f, err := is.BaseFile("4.8")
+				f, err := is.BaseFile("4.8", ImageTypeFull)
 				Expect(err).NotTo(HaveOccurred())
 				content, err := io.ReadAll(f)
 				Expect(err).NotTo(HaveOccurred())
@@ -161,7 +161,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("fails for a missing version", func() {
-				_, err := is.BaseFile("3.2")
+				_, err := is.BaseFile("3.2", ImageTypeFull)
 				Expect(err).To(HaveOccurred())
 			})
 		})

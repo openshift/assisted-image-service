@@ -33,7 +33,7 @@ var DefaultVersions = map[string]map[string]string{
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
 type ImageStore interface {
 	Populate(ctx context.Context) error
-	BaseFile(version string) (*os.File, error)
+	BaseFile(version, imageType string) (*os.File, error)
 	HaveVersion(version string) bool
 }
 
@@ -46,6 +46,11 @@ type rhcosStore struct {
 	cfg      *Config
 	versions map[string]map[string]string
 }
+
+const (
+	ImageTypeFull    = "full"
+	ImageTypeMinimal = "minimal"
+)
 
 func NewImageStore() (ImageStore, error) {
 	cfg := &Config{}
@@ -184,11 +189,24 @@ func (s *rhcosStore) minimalPathForVersion(version string) (string, error) {
 	return filepath.Join(s.cfg.DataDir, "minimal-"+filepath.Base(url)), nil
 }
 
-func (s *rhcosStore) BaseFile(version string) (*os.File, error) {
-	path, err := s.pathForVersion(version)
+func (s *rhcosStore) BaseFile(version, imageType string) (*os.File, error) {
+	var (
+		path string
+		err  error
+	)
+
+	switch imageType {
+	case ImageTypeFull:
+		path, err = s.pathForVersion(version)
+	case ImageTypeMinimal:
+		path, err = s.minimalPathForVersion(version)
+	default:
+		err = fmt.Errorf("unsupported image type '%s'", imageType)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return os.Open(path)
 }
 
