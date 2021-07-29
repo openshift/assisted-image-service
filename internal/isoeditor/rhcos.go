@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/carbonin/assisted-image-service/internal/isoutil"
@@ -15,12 +16,11 @@ import (
 )
 
 const (
-	RamDiskPaddingLength  = uint64(1024 * 1024) // 1MB
-	IgnitionPaddingLength = uint64(256 * 1024)  // 256KB
-	ignitionImagePath     = "/images/ignition.img"
-	ramDiskImagePath      = "/images/assisted_installer_custom.img"
-	ignitionHeaderKey     = "coreiso+"
-	ramdiskHeaderKey      = "ramdisk+"
+	RamDiskPaddingLength = uint64(1024 * 1024) // 1MB
+	ignitionImagePath    = "/images/ignition.img"
+	ramDiskImagePath     = "/images/assisted_installer_custom.img"
+	ignitionHeaderKey    = "coreiso+"
+	ramdiskHeaderKey     = "ramdisk+"
 )
 
 type OffsetInfo struct {
@@ -31,70 +31,82 @@ type OffsetInfo struct {
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go -self_package=github.com/openshift/assisted-service/internal/isoeditor . Editor
 type Editor interface {
-	CreateMinimalISOTemplate(rootFSURL string) (string, error)
+	CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error
 }
 
 type rhcosEditor struct {
-	isoHandler isoutil.Handler
-	workDir    string
+	workDir string
 }
 
-func NewEditor(isoPath string, dataDir string) (Editor, error) {
-	isoTmpWorkDir, err := ioutil.TempDir(dataDir, "isoutil")
-	if err != nil {
-		return nil, err
-	}
-	return &rhcosEditor{
-		isoHandler: isoutil.NewHandler(isoPath, isoTmpWorkDir),
-		workDir:    dataDir,
-	}, nil
+func NewEditor(dataDir string) Editor {
+	return &rhcosEditor{workDir: dataDir}
 }
 
 // Creates the template minimal iso by removing the rootfs and adding the url
-// Returns the path to the created iso file
-func (e *rhcosEditor) CreateMinimalISOTemplate(rootFSURL string) (string, error) {
-	if err := e.isoHandler.Extract(); err != nil {
-		return "", err
-	}
-
-	if err := os.Remove(e.isoHandler.ExtractedPath("images/pxeboot/rootfs.img")); err != nil {
-		return "", err
-	}
-
-	if err := e.embedInitrdPlaceholders(); err != nil {
-		log.WithError(err).Warnf("Failed to embed initrd placeholders")
-		return "", err
-	}
-
-	if err := e.fixTemplateConfigs(rootFSURL); err != nil {
-		log.WithError(err).Warnf("Failed to edit template configs")
-		return "", err
-	}
-
-	isoPath, err := e.create()
+func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error {
+	extractDir, err := os.MkdirTemp(e.workDir, "isoutil")
 	if err != nil {
-		log.WithError(err).Errorf("Failed to create minimal ISO template")
-		return "", err
+		return err
 	}
 
-	if err := e.embedOffsetsInSystemArea(isoPath); err != nil {
+	if err = isoutil.Extract(fullISOPath, extractDir); err != nil {
+		return err
+	}
+
+	if err = os.Remove(filepath.Join(extractDir, "images/pxeboot/rootfs.img")); err != nil {
+		return err
+	}
+
+	if err = embedInitrdPlaceholders(extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to embed initrd placeholders")
+		return err
+	}
+
+	if err = fixTemplateConfigs(rootFSURL, extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to edit template configs")
+		return err
+	}
+
+	volumeID, err := isoutil.VolumeIdentifier(fullISOPath)
+	if err != nil {
+		return err
+	}
+
+	if err = isoutil.Create(minimalISOPath, extractDir, volumeID); err != nil {
+		return err
+	}
+
+	if err = embedOffsetsInSystemArea(minimalISOPath); err != nil {
 		log.WithError(err).Errorf("Failed to embed offsets in ISO system area")
-		return "", err
-	}
-
-	return isoPath, nil
-}
-
-func (e *rhcosEditor) embedInitrdPlaceholders() error {
-	// Create ramdisk image placeholder
-	if err := e.createImagePlaceholder(ramDiskImagePath, RamDiskPaddingLength); err != nil {
-		return errors.Wrap(err, "Failed to create placeholder for custom ramdisk image")
+		return err
 	}
 
 	return nil
 }
 
-func (e *rhcosEditor) embedOffsetsInSystemArea(isoPath string) error {
+func embedInitrdPlaceholders(extractDir string) error {
+	f, err := os.Create(filepath.Join(extractDir, ramDiskImagePath))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if deferErr := f.Sync(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to sync disk image placeholder file")
+		}
+		if deferErr := f.Close(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to close disk image placeholder file")
+		}
+	}()
+
+	err = f.Truncate(int64(RamDiskPaddingLength))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func embedOffsetsInSystemArea(isoPath string) error {
 	ignitionOffset, err := isoutil.GetFileLocation(ignitionImagePath, isoPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get ignition image offset")
@@ -128,69 +140,30 @@ func (e *rhcosEditor) embedOffsetsInSystemArea(isoPath string) error {
 	return writeHeader(&ignitionOffsetInfo, &ramDiskOffsetInfo, isoPath)
 }
 
-func (e *rhcosEditor) createImagePlaceholder(imagePath string, paddingLength uint64) error {
-	f, err := os.Create(e.isoHandler.ExtractedPath(imagePath))
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if deferErr := f.Sync(); deferErr != nil {
-			log.WithError(deferErr).Error("Failed to sync disk image placeholder file")
-		}
-		if deferErr := f.Close(); deferErr != nil {
-			log.WithError(deferErr).Error("Failed to close disk image placeholder file")
-		}
-	}()
-
-	err = f.Truncate(int64(paddingLength))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e *rhcosEditor) create() (string, error) {
-	isoPath, err := tempFileName(e.workDir)
-	if err != nil {
-		return "", err
-	}
-
-	volumeID, err := e.isoHandler.VolumeIdentifier()
-	if err != nil {
-		return "", err
-	}
-	if err = e.isoHandler.Create(isoPath, volumeID); err != nil {
-		return "", err
-	}
-
-	return isoPath, nil
-}
-
-func (e *rhcosEditor) fixTemplateConfigs(rootFSURL string) error {
+func fixTemplateConfigs(rootFSURL, extractDir string) error {
 	// Add the rootfs url
 	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
-	if err := editFile(e.isoHandler.ExtractedPath("EFI/redhat/grub.cfg"), `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
 		return err
 	}
 	replacement = fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
-	if err := editFile(e.isoHandler.ExtractedPath("isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
 		return err
 	}
 
 	// Remove the coreos.liveiso parameter
-	if err := editFile(e.isoHandler.ExtractedPath("EFI/redhat/grub.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
 		return err
 	}
-	if err := editFile(e.isoHandler.ExtractedPath("isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
 		return err
 	}
 
 	// Edit config to add custom ramdisk image to initrd
-	if err := editFile(e.isoHandler.ExtractedPath("EFI/redhat/grub.cfg"), `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
 		return err
 	}
-	if err := editFile(e.isoHandler.ExtractedPath("isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
 		return err
 	}
 
@@ -211,20 +184,6 @@ func editFile(fileName string, reString string, replacement string) error {
 	}
 
 	return nil
-}
-
-func tempFileName(baseDir string) (string, error) {
-	f, err := ioutil.TempFile(baseDir, "isoeditor")
-	if err != nil {
-		return "", err
-	}
-	path := f.Name()
-
-	if err := os.Remove(path); err != nil {
-		return "", err
-	}
-
-	return path, nil
 }
 
 // Writing the offsets of initrd images in the end of system area (first 32KB).
