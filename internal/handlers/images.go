@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/carbonin/assisted-image-service/pkg/imagestore"
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"

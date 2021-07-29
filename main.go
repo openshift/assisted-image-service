@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/carbonin/assisted-image-service/internal/handlers"
-	"github.com/carbonin/assisted-image-service/pkg/imagestore"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/openshift/assisted-image-service/internal/handlers"
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
