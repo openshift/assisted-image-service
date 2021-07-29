@@ -1,4 +1,4 @@
-module github.com/carbonin/assisted-image-service
+module github.com/openshift/assisted-image-service
 
 go 1.16
 

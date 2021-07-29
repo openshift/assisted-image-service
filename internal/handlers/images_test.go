@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/carbonin/assisted-image-service/pkg/imagestore"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 )
 
 func TestHandlers(t *testing.T) {
