@@ -38,7 +38,6 @@ type ImageStore interface {
 }
 
 type Config struct {
-	DataDir  string `envconfig:"DATA_DIR"`
 	Versions string `envconfig:"RHCOS_VERSIONS"`
 }
 
@@ -46,6 +45,7 @@ type rhcosStore struct {
 	cfg       *Config
 	versions  map[string]map[string]string
 	isoEditor isoeditor.Editor
+	dataDir   string
 }
 
 const (
@@ -53,7 +53,7 @@ const (
 	ImageTypeMinimal = "minimal"
 )
 
-func NewImageStore(ed isoeditor.Editor) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
 	cfg := &Config{}
 	err := envconfig.Process("image-store", cfg)
 	if err != nil {
@@ -62,6 +62,7 @@ func NewImageStore(ed isoeditor.Editor) (ImageStore, error) {
 	is := rhcosStore{
 		cfg:       cfg,
 		isoEditor: ed,
+		dataDir:   dataDir,
 	}
 	if cfg.Versions == "" {
 		is.versions = DefaultVersions
@@ -170,7 +171,7 @@ func (s *rhcosStore) pathForVersion(version string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
 	}
-	return filepath.Join(s.cfg.DataDir, filepath.Base(url)), nil
+	return filepath.Join(s.dataDir, filepath.Base(url)), nil
 }
 
 func (s *rhcosStore) minimalPathForVersion(version string) (string, error) {
@@ -182,7 +183,7 @@ func (s *rhcosStore) minimalPathForVersion(version string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
 	}
-	return filepath.Join(s.cfg.DataDir, "minimal-"+filepath.Base(url)), nil
+	return filepath.Join(s.dataDir, "minimal-"+filepath.Base(url)), nil
 }
 
 func (s *rhcosStore) BaseFile(version, imageType string) (*os.File, error) {

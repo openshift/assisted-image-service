@@ -7,6 +7,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/internal/handlers"
+	"github.com/openshift/assisted-image-service/internal/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ var Options struct {
 	Port               string `envconfig:"PORT" default:"8080"`
 	HTTPSKeyFile       string `envconfig:"HTTPS_KEY_FILE"`
 	HTTPSCertFile      string `envconfig:"HTTPS_CERT_FILE"`
+	DataDir            string `envconfig:"DATA_DIR"`
 }
 
 func main() {
@@ -26,7 +28,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
-	is, err := imagestore.NewImageStore()
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
