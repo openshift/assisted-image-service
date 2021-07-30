@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/carbonin/assisted-image-service/internal/isoeditor"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/openshift/assisted-image-service/internal/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )

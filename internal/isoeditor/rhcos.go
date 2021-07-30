@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/carbonin/assisted-image-service/internal/isoutil"
+	"github.com/openshift/assisted-image-service/internal/isoutil"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )

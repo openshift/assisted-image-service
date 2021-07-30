@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/carbonin/assisted-image-service/internal/isoutil"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-image-service/internal/isoutil"
 )
 
 const (
