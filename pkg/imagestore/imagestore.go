@@ -43,8 +43,9 @@ type Config struct {
 }
 
 type rhcosStore struct {
-	cfg      *Config
-	versions map[string]map[string]string
+	cfg       *Config
+	versions  map[string]map[string]string
+	isoEditor isoeditor.Editor
 }
 
 const (
@@ -52,13 +53,16 @@ const (
 	ImageTypeMinimal = "minimal"
 )
 
-func NewImageStore() (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor) (ImageStore, error) {
 	cfg := &Config{}
 	err := envconfig.Process("image-store", cfg)
 	if err != nil {
 		return nil, err
 	}
-	is := rhcosStore{cfg: cfg}
+	is := rhcosStore{
+		cfg:       cfg,
+		isoEditor: ed,
+	}
 	if cfg.Versions == "" {
 		is.versions = DefaultVersions
 	} else {
@@ -125,23 +129,15 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 
 			if _, err = os.Stat(minimalPath); os.IsNotExist(err) {
 				log.Infof("Creating minimal iso for version %s", version)
-				ed, err := isoeditor.NewEditor(fullPath, s.cfg.DataDir)
-				if err != nil {
-					return fmt.Errorf("failed to creat editor for version %s: %v", version, err)
-				}
 
 				rootfsURL, err := s.rootfsURLForVersion(version)
 				if err != nil {
 					return err
 				}
 
-				tempPath, err := ed.CreateMinimalISOTemplate(rootfsURL)
+				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
 				if err != nil {
 					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
-				}
-
-				if err = os.Rename(tempPath, minimalPath); err != nil {
-					return fmt.Errorf("failed to move %s minimal template from %s to %s: %v", version, tempPath, minimalPath, err)
 				}
 				log.Infof("Finished creating minimal iso for version %s", version)
 			}
