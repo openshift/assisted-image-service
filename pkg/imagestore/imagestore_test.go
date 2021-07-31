@@ -13,7 +13,7 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/assisted-image-service/internal/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
 
 func TestImageStore(t *testing.T) {

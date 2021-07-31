@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/openshift/assisted-image-service/internal/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )

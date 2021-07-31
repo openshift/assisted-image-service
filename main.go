@@ -7,8 +7,8 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/internal/handlers"
-	"github.com/openshift/assisted-image-service/internal/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
