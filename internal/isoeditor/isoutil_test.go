@@ -5,17 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"testing"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestIsoUtil(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Iso Util")
-}
 
 var _ = Context("with test files", func() {
 	var (
@@ -24,8 +18,52 @@ var _ = Context("with test files", func() {
 		filesDir string
 		volumeID = "Assisted123"
 	)
+
+	createIsoViaGenisoimage := func(volumeID string) {
+		var err error
+		filesDir, err = ioutil.TempDir("", "isotest")
+		Expect(err).ToNot(HaveOccurred())
+
+		isoDir, err = ioutil.TempDir("", "isotest")
+		Expect(err).ToNot(HaveOccurred())
+		isoFile = filepath.Join(isoDir, "test.iso")
+
+		err = os.Mkdir(filepath.Join(filesDir, "files"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "files", "test"), []byte("testcontent\n"), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.Mkdir(filepath.Join(filesDir, "files", "testdir"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "files", "testdir", "stuff"), []byte("morecontent\n"), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.Mkdir(filepath.Join(filesDir, "boot_files"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.Mkdir(filepath.Join(filesDir, "boot_files", "images"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		// Create a file with some size to test load sector calculation
+		f, err := os.Create(filepath.Join(filesDir, "boot_files", "images", "efiboot.img"))
+		Expect(err).ToNot(HaveOccurred())
+		err = f.Truncate(8184422)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.Mkdir(filepath.Join(filesDir, "boot_files", "isolinux"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "boot.cat"), []byte(""), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "isolinux.bin"), []byte(""), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filepath.Join(filesDir, "files"))
+		err = cmd.Run()
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	validateFileContent := func(filename string, content string) {
+		fileContent, err := ioutil.ReadFile(filename)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(fileContent)).To(Equal(content))
+	}
+
 	BeforeEach(func() {
-		filesDir, isoDir, isoFile = createIsoViaGenisoimage(volumeID)
+		createIsoViaGenisoimage(volumeID)
 	})
 
 	AfterEach(func() {
@@ -135,47 +173,3 @@ var _ = Context("with test files", func() {
 		})
 	})
 })
-
-func createIsoViaGenisoimage(volumeID string) (string, string, string) {
-	filesDir, err := ioutil.TempDir("", "isotest")
-	Expect(err).ToNot(HaveOccurred())
-
-	isoDir, err := ioutil.TempDir("", "isotest")
-	Expect(err).ToNot(HaveOccurred())
-	isoFile := filepath.Join(isoDir, "test.iso")
-
-	err = os.Mkdir(filepath.Join(filesDir, "files"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "files", "test"), []byte("testcontent\n"), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.Mkdir(filepath.Join(filesDir, "files", "testdir"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "files", "testdir", "stuff"), []byte("morecontent\n"), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.Mkdir(filepath.Join(filesDir, "boot_files"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.Mkdir(filepath.Join(filesDir, "boot_files", "images"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	// Create a file with some size to test load sector calculation
-	f, err := os.Create(filepath.Join(filesDir, "boot_files", "images", "efiboot.img"))
-	Expect(err).ToNot(HaveOccurred())
-	err = f.Truncate(8184422)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.Mkdir(filepath.Join(filesDir, "boot_files", "isolinux"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "boot.cat"), []byte(""), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "isolinux.bin"), []byte(""), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filepath.Join(filesDir, "files"))
-	err = cmd.Run()
-	Expect(err).ToNot(HaveOccurred())
-
-	return filesDir, isoDir, isoFile
-}
-
-func validateFileContent(filename string, content string) {
-	fileContent, err := ioutil.ReadFile(filename)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(string(fileContent)).To(Equal(content))
-}

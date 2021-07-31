@@ -9,22 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/assisted-image-service/internal/isoutil"
 )
 
 const (
 	testRootFSURL         = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
 	ignitionPaddingLength = 256 * 1024 // 256KB
 )
-
-func TestIsoEditor(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "IsoEditor")
-}
 
 var _ = Context("with test files", func() {
 	var (
@@ -36,8 +29,66 @@ var _ = Context("with test files", func() {
 		volumeID       = "Assisted123"
 	)
 
+	createIsoViaGenisoimage := func(volumeID string) {
+		grubConfig := `
+menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {
+	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
+	initrd /images/pxeboot/initrd.img /images/ignition.img
+}
+	`
+		isoLinuxConfig := `
+label linux
+  menu label ^RHEL CoreOS (Live)
+  menu default
+  kernel /images/pxeboot/vmlinuz
+  append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
+	`
+
+		var err error
+		filesDir, err = ioutil.TempDir("", "isotest")
+		Expect(err).ToNot(HaveOccurred())
+
+		isoDir, err = ioutil.TempDir("", "isotest")
+		Expect(err).ToNot(HaveOccurred())
+		isoFile = filepath.Join(isoDir, "test.iso")
+
+		err = os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), []byte("this is rootfs"), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.MkdirAll(filepath.Join(filesDir, "EFI/redhat"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), []byte(grubConfig), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = os.MkdirAll(filepath.Join(filesDir, "isolinux"), 0755)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "isolinux/isolinux.cfg"), []byte(isoLinuxConfig), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "images/assisted_installer_custom.img"), make([]byte, RamDiskPaddingLength), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		err = ioutil.WriteFile(filepath.Join(filesDir, "images/ignition.img"), make([]byte, ignitionPaddingLength), 0600)
+		Expect(err).ToNot(HaveOccurred())
+		cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filesDir)
+		err = cmd.Run()
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	validateFileContainsLine := func(filename string, content string) {
+		fileContent, err := ioutil.ReadFile(filename)
+		Expect(err).NotTo(HaveOccurred())
+
+		found := false
+		for _, line := range strings.Split(string(fileContent), "\n") {
+			if line == content {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(BeTrue(), "Failed to find required string `%s` in file `%s`", content, filename)
+	}
+
 	BeforeSuite(func() {
-		filesDir, isoDir, isoFile = createIsoViaGenisoimage(volumeID)
+		createIsoViaGenisoimage(volumeID)
 	})
 
 	AfterSuite(func() {
@@ -122,14 +173,14 @@ var _ = Context("with test files", func() {
 			ramDiskOffsetInfo := getOffsetInfo(f, 32720)
 
 			// Validate ignitionOffsetInfo
-			ignitionOffset, err := isoutil.GetFileLocation(ignitionImagePath, minimalISOPath)
+			ignitionOffset, err := GetFileLocation(ignitionImagePath, minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(ignitionOffsetInfo.Key[:])).To(Equal(ignitionHeaderKey))
 			Expect(ignitionOffsetInfo.Offset).To(Equal(ignitionOffset))
 			Expect(ignitionOffsetInfo.Length).To(Equal(uint64(ignitionPaddingLength)))
 
 			// Validate ramDiskOffsetInfo
-			ramDiskOffset, err := isoutil.GetFileLocation(ramDiskImagePath, minimalISOPath)
+			ramDiskOffset, err := GetFileLocation(ramDiskImagePath, minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(ramDiskOffsetInfo.Key[:])).To(Equal(ramdiskHeaderKey))
 			Expect(ramDiskOffsetInfo.Offset).To(Equal(ramDiskOffset))
@@ -137,62 +188,3 @@ var _ = Context("with test files", func() {
 		})
 	})
 })
-
-func createIsoViaGenisoimage(volumeID string) (string, string, string) {
-	grubConfig := `
-menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {
-	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
-	initrd /images/pxeboot/initrd.img /images/ignition.img
-}
-`
-	isoLinuxConfig := `
-label linux
-  menu label ^RHEL CoreOS (Live)
-  menu default
-  kernel /images/pxeboot/vmlinuz
-  append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
-`
-
-	filesDir, err := ioutil.TempDir("", "isotest")
-	Expect(err).ToNot(HaveOccurred())
-
-	isoDir, err := ioutil.TempDir("", "isotest")
-	Expect(err).ToNot(HaveOccurred())
-	isoFile := filepath.Join(isoDir, "test.iso")
-
-	err = os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), []byte("this is rootfs"), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.MkdirAll(filepath.Join(filesDir, "EFI/redhat"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), []byte(grubConfig), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = os.MkdirAll(filepath.Join(filesDir, "isolinux"), 0755)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "isolinux/isolinux.cfg"), []byte(isoLinuxConfig), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "images/assisted_installer_custom.img"), make([]byte, RamDiskPaddingLength), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	err = ioutil.WriteFile(filepath.Join(filesDir, "images/ignition.img"), make([]byte, ignitionPaddingLength), 0600)
-	Expect(err).ToNot(HaveOccurred())
-	cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filesDir)
-	err = cmd.Run()
-	Expect(err).ToNot(HaveOccurred())
-
-	return filesDir, isoDir, isoFile
-}
-
-func validateFileContainsLine(filename string, content string) {
-	fileContent, err := ioutil.ReadFile(filename)
-	Expect(err).NotTo(HaveOccurred())
-
-	found := false
-	for _, line := range strings.Split(string(fileContent), "\n") {
-		if line == content {
-			found = true
-			break
-		}
-	}
-	Expect(found).To(BeTrue(), "Failed to find required string `%s` in file `%s`", content, filename)
-}

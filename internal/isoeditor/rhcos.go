@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/openshift/assisted-image-service/internal/isoutil"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,7 +48,7 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalIS
 		return err
 	}
 
-	if err = isoutil.Extract(fullISOPath, extractDir); err != nil {
+	if err = Extract(fullISOPath, extractDir); err != nil {
 		return err
 	}
 
@@ -67,12 +66,12 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalIS
 		return err
 	}
 
-	volumeID, err := isoutil.VolumeIdentifier(fullISOPath)
+	volumeID, err := VolumeIdentifier(fullISOPath)
 	if err != nil {
 		return err
 	}
 
-	if err = isoutil.Create(minimalISOPath, extractDir, volumeID); err != nil {
+	if err = Create(minimalISOPath, extractDir, volumeID); err != nil {
 		return err
 	}
 
@@ -107,22 +106,22 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func embedOffsetsInSystemArea(isoPath string) error {
-	ignitionOffset, err := isoutil.GetFileLocation(ignitionImagePath, isoPath)
+	ignitionOffset, err := GetFileLocation(ignitionImagePath, isoPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get ignition image offset")
 	}
 
-	ramDiskOffset, err := isoutil.GetFileLocation(ramDiskImagePath, isoPath)
+	ramDiskOffset, err := GetFileLocation(ramDiskImagePath, isoPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get ram disk image offset")
 	}
 
-	ignitionSize, err := isoutil.GetFileSize(ignitionImagePath, isoPath)
+	ignitionSize, err := GetFileSize(ignitionImagePath, isoPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get ignition image size")
 	}
 
-	ramDiskSize, err := isoutil.GetFileSize(ramDiskImagePath, isoPath)
+	ramDiskSize, err := GetFileSize(ramDiskImagePath, isoPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get ram disk image size")
 	}
