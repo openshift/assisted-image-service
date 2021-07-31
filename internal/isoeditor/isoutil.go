@@ -1,4 +1,4 @@
-package isoutil
+package isoeditor
 
 import (
 	"fmt"
