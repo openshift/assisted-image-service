@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,27 +33,37 @@ var DefaultVersions = map[string]map[string]string{
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
 type ImageStore interface {
 	Populate(ctx context.Context) error
-	BaseFile(version string) (*os.File, error)
+	BaseFile(version, imageType string) (*os.File, error)
 	HaveVersion(version string) bool
 }
 
 type Config struct {
-	DataDir  string `envconfig:"DATA_DIR"`
 	Versions string `envconfig:"RHCOS_VERSIONS"`
 }
 
 type rhcosStore struct {
-	cfg      *Config
-	versions map[string]map[string]string
+	cfg       *Config
+	versions  map[string]map[string]string
+	isoEditor isoeditor.Editor
+	dataDir   string
 }
 
-func NewImageStore() (ImageStore, error) {
+const (
+	ImageTypeFull    = "full"
+	ImageTypeMinimal = "minimal"
+)
+
+func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
 	cfg := &Config{}
 	err := envconfig.Process("image-store", cfg)
 	if err != nil {
 		return nil, err
 	}
-	is := rhcosStore{cfg: cfg}
+	is := rhcosStore{
+		cfg:       cfg,
+		isoEditor: ed,
+		dataDir:   dataDir,
+	}
 	if cfg.Versions == "" {
 		is.versions = DefaultVersions
 	} else {
@@ -64,52 +75,91 @@ func NewImageStore() (ImageStore, error) {
 	return &is, nil
 }
 
+func downloadURLToFile(url string, path string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("Request to %s returned error code %d", url, resp.StatusCode)
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	count, err := io.Copy(f, resp.Body)
+	if err != nil {
+		return err
+	} else if count != resp.ContentLength {
+		return fmt.Errorf("Wrote %d bytes, but expected to write %d", count, resp.ContentLength)
+	}
+
+	return nil
+}
+
 func (s *rhcosStore) Populate(ctx context.Context) error {
 	errs, _ := errgroup.WithContext(ctx)
 
 	for version := range s.versions {
 		version := version
 		errs.Go(func() error {
-			dest, err := s.pathForVersion(version)
+			fullPath, err := s.pathForVersion(version)
 			if err != nil {
 				return err
 			}
 
-			// bail out early if the file exists
-			if _, err = os.Stat(dest); !os.IsNotExist(err) {
-				return nil
+			if _, err = os.Stat(fullPath); os.IsNotExist(err) {
+				url := s.versions[version]["iso_url"]
+				log.Infof("Downloading iso from %s to %s", url, fullPath)
+				err = downloadURLToFile(url, fullPath)
+				if err != nil {
+					return fmt.Errorf("failed to download %s: %v", url, err)
+				}
+				log.Infof("Finished downloading for version %s", version)
 			}
 
-			url := s.versions[version]["iso_url"]
-			log.Infof("Downloading iso for version %s from %s to %s", version, url, dest)
-			resp, err := http.Get(url)
+			minimalPath, err := s.minimalPathForVersion(version)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 
-			if resp.StatusCode < 200 || resp.StatusCode > 299 {
-				return fmt.Errorf("Request to %s returned error code %d", url, resp.StatusCode)
+			if _, err = os.Stat(minimalPath); os.IsNotExist(err) {
+				log.Infof("Creating minimal iso for version %s", version)
+
+				rootfsURL, err := s.rootfsURLForVersion(version)
+				if err != nil {
+					return err
+				}
+
+				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
+				if err != nil {
+					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
+				}
+				log.Infof("Finished creating minimal iso for version %s", version)
 			}
 
-			f, err := os.Create(dest)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			count, err := io.Copy(f, resp.Body)
-			if err != nil {
-				return err
-			} else if count != resp.ContentLength {
-				return fmt.Errorf("Wrote %d bytes, but expected to write %d", count, resp.ContentLength)
-			}
-			log.Infof("Finished downloading for version %s", version)
 			return nil
 		})
 	}
 
 	return errs.Wait()
+}
+
+func (s *rhcosStore) rootfsURLForVersion(version string) (string, error) {
+	v, ok := s.versions[version]
+	if !ok {
+		return "", fmt.Errorf("missing version entry for %s", version)
+	}
+	url, ok := v["rootfs_url"]
+	if !ok {
+		return "", fmt.Errorf("version %s missing key 'rootfs_url'", version)
+	}
+	return url, nil
 }
 
 func (s *rhcosStore) pathForVersion(version string) (string, error) {
@@ -121,14 +171,39 @@ func (s *rhcosStore) pathForVersion(version string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
 	}
-	return filepath.Join(s.cfg.DataDir, filepath.Base(url)), nil
+	return filepath.Join(s.dataDir, filepath.Base(url)), nil
 }
 
-func (s *rhcosStore) BaseFile(version string) (*os.File, error) {
-	path, err := s.pathForVersion(version)
+func (s *rhcosStore) minimalPathForVersion(version string) (string, error) {
+	v, ok := s.versions[version]
+	if !ok {
+		return "", fmt.Errorf("missing version entry for %s", version)
+	}
+	url, ok := v["iso_url"]
+	if !ok {
+		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
+	}
+	return filepath.Join(s.dataDir, "minimal-"+filepath.Base(url)), nil
+}
+
+func (s *rhcosStore) BaseFile(version, imageType string) (*os.File, error) {
+	var (
+		path string
+		err  error
+	)
+
+	switch imageType {
+	case ImageTypeFull:
+		path, err = s.pathForVersion(version)
+	case ImageTypeMinimal:
+		path, err = s.minimalPathForVersion(version)
+	default:
+		err = fmt.Errorf("unsupported image type '%s'", imageType)
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return os.Open(path)
 }
 

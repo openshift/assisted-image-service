@@ -1,0 +1,235 @@
+package isoeditor
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+)
+
+const (
+	RamDiskPaddingLength = uint64(1024 * 1024) // 1MB
+	ignitionImagePath    = "/images/ignition.img"
+	ramDiskImagePath     = "/images/assisted_installer_custom.img"
+	ignitionHeaderKey    = "coreiso+"
+	ramdiskHeaderKey     = "ramdisk+"
+)
+
+type OffsetInfo struct {
+	Key    [8]byte
+	Offset uint64
+	Length uint64
+}
+
+//go:generate mockgen -package=isoeditor -destination=mock_editor.go -self_package=github.com/openshift/assisted-service/internal/isoeditor . Editor
+type Editor interface {
+	CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error
+}
+
+type rhcosEditor struct {
+	workDir string
+}
+
+func NewEditor(dataDir string) Editor {
+	return &rhcosEditor{workDir: dataDir}
+}
+
+// Creates the template minimal iso by removing the rootfs and adding the url
+func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error {
+	extractDir, err := os.MkdirTemp(e.workDir, "isoutil")
+	if err != nil {
+		return err
+	}
+
+	if err = Extract(fullISOPath, extractDir); err != nil {
+		return err
+	}
+
+	if err = os.Remove(filepath.Join(extractDir, "images/pxeboot/rootfs.img")); err != nil {
+		return err
+	}
+
+	if err = embedInitrdPlaceholders(extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to embed initrd placeholders")
+		return err
+	}
+
+	if err = fixTemplateConfigs(rootFSURL, extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to edit template configs")
+		return err
+	}
+
+	volumeID, err := VolumeIdentifier(fullISOPath)
+	if err != nil {
+		return err
+	}
+
+	if err = Create(minimalISOPath, extractDir, volumeID); err != nil {
+		return err
+	}
+
+	if err = embedOffsetsInSystemArea(minimalISOPath); err != nil {
+		log.WithError(err).Errorf("Failed to embed offsets in ISO system area")
+		return err
+	}
+
+	return nil
+}
+
+func embedInitrdPlaceholders(extractDir string) error {
+	f, err := os.Create(filepath.Join(extractDir, ramDiskImagePath))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if deferErr := f.Sync(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to sync disk image placeholder file")
+		}
+		if deferErr := f.Close(); deferErr != nil {
+			log.WithError(deferErr).Error("Failed to close disk image placeholder file")
+		}
+	}()
+
+	err = f.Truncate(int64(RamDiskPaddingLength))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func embedOffsetsInSystemArea(isoPath string) error {
+	ignitionOffset, err := GetFileLocation(ignitionImagePath, isoPath)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get ignition image offset")
+	}
+
+	ramDiskOffset, err := GetFileLocation(ramDiskImagePath, isoPath)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get ram disk image offset")
+	}
+
+	ignitionSize, err := GetFileSize(ignitionImagePath, isoPath)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get ignition image size")
+	}
+
+	ramDiskSize, err := GetFileSize(ramDiskImagePath, isoPath)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get ram disk image size")
+	}
+
+	var ignitionOffsetInfo OffsetInfo
+	copy(ignitionOffsetInfo.Key[:], ignitionHeaderKey)
+	ignitionOffsetInfo.Offset = ignitionOffset
+	ignitionOffsetInfo.Length = ignitionSize
+
+	var ramDiskOffsetInfo OffsetInfo
+	copy(ramDiskOffsetInfo.Key[:], ramdiskHeaderKey)
+	ramDiskOffsetInfo.Offset = ramDiskOffset
+	ramDiskOffsetInfo.Length = ramDiskSize
+
+	return writeHeader(&ignitionOffsetInfo, &ramDiskOffsetInfo, isoPath)
+}
+
+func fixTemplateConfigs(rootFSURL, extractDir string) error {
+	// Add the rootfs url
+	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
+		return err
+	}
+	replacement = fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
+		return err
+	}
+
+	// Remove the coreos.liveiso parameter
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+		return err
+	}
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+		return err
+	}
+
+	// Edit config to add custom ramdisk image to initrd
+	if err := editFile(filepath.Join(extractDir, "EFI/redhat/grub.cfg"), `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
+		return err
+	}
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func editFile(fileName string, reString string, replacement string) error {
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+
+	re := regexp.MustCompile(reString)
+	newContent := re.ReplaceAllString(string(content), replacement)
+
+	if err := ioutil.WriteFile(fileName, []byte(newContent), 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Writing the offsets of initrd images in the end of system area (first 32KB).
+// As the ISO template is generated by us, we know that this area should be empty.
+func writeHeader(ignitionOffsetInfo, ramDiskOffsetInfo *OffsetInfo, isoPath string) error {
+	iso, err := os.OpenFile(isoPath, os.O_WRONLY, 0o664)
+	if err != nil {
+		return err
+	}
+	defer iso.Close()
+
+	// Starting to write from the end of the system area in order to easily support
+	// additional offsets (and as done in coreos-assembler/src/cmd-buildextend-live)
+	headerEndOffset := int64(32768)
+
+	// Write ignition config
+	writtenBytesLength, err := writeOffsetInfo(headerEndOffset, ignitionOffsetInfo, iso)
+	if err != nil {
+		return err
+	}
+
+	// Write ram disk
+	_, err = writeOffsetInfo(headerEndOffset-writtenBytesLength, ramDiskOffsetInfo, iso)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeOffsetInfo(headerOffset int64, offsetInfo *OffsetInfo, iso *os.File) (int64, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, offsetInfo)
+	if err != nil {
+		return 0, err
+	}
+
+	bytesLength := int64(buf.Len())
+	headerOffset = headerOffset - bytesLength
+	_, err = iso.Seek(headerOffset, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
+	_, err = iso.Write(buf.Bytes())
+	if err != nil {
+		return 0, err
+	}
+
+	return bytesLength, nil
+}

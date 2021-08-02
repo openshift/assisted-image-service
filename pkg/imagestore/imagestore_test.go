@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
 
 func TestImageStore(t *testing.T) {
@@ -28,23 +30,11 @@ var _ = Context("with a data directory configured", func() {
 		var err error
 		dataDir, err = os.MkdirTemp("", "imageStoreTest")
 		Expect(err).NotTo(HaveOccurred())
-
-		Expect(os.Setenv("DATA_DIR", dataDir)).To(Succeed())
-	})
-
-	AfterEach(func() {
-		Expect(os.Unsetenv("DATA_DIR")).To(Succeed())
 	})
 
 	Describe("NewImageStore", func() {
-		It("initializes the data directory value", func() {
-			is, err := NewImageStore()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(is.(*rhcosStore).cfg.DataDir).To(Equal(dataDir))
-		})
-
 		It("uses the default versions", func() {
-			is, err := NewImageStore()
+			is, err := NewImageStore(nil, dataDir)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(is.(*rhcosStore).versions).To(Equal(DefaultVersions))
@@ -63,7 +53,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("initializes the versions value correctly", func() {
-				is, err := NewImageStore()
+				is, err := NewImageStore(nil, dataDir)
 				Expect(err).NotTo(HaveOccurred())
 
 				expected := map[string]map[string]string{
@@ -104,12 +94,23 @@ var _ = Context("with a data directory configured", func() {
 		})
 
 		Describe("Populate", func() {
+			var (
+				ctrl       *gomock.Controller
+				mockEditor *isoeditor.MockEditor
+			)
+			BeforeEach(func() {
+				ctrl = gomock.NewController(GinkgoT())
+				mockEditor = isoeditor.NewMockEditor(ctrl)
+			})
+
 			It("downloads an image correctly", func() {
 				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/some.iso")
 				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
 
-				is, err := NewImageStore()
+				is, err := NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "some.iso"))
@@ -121,8 +122,19 @@ var _ = Context("with a data directory configured", func() {
 				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/fail.iso")
 				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
 
-				is, err := NewImageStore()
+				is, err := NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
+				Expect(is.Populate(ctx)).NotTo(Succeed())
+			})
+
+			It("fails when minimal iso creation fails", func() {
+				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/some.iso")
+				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+				is, err := NewImageStore(mockEditor, dataDir)
+				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(fmt.Errorf("minimal iso creation failed"))
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 			})
 
@@ -130,38 +142,73 @@ var _ = Context("with a data directory configured", func() {
 				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/dontcallthis.iso")
 				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
 
-				is, err := NewImageStore()
+				is, err := NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(os.WriteFile(filepath.Join(dataDir, "dontcallthis.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+			})
+
+			It("doesn't create the minimal iso when it's already present", func() {
+				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/dontcallthis.iso")
+				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+				is, err := NewImageStore(mockEditor, dataDir)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.WriteFile(filepath.Join(dataDir, "dontcallthis.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "minimal-dontcallthis.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
+
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 		})
 
 		Describe("BaseFile", func() {
 			var (
-				is ImageStore
+				is         ImageStore
+				ctrl       *gomock.Controller
+				mockEditor *isoeditor.MockEditor
 			)
 
 			BeforeEach(func() {
 				versions := fmt.Sprintf(`{"4.8": {"iso_url": "%s", "rootfs_url": "http://example.com/image/48.img"}}`, ts.URL+"/some.iso")
 				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+				ctrl = gomock.NewController(GinkgoT())
+				mockEditor = isoeditor.NewMockEditor(ctrl)
 
 				var err error
-				is, err = NewImageStore()
+				is, err = NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
+				Expect(os.WriteFile(filepath.Join(dataDir, "minimal-some.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
+
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
-			It("returns the correct file", func() {
-				f, err := is.BaseFile("4.8")
+			It("returns the correct file for full iso", func() {
+				f, err := is.BaseFile("4.8", ImageTypeFull)
 				Expect(err).NotTo(HaveOccurred())
 				content, err := io.ReadAll(f)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("someisocontenthere"))
 			})
 
+			It("returns the correct file for minimal iso", func() {
+				f, err := is.BaseFile("4.8", ImageTypeMinimal)
+				Expect(err).NotTo(HaveOccurred())
+				content, err := io.ReadAll(f)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("minimalisocontent"))
+			})
+
 			It("fails for a missing version", func() {
-				_, err := is.BaseFile("3.2")
+				_, err := is.BaseFile("3.2", ImageTypeFull)
+				Expect(err).To(HaveOccurred())
+			})
+
+			It("fails for an unsupported image type", func() {
+				_, err := is.BaseFile("4.8", "something")
 				Expect(err).To(HaveOccurred())
 			})
 		})

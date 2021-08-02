@@ -56,6 +56,7 @@ Downloads the RHCOS image for the specified image ID.
 #### Query paraeters
 
 `version`: indicates the version of the RHCOS base image to use (must match a key in `RHCOS_VERSIONS`)
+`type`: `full` to download the ISO including the rootfs, `minimal` to download the iso without the rootfs
 
 ### `GET /health`
 
