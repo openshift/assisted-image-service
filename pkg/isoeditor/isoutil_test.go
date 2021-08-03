@@ -3,7 +3,6 @@ package isoeditor
 import (
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	diskfs "github.com/diskfs/go-diskfs"
@@ -13,48 +12,10 @@ import (
 
 var _ = Context("with test files", func() {
 	var (
-		isoDir   string
 		isoFile  string
 		filesDir string
 		volumeID = "Assisted123"
 	)
-
-	createIsoViaGenisoimage := func(volumeID string) {
-		var err error
-		filesDir, err = ioutil.TempDir("", "isotest")
-		Expect(err).ToNot(HaveOccurred())
-
-		isoDir, err = ioutil.TempDir("", "isotest")
-		Expect(err).ToNot(HaveOccurred())
-		isoFile = filepath.Join(isoDir, "test.iso")
-
-		err = os.Mkdir(filepath.Join(filesDir, "files"), 0755)
-		Expect(err).ToNot(HaveOccurred())
-		err = ioutil.WriteFile(filepath.Join(filesDir, "files", "test"), []byte("testcontent\n"), 0600)
-		Expect(err).ToNot(HaveOccurred())
-		err = os.Mkdir(filepath.Join(filesDir, "files", "testdir"), 0755)
-		Expect(err).ToNot(HaveOccurred())
-		err = ioutil.WriteFile(filepath.Join(filesDir, "files", "testdir", "stuff"), []byte("morecontent\n"), 0600)
-		Expect(err).ToNot(HaveOccurred())
-		err = os.Mkdir(filepath.Join(filesDir, "boot_files"), 0755)
-		Expect(err).ToNot(HaveOccurred())
-		err = os.Mkdir(filepath.Join(filesDir, "boot_files", "images"), 0755)
-		Expect(err).ToNot(HaveOccurred())
-		// Create a file with some size to test load sector calculation
-		f, err := os.Create(filepath.Join(filesDir, "boot_files", "images", "efiboot.img"))
-		Expect(err).ToNot(HaveOccurred())
-		err = f.Truncate(8184422)
-		Expect(err).ToNot(HaveOccurred())
-		err = os.Mkdir(filepath.Join(filesDir, "boot_files", "isolinux"), 0755)
-		Expect(err).ToNot(HaveOccurred())
-		err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "boot.cat"), []byte(""), 0600)
-		Expect(err).ToNot(HaveOccurred())
-		err = ioutil.WriteFile(filepath.Join(filesDir, "boot_files", "isolinux", "isolinux.bin"), []byte(""), 0600)
-		Expect(err).ToNot(HaveOccurred())
-		cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filepath.Join(filesDir, "files"))
-		err = cmd.Run()
-		Expect(err).ToNot(HaveOccurred())
-	}
 
 	validateFileContent := func(filename string, content string) {
 		fileContent, err := ioutil.ReadFile(filename)
@@ -63,12 +24,12 @@ var _ = Context("with test files", func() {
 	}
 
 	BeforeEach(func() {
-		createIsoViaGenisoimage(volumeID)
+		filesDir, isoFile = createTestFiles(volumeID)
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(filesDir)
-		os.RemoveAll(isoDir)
+		Expect(os.RemoveAll(filesDir)).To(Succeed())
+		Expect(os.Remove(isoFile)).To(Succeed())
 	})
 
 	Describe("Extract", func() {
@@ -79,8 +40,10 @@ var _ = Context("with test files", func() {
 
 			Expect(Extract(isoFile, dir)).To(Succeed())
 
-			validateFileContent(filepath.Join(dir, "test"), "testcontent\n")
-			validateFileContent(filepath.Join(dir, "testdir/stuff"), "morecontent\n")
+			validateFileContent(filepath.Join(dir, "images/pxeboot/rootfs.img"), "this is rootfs")
+			validateFileContent(filepath.Join(dir, "EFI/redhat/grub.cfg"), testGrubConfig)
+			validateFileContent(filepath.Join(dir, "isolinux/isolinux.cfg"), testISOLinuxConfig)
+			validateFileContent(filepath.Join(dir, "isolinux/boot.cat"), "")
 		})
 	})
 
@@ -91,34 +54,34 @@ var _ = Context("with test files", func() {
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")
 
-			Expect(Create(isoPath, filepath.Join(filesDir, "files"), "my-vol")).To(Succeed())
+			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
 
 			d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
 			Expect(err).ToNot(HaveOccurred())
 			fs, err := d.GetFilesystem(0)
 			Expect(err).ToNot(HaveOccurred())
 
-			f, err := fs.OpenFile("/test", os.O_RDONLY)
+			f, err := fs.OpenFile("/images/pxeboot/rootfs.img", os.O_RDONLY)
 			Expect(err).ToNot(HaveOccurred())
 			content, err := ioutil.ReadAll(f)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(content)).To(Equal("testcontent\n"))
+			Expect(string(content)).To(Equal("this is rootfs"))
 
-			f, err = fs.OpenFile("/testdir/stuff", os.O_RDONLY)
+			f, err = fs.OpenFile("/isolinux/boot.cat", os.O_RDONLY)
 			Expect(err).ToNot(HaveOccurred())
 			content, err = ioutil.ReadAll(f)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(content)).To(Equal("morecontent\n"))
+			Expect(string(content)).To(Equal(""))
 		})
 	})
 
 	Describe("fileExists", func() {
 		It("returns true when file exists", func() {
-			exists, err := fileExists(filepath.Join(filesDir, "files/test"))
+			exists, err := fileExists(filepath.Join(filesDir, "images/ignition.img"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeTrue())
 
-			exists, err = fileExists(filepath.Join(filesDir, "files/testdir/stuff"))
+			exists, err = fileExists(filepath.Join(filesDir, "images/efiboot.img"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(exists).To(BeTrue())
 		})
@@ -136,16 +99,23 @@ var _ = Context("with test files", func() {
 
 	Describe("haveBootFiles", func() {
 		It("returns true when boot files are present", func() {
-			p, err := filepath.Abs(filepath.Join(filesDir, "boot_files"))
+			bootFilesDir, err := os.MkdirTemp("", "bootfiles")
 			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(bootFilesDir)
 
-			haveBootFiles, err := haveBootFiles(p)
+			Expect(os.Mkdir(filepath.Join(bootFilesDir, "isolinux"), 0755)).To(Succeed())
+			Expect(os.Mkdir(filepath.Join(bootFilesDir, "images"), 0755)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(bootFilesDir, "isolinux/boot.cat"), []byte("boot.cat"), 0600)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(bootFilesDir, "isolinux/isolinux.bin"), []byte("isolinux.bin"), 0600)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(bootFilesDir, "images/efiboot.img"), []byte("efiboot.img"), 0600)).To(Succeed())
+
+			haveBootFiles, err := haveBootFiles(bootFilesDir)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(haveBootFiles).To(BeTrue())
 		})
 
 		It("returns false when boot files are not present", func() {
-			p, err := filepath.Abs(filepath.Join(filesDir, "files"))
+			p, err := filepath.Abs(filepath.Join(filesDir, "images"))
 			Expect(err).ToNot(HaveOccurred())
 
 			haveBootFiles, err := haveBootFiles(p)
@@ -164,10 +134,7 @@ var _ = Context("with test files", func() {
 
 	Describe("efiLoadSectors", func() {
 		It("returns the correct value", func() {
-			p, err := filepath.Abs(filepath.Join(filesDir, "boot_files"))
-			Expect(err).ToNot(HaveOccurred())
-
-			sectors, err := efiLoadSectors(p)
+			sectors, err := efiLoadSectors(filesDir)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sectors).To(Equal(uint16(3997)))
 		})
