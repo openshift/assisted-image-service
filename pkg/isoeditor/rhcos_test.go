@@ -1,8 +1,6 @@
 package isoeditor
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -14,8 +12,7 @@ import (
 )
 
 const (
-	testRootFSURL         = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
-	ignitionPaddingLength = 256 * 1024 // 256KB
+	testRootFSURL = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
 )
 
 var _ = Context("with test files", func() {
@@ -59,10 +56,8 @@ var _ = Context("with test files", func() {
 	Describe("CreateMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir)
-			err := embedOffsetsInSystemArea(isoFile)
-			Expect(err).ToNot(HaveOccurred())
 
-			err = editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -89,50 +84,6 @@ var _ = Context("with test files", func() {
 			newLine = "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
 			isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
 			validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
-		})
-	})
-
-	Describe("embedOffsetsInSystemArea", func() {
-		getOffsetInfo := func(f *os.File, loc int64) *OffsetInfo {
-			meta := make([]byte, 24)
-			count, err := f.ReadAt(meta, loc)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(count).To(Equal(24))
-
-			buf := bytes.NewReader(meta)
-			info := new(OffsetInfo)
-			err = binary.Read(buf, binary.LittleEndian, info)
-			Expect(err).ToNot(HaveOccurred())
-
-			return info
-		}
-
-		It("embeds offsets in system area correctly", func() {
-			editor := NewEditor(workDir)
-
-			// Create template
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, minimalISOPath)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Read offsets
-			f, err := os.OpenFile(minimalISOPath, os.O_RDONLY, 0o664)
-			Expect(err).ToNot(HaveOccurred())
-			ignitionOffsetInfo := getOffsetInfo(f, 32744)
-			ramDiskOffsetInfo := getOffsetInfo(f, 32720)
-
-			// Validate ignitionOffsetInfo
-			ignitionOffset, err := GetFileLocation(ignitionImagePath, minimalISOPath)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(string(ignitionOffsetInfo.Key[:])).To(Equal(ignitionHeaderKey))
-			Expect(ignitionOffsetInfo.Offset).To(Equal(ignitionOffset))
-			Expect(ignitionOffsetInfo.Length).To(Equal(uint64(ignitionPaddingLength)))
-
-			// Validate ramDiskOffsetInfo
-			ramDiskOffset, err := GetFileLocation(ramDiskImagePath, minimalISOPath)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(string(ramDiskOffsetInfo.Key[:])).To(Equal(ramdiskHeaderKey))
-			Expect(ramDiskOffsetInfo.Offset).To(Equal(ramDiskOffset))
-			Expect(ramDiskOffsetInfo.Length).To(Equal(RamDiskPaddingLength))
 		})
 	})
 })

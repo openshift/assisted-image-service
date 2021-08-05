@@ -30,6 +30,8 @@ label linux
   append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
 `
 
+const ignitionPaddingLength = 256 * 1024 // 256KB
+
 func createTestFiles(volumeID string) (string, string) {
 	filesDir, err := os.MkdirTemp("", "isotest")
 	Expect(err).ToNot(HaveOccurred())
