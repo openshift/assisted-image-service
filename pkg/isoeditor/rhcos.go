@@ -15,7 +15,7 @@ const (
 	ramDiskImagePath     = "/images/assisted_installer_custom.img"
 )
 
-//go:generate mockgen -package=isoeditor -destination=mock_editor.go -self_package=github.com/openshift/assisted-service/internal/isoeditor . Editor
+//go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
 	CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error
 }
