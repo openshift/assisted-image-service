@@ -1,10 +1,10 @@
 package isoeditor
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 	"github.com/pkg/errors"
@@ -12,15 +12,15 @@ import (
 
 const ignitionImagePath = "/images/ignition.img"
 
-type StreamGeneratorFunc func(isoPath string, ignitionContent string) (io.ReadSeeker, error)
+type StreamGeneratorFunc func(isoPath string, ignitionContent []byte) (io.ReadSeeker, error)
 
-func NewRHCOSStreamReader(isoPath string, ignitionContent string) (io.ReadSeeker, error) {
+func NewRHCOSStreamReader(isoPath string, ignitionContent []byte) (io.ReadSeeker, error) {
 	areaStart, areaLength, err := GetISOFileInfo(ignitionImagePath, isoPath)
 	if err != nil {
 		return nil, err
 	}
 
-	ignitionReader := strings.NewReader(ignitionContent)
+	ignitionReader := bytes.NewReader(ignitionContent)
 	if areaLength < ignitionReader.Size() {
 		return nil, errors.New(fmt.Sprintf("ignition length (%d) exceeds embed area size (%d)", ignitionReader.Size(), areaLength))
 	}

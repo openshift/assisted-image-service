@@ -1,9 +1,9 @@
 package isoeditor
 
 import (
+	"bytes"
 	"io"
 	"os"
-	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	. "github.com/onsi/ginkgo"
@@ -25,7 +25,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(os.Remove(isoFile)).To(Succeed())
 	})
 
-	isoFileContent := func(isoPath, filePath string) string {
+	isoFileContent := func(isoPath, filePath string) []byte {
 		d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -38,11 +38,11 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Embedded files will always have trailing nulls
-		return strings.TrimRight(string(contentBytes), "\x00")
+		return bytes.TrimRight(contentBytes, "\x00")
 	}
 
 	It("embeds the ignition", func() {
-		ignitionContent := "someignitioncontent"
+		ignitionContent := []byte("someignitioncontent")
 		streamReader, err := NewRHCOSStreamReader(isoFile, ignitionContent)
 		Expect(err).NotTo(HaveOccurred())
 

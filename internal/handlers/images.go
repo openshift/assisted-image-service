@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,8 +10,10 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/cavaliercoder/go-cpio"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
@@ -123,23 +127,58 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ImageHandler) imageStreamForID(imageID string, baseISOPath string) (io.ReadSeeker, error) {
-	var ignitionBytes []byte
-	if h.AssistedServiceHost != "" {
-		// get ignition content
-		u := url.URL{
-			Scheme:   h.AssistedServiceScheme,
-			Host:     h.AssistedServiceHost,
-			Path:     fmt.Sprintf("v1/clusters/%s/downloads/files", imageID),
-			RawQuery: "file_name=discovery.ign",
-		}
-		resp, err := http.Get(u.String())
-		if err != nil || resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("ignition request to %s returned status %d: %v", u.String(), resp.StatusCode, err)
-		}
-		ignitionBytes, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %v", err)
-		}
+	ignition, err := h.ignitionContent(imageID)
+	if err != nil {
+		return nil, err
 	}
-	return h.GenerateImageStream(baseISOPath, string(ignitionBytes))
+	return h.GenerateImageStream(baseISOPath, ignition)
+}
+
+func (h *ImageHandler) ignitionContent(imageID string) ([]byte, error) {
+	var ignitionBytes []byte
+	if h.AssistedServiceHost == "" {
+		return nil, nil
+	}
+
+	// get ignition content
+	u := url.URL{
+		Scheme:   h.AssistedServiceScheme,
+		Host:     h.AssistedServiceHost,
+		Path:     fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID),
+		RawQuery: "file_name=discovery.ign",
+	}
+	resp, err := http.Get(u.String())
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ignition request to %s returned status %d: %v", u.String(), resp.StatusCode, err)
+	}
+	ignitionBytes, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	// Create CPIO archive
+	archiveBuffer := new(bytes.Buffer)
+	cpioWriter := cpio.NewWriter(archiveBuffer)
+	if err := cpioWriter.WriteHeader(&cpio.Header{Name: "config.ign", Mode: 0o100_644, Size: int64(len(ignitionBytes))}); err != nil {
+		return nil, errors.Wrap(err, "Failed to write CPIO header")
+	}
+	if _, err := cpioWriter.Write(ignitionBytes); err != nil {
+
+		return nil, errors.Wrap(err, "Failed to write CPIO archive")
+	}
+	if err := cpioWriter.Close(); err != nil {
+		return nil, errors.Wrap(err, "Failed to close CPIO archive")
+	}
+
+	// Run gzip compression
+	compressedBuffer := new(bytes.Buffer)
+	gzipWriter := gzip.NewWriter(compressedBuffer)
+	if _, err := gzipWriter.Write(archiveBuffer.Bytes()); err != nil {
+		return nil, errors.Wrap(err, "Failed to gzip archive")
+	}
+	if err := gzipWriter.Close(); err != nil {
+		return nil, errors.Wrap(err, "Failed to gzip archive")
+	}
+
+	return compressedBuffer.Bytes(), nil
 }
