@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -112,5 +113,26 @@ var _ = Describe("ServeHTTP", func() {
 		resp, err := client.Get(server.URL + "/images/")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+	})
+})
+
+var _ = Describe("parseImageID", func() {
+	var imageID = "87bfb5e4-884b-4c00-a38a-f90f8b71effe"
+	It("returns the correct ID", func() {
+		path := filepath.Join("/images", imageID)
+		id, err := parseImageID(path)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(id).To(Equal(imageID))
+	})
+
+	It("fails with the wrong path", func() {
+		path := filepath.Join("/wat/images", imageID)
+		_, err := parseImageID(path)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails with no id", func() {
+		_, err := parseImageID("/images/")
+		Expect(err).To(HaveOccurred())
 	})
 })

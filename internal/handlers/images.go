@@ -18,14 +18,14 @@ type ImageHandler struct {
 
 var _ http.Handler = &ImageHandler{}
 
-var clusterRegexp = regexp.MustCompile(`/images/.+`)
+var clusterRegexp = regexp.MustCompile(`^/images/(.+)`)
 
-func parseClusterID(path string) (string, error) {
-	found := clusterRegexp.FindString(path)
-	if found == "" {
+func parseImageID(path string) (string, error) {
+	match := clusterRegexp.FindStringSubmatch(path)
+	if match == nil {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
-	return found, nil
+	return match[1], nil
 }
 
 func NewImageHandler(is imagestore.ImageStore) http.Handler {
@@ -42,7 +42,7 @@ func NewImageHandler(is imagestore.ImageStore) http.Handler {
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	clusterID, err := parseClusterID(r.URL.Path)
+	clusterID, err := parseImageID(r.URL.Path)
 	if err != nil {
 		log.Errorf("failed to parse cluster ID: %v\n", err)
 		http.NotFound(w, r)
