@@ -3,7 +3,6 @@ package imagestore
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -189,7 +188,7 @@ var _ = Context("with a data directory configured", func() {
 			It("returns the correct file for full iso", func() {
 				f, err := is.BaseFile("4.8", ImageTypeFull)
 				Expect(err).NotTo(HaveOccurred())
-				content, err := io.ReadAll(f)
+				content, err := os.ReadFile(f)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("someisocontenthere"))
 			})
@@ -197,7 +196,7 @@ var _ = Context("with a data directory configured", func() {
 			It("returns the correct file for minimal iso", func() {
 				f, err := is.BaseFile("4.8", ImageTypeMinimal)
 				Expect(err).NotTo(HaveOccurred())
-				content, err := io.ReadAll(f)
+				content, err := os.ReadFile(f)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("minimalisocontent"))
 			})
