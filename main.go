@@ -14,11 +14,12 @@ import (
 )
 
 var Options struct {
-	AssistedServiceURL string `envconfig:"ASSISTED_SERVICE_URL" default:"http://assisted-service:8080"`
-	Port               string `envconfig:"PORT" default:"8080"`
-	HTTPSKeyFile       string `envconfig:"HTTPS_KEY_FILE"`
-	HTTPSCertFile      string `envconfig:"HTTPS_CERT_FILE"`
-	DataDir            string `envconfig:"DATA_DIR"`
+	AssistedServiceScheme string `envconfig:"ASSISTED_SERVICE_SCHEME"`
+	AssistedServiceHost   string `envconfig:"ASSISTED_SERVICE_HOST"`
+	Port                  string `envconfig:"PORT" default:"8080"`
+	HTTPSKeyFile          string `envconfig:"HTTPS_KEY_FILE"`
+	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
+	DataDir               string `envconfig:"DATA_DIR"`
 }
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", handlers.NewImageHandler(is))
+	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost))
 	http.Handle("/health", handlers.NewHealthHandler())
 	http.Handle("/metrics", promhttp.Handler())
 

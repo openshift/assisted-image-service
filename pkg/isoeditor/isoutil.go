@@ -205,39 +205,23 @@ func VolumeIdentifier(isoPath string) (string, error) {
 	return strings.TrimSpace(string(volumeId)), nil
 }
 
-func GetFileLocation(filePath, isoPath string) (uint64, error) {
-	myFile, err := GetFile(filePath, isoPath)
-	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to fetch ISO file %s", filePath)
-	}
-	defaultSectorSize := uint64(2 * 1024)
-	offset := uint64(myFile.Location()) * defaultSectorSize
-	return offset, nil
-}
-
-func GetFileSize(filePath, isoPath string) (uint64, error) {
-	myFile, err := GetFile(filePath, isoPath)
-	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to fetch ISO file %s", filePath)
-	}
-	return uint64(myFile.Size()), nil
-}
-
-func GetFile(filePath, isoPath string) (*iso9660.File, error) {
+func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
 	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
 	if err != nil {
-		return nil, err
+		return 0, 0, err
 	}
 
 	fs, err := d.GetFilesystem(0)
 	if err != nil {
-		return nil, err
+		return 0, 0, err
 	}
 
-	isoFile, err := fs.OpenFile(filePath, os.O_RDONLY)
+	fsFile, err := fs.OpenFile(filePath, os.O_RDONLY)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to open file %s", filePath)
+		return 0, 0, errors.Wrapf(err, "Failed to open file %s", filePath)
 	}
 
-	return isoFile.(*iso9660.File), nil
+	isoFile := fsFile.(*iso9660.File)
+	defaultSectorSize := uint32(2 * 1024)
+	return int64(isoFile.Location() * defaultSectorSize), isoFile.Size(), nil
 }

@@ -3,6 +3,7 @@ module github.com/openshift/assisted-image-service
 go 1.16
 
 require (
+	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
 	github.com/diskfs/go-diskfs v1.2.0
 	github.com/frankban/quicktest v1.13.0 // indirect
 	github.com/golang/mock v1.6.0

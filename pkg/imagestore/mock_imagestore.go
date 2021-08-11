@@ -6,7 +6,6 @@ package imagestore
 
 import (
 	context "context"
-	os "os"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -36,10 +35,10 @@ func (m *MockImageStore) EXPECT() *MockImageStoreMockRecorder {
 }
 
 // BaseFile mocks base method.
-func (m *MockImageStore) BaseFile(arg0, arg1 string) (*os.File, error) {
+func (m *MockImageStore) BaseFile(arg0, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BaseFile", arg0, arg1)
-	ret0, _ := ret[0].(*os.File)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
