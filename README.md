@@ -27,7 +27,11 @@ skipper make test
 - `PORT` - Service listen port
 - `HTTPS_KEY_FILE` - tls key file path
 - `HTTPS_CERT_FILE` - tls cert file path
-- `ASSISTED_SERVICE_URL` - URL to use to query assisted service for image information
+- `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
+- `ASSISTED_SERVICE_HOST` - host to use to query assisted service for image information
+- `REQUEST_AUTH_TYPE` - determines how the auth token should be passed to the assisted service - either `header` or `param`
+  - For `header` a header of the form `Authorization: Bearer <token>` is used
+  - For `param` an `api_key=<token>` query parameter is added to the URL
 
 Example `RHCOS_VERSIONS`:
 ```json
@@ -57,6 +61,7 @@ Downloads the RHCOS image for the specified image ID.
 
 `version`: indicates the version of the RHCOS base image to use (must match a key in `RHCOS_VERSIONS`)
 `type`: `full` to download the ISO including the rootfs, `minimal` to download the iso without the rootfs
+`api_key`: the api token to pass through to the assisted service calls if authentication is required
 
 ### `GET /health`
 
