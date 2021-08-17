@@ -1,6 +1,6 @@
 IMAGE := $(or ${IMAGE}, quay.io/ocpmetal/assisted-image-service:latest)
 PWD = $(shell pwd)
-PORT := $(or ${PORT}, 8080)
+LISTEN_PORT := $(or ${LISTEN_PORT}, 8080)
 
 build:
 	podman build -f Dockerfile.image-service . -t $(IMAGE)
@@ -24,8 +24,8 @@ format:
 run: certs
 	podman run --rm \
 		-v $(PWD)/data:/data:Z -v $(PWD)/certs:/certs:Z \
-		-p$(PORT):$(PORT) \
-		-e PORT=$(PORT) \
+		-p$(LISTEN_PORT):$(LISTEN_PORT) \
+		-e LISTEN_PORT=$(LISTEN_PORT) \
 		-e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt \
 		-e ASSISTED_SERVICE_SCHEME=${ASSISTED_SERVICE_SCHEME} -e ASSISTED_SERVICE_HOST=${ASSISTED_SERVICE_HOST} \
 		-e REQUEST_AUTH_TYPE=${REQUEST_AUTH_TYPE} \
