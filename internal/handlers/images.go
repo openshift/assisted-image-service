@@ -20,11 +20,17 @@ import (
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 )
 
+const (
+	RequestAuthTypeHeader = "header"
+	RequestAuthTypeParam  = "param"
+)
+
 type ImageHandler struct {
 	ImageStore            imagestore.ImageStore
 	AssistedServiceScheme string
 	AssistedServiceHost   string
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
+	RequestAuthType       string
 }
 
 var _ http.Handler = &ImageHandler{}
@@ -39,7 +45,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost string) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType string) http.Handler {
 	metricsConfig := metrics.Config{
 		Prefix:          "assisted_image_service",
 		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
@@ -54,6 +60,7 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedSe
 		AssistedServiceScheme: assistedServiceScheme,
 		AssistedServiceHost:   assistedServiceHost,
 		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
+		RequestAuthType:       requestAuthType,
 	}
 
 	return stdmiddleware.Handler("/images/:imageID", mdw, h)
@@ -67,39 +74,10 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := r.URL.Query()
-
-	version := params.Get("version")
-	if version == "" {
+	version, imageType, apiKey, err := h.parseQueryParams(r.URL.Query())
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_, err = w.Write([]byte("'version' parameter required"))
-		if err != nil {
-			log.Errorf("Failed to write response: %v\n", err)
-		}
-		return
-	}
-
-	if !h.ImageStore.HaveVersion(version) {
-		w.WriteHeader(http.StatusBadRequest)
-		message := fmt.Sprintf("version %s not found", version)
-		_, err = w.Write([]byte(message))
-		if err != nil {
-			log.Errorf("Failed to write response: %v\n", err)
-		}
-		return
-	}
-
-	imageType := params.Get("type")
-	if imageType == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		_, err = w.Write([]byte("'type' parameter required"))
-		if err != nil {
-			log.Errorf("Failed to write response: %v\n", err)
-		}
-		return
-	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
-		w.WriteHeader(http.StatusBadRequest)
-		_, err = w.Write([]byte("invalid value for parameter 'type'"))
+		_, err = w.Write([]byte(err.Error()))
 		if err != nil {
 			log.Errorf("Failed to write response: %v\n", err)
 		}
@@ -113,7 +91,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isoReader, err := h.imageStreamForID(clusterID, f)
+	isoReader, err := h.imageStreamForID(clusterID, f, apiKey)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -126,32 +104,79 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, fileName, time.Now(), isoReader)
 }
 
-func (h *ImageHandler) imageStreamForID(imageID string, baseISOPath string) (io.ReadSeeker, error) {
-	ignition, err := h.ignitionContent(imageID)
+func (h *ImageHandler) parseQueryParams(values url.Values) (string, string, string, error) {
+	version := values.Get("version")
+	if version == "" {
+		return "", "", "", fmt.Errorf("'version' parameter required")
+	}
+
+	if !h.ImageStore.HaveVersion(version) {
+		return "", "", "", fmt.Errorf("version %s not found", version)
+	}
+
+	imageType := values.Get("type")
+	if imageType == "" {
+		return "", "", "", fmt.Errorf("'type' parameter required")
+	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
+		return "", "", "", fmt.Errorf("invalid value '%s' for parameter 'type'", imageType)
+	}
+
+	apiKey := values.Get("api_key")
+
+	return version, imageType, apiKey, nil
+}
+
+func (h *ImageHandler) imageStreamForID(imageID string, baseISOPath string, apiKey string) (io.ReadSeeker, error) {
+	ignition, err := h.ignitionContent(imageID, apiKey)
 	if err != nil {
 		return nil, err
 	}
 	return h.GenerateImageStream(baseISOPath, ignition)
 }
 
-func (h *ImageHandler) ignitionContent(imageID string) ([]byte, error) {
-	var ignitionBytes []byte
+func (h *ImageHandler) setRequestAuth(req *http.Request, apiKey string) error {
+	switch h.RequestAuthType {
+	case RequestAuthTypeParam:
+		params := req.URL.Query()
+		params.Set("api_key", apiKey)
+		req.URL.RawQuery = params.Encode()
+	case RequestAuthTypeHeader:
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	case "":
+	default:
+		return fmt.Errorf("invalid request auth type '%s'", h.RequestAuthType)
+	}
+	return nil
+}
+
+func (h *ImageHandler) ignitionContent(imageID string, apiKey string) ([]byte, error) {
 	if h.AssistedServiceHost == "" {
 		return nil, nil
 	}
 
-	// get ignition content
 	u := url.URL{
-		Scheme:   h.AssistedServiceScheme,
-		Host:     h.AssistedServiceHost,
-		Path:     fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID),
-		RawQuery: "file_name=discovery.ign",
+		Scheme: h.AssistedServiceScheme,
+		Host:   h.AssistedServiceHost,
+		Path:   fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID),
 	}
-	resp, err := http.Get(u.String())
+	queryValues := url.Values{}
+	queryValues.Set("file_name", "discovery.ign")
+	u.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	err = h.setRequestAuth(req, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ignition request to %s returned status %d: %v", u.String(), resp.StatusCode, err)
+		return nil, fmt.Errorf("ignition request to %s returned status %d: %v", req.URL.String(), resp.StatusCode, err)
 	}
-	ignitionBytes, err = io.ReadAll(resp.Body)
+	ignitionBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}

@@ -22,7 +22,14 @@ format:
 	@goimports -w -l main.go internal pkg || /bin/true
 
 run: certs
-	podman run --rm -v $(PWD)/data:/data:Z -v $(PWD)/certs:/certs:Z -p$(PORT):$(PORT) -e PORT=$(PORT) -e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt -e ASSISTED_SERVICE_SCHEME=${ASSISTED_SERVICE_SCHEME} -e ASSISTED_SERVICE_HOST=${ASSISTED_SERVICE_HOST} $(IMAGE)
+	podman run --rm \
+		-v $(PWD)/data:/data:Z -v $(PWD)/certs:/certs:Z \
+		-p$(PORT):$(PORT) \
+		-e PORT=$(PORT) \
+		-e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt \
+		-e ASSISTED_SERVICE_SCHEME=${ASSISTED_SERVICE_SCHEME} -e ASSISTED_SERVICE_HOST=${ASSISTED_SERVICE_HOST} \
+		-e REQUEST_AUTH_TYPE=${REQUEST_AUTH_TYPE} \
+		$(IMAGE)
 
 .PHONY: certs
 certs:
