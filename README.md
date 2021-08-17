@@ -3,7 +3,7 @@
 This service customizes and serves RHCOS images for the [Assisted Installer Service](https://github.com/openshift/assisted-service).
 It downloads a set of RHCOS images on startup based on config and responds to a single API endpoint to allow a user to download a customized image for use with assisted service.
 
-## Running the Service
+## Running the Image Service
 
 Build the image and run it locally using `podman`
 
@@ -24,11 +24,11 @@ skipper make test
 
 - `DATA_DIR` - Path at which to store downloaded RHCOS images.
 - `RHCOS_VERSIONS` - JSON string indicating the supported versions and their required urls.
-- `PORT` - Service listen port
+- `LISTEN_PORT` - Image Service listen port
 - `HTTPS_KEY_FILE` - tls key file path
 - `HTTPS_CERT_FILE` - tls cert file path
 - `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
-- `ASSISTED_SERVICE_HOST` - host to use to query assisted service for image information
+- `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
 - `REQUEST_AUTH_TYPE` - determines how the auth token should be passed to the assisted service - either `header` or `param`
   - For `header` a header of the form `Authorization: Bearer <token>` is used
   - For `param` an `api_key=<token>` query parameter is added to the URL

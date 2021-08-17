@@ -8,5 +8,5 @@ volumes:
   - $HOME/.cache/golangci-lint:$HOME/.cache/golangci-lint
 env:
   IMAGE: $IMAGE
-  PORT: $PORT
+  LISTEN_PORT: $LISTEN_PORT
   GOCACHE: "/go/pkg/mod"

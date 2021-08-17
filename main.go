@@ -19,7 +19,7 @@ var Options struct {
 	DataDir               string `envconfig:"DATA_DIR"`
 	HTTPSKeyFile          string `envconfig:"HTTPS_KEY_FILE"`
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
-	Port                  string `envconfig:"PORT" default:"8080"`
+	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
 }
 
@@ -44,7 +44,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	log.Info("Starting http handler...")
-	address := fmt.Sprintf(":%s", Options.Port)
+	address := fmt.Sprintf(":%s", Options.ListenPort)
 	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
 		log.Fatal(http.ListenAndServeTLS(address, Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
 	} else {
