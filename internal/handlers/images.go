@@ -88,14 +88,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := h.ImageStore.BaseFile(version, imageType)
-	if err != nil {
-		log.Errorf("Error getting base image: err: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	isoReader, err := h.imageStreamForID(clusterID, f, apiKey)
+	isoReader, err := h.imageStreamForID(clusterID, version, imageType, apiKey)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -130,12 +123,63 @@ func (h *ImageHandler) parseQueryParams(values url.Values) (string, string, stri
 	return version, imageType, apiKey, nil
 }
 
-func (h *ImageHandler) imageStreamForID(imageID string, baseISOPath string, apiKey string) (io.ReadSeeker, error) {
+func (h *ImageHandler) imageStreamForID(imageID, version, imageType, apiKey string) (io.ReadSeeker, error) {
+	f, err := h.ImageStore.BaseFile(version, imageType)
+	if err != nil {
+		return nil, err
+	}
+
 	ignition, err := h.ignitionContent(imageID, apiKey)
 	if err != nil {
 		return nil, err
 	}
-	return h.GenerateImageStream(baseISOPath, ignition)
+
+	var ramdisk []byte
+	if imageType == imagestore.ImageTypeMinimal {
+		ramdisk, err = h.ramdiskContent(imageID, apiKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return h.GenerateImageStream(f, ignition, ramdisk)
+}
+
+func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {
+	var ramdiskBytes []byte
+	if h.AssistedServiceHost == "" {
+		return nil, nil
+	}
+
+	u := url.URL{
+		Scheme: h.AssistedServiceScheme,
+		Host:   h.AssistedServiceHost,
+		Path:   fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
+	}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	err = h.setRequestAuth(req, apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("request to %s returned status %d: %v", u.String(), resp.StatusCode, err)
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		return nil, nil
+	}
+
+	ramdiskBytes, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	return ramdiskBytes, nil
 }
 
 func (h *ImageHandler) setRequestAuth(req *http.Request, apiKey string) error {
