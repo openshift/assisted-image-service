@@ -95,7 +95,7 @@ var _ = Describe("ServeHTTP", func() {
 			BeforeEach(func() {
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID), "file_name=discovery.ign"),
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
 						ghttp.RespondWith(http.StatusOK, ignitionContent),
 					),
 				)
@@ -172,7 +172,7 @@ var _ = Describe("ServeHTTP", func() {
 		It("passes the token in a header with header auth", func() {
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
 					ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
@@ -205,7 +205,7 @@ var _ = Describe("ServeHTTP", func() {
 		})
 
 		It("passes the token in a param with param auth", func() {
-			assistedPath := fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID)
+			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign&api_key=mytoken"),

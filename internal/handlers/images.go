@@ -25,6 +25,10 @@ const (
 	RequestAuthTypeParam  = "param"
 )
 
+const (
+	fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
+)
+
 type ImageHandler struct {
 	ImageStore            imagestore.ImageStore
 	AssistedServiceScheme string
@@ -157,7 +161,7 @@ func (h *ImageHandler) ignitionContent(imageID string, apiKey string) ([]byte, e
 	u := url.URL{
 		Scheme: h.AssistedServiceScheme,
 		Host:   h.AssistedServiceHost,
-		Path:   fmt.Sprintf("/api/assisted-install/v1/clusters/%s/downloads/files", imageID),
+		Path:   fmt.Sprintf(fileRouteFormat, imageID),
 	}
 	queryValues := url.Values{}
 	queryValues.Set("file_name", "discovery.ign")
