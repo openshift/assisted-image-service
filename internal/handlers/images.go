@@ -124,11 +124,6 @@ func (h *ImageHandler) parseQueryParams(values url.Values) (string, string, stri
 }
 
 func (h *ImageHandler) imageStreamForID(imageID, version, imageType, apiKey string) (io.ReadSeeker, error) {
-	f, err := h.ImageStore.BaseFile(version, imageType)
-	if err != nil {
-		return nil, err
-	}
-
 	ignition, err := h.ignitionContent(imageID, apiKey)
 	if err != nil {
 		return nil, err
@@ -142,7 +137,7 @@ func (h *ImageHandler) imageStreamForID(imageID, version, imageType, apiKey stri
 		}
 	}
 
-	return h.GenerateImageStream(f, ignition, ramdisk)
+	return h.GenerateImageStream(h.ImageStore.PathForParams(imageType, version, "x86_64"), ignition, ramdisk)
 }
 
 func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {

@@ -15,25 +15,31 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var DefaultVersions = map[string]map[string]string{
-	"4.6": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
+var DefaultVersions = []map[string]string{
+	{
+		"openshift_version": "4.6",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
 	},
-	"4.7": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
+	{
+		"openshift_version": "4.7",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
 	},
-	"4.8": {
-		"iso_url":    "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/pre-release/4.8.0-rc.3/rhcos-4.8.0-rc.3-x86_64-live.x86_64.iso",
-		"rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/pre-release/4.8.0-rc.3/rhcos-live-rootfs.x86_64.img",
+	{
+		"openshift_version": "4.8",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-4.8.2-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-live-rootfs.x86_64.img",
 	},
 }
 
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
 type ImageStore interface {
 	Populate(ctx context.Context) error
-	BaseFile(version, imageType string) (string, error)
+	PathForParams(imageType, version, arch string) string
 	HaveVersion(version string) bool
 }
 
@@ -43,7 +49,7 @@ type Config struct {
 
 type rhcosStore struct {
 	cfg       *Config
-	versions  map[string]map[string]string
+	versions  []map[string]string
 	isoEditor isoeditor.Editor
 	dataDir   string
 }
@@ -72,7 +78,30 @@ func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
 			return nil, err
 		}
 	}
+	if err := validateVersions(is.versions); err != nil {
+		return nil, err
+	}
 	return &is, nil
+}
+
+func validateVersions(versions []map[string]string) error {
+	for _, entry := range versions {
+		missingKeyFmt := "invalid version entry %+v: missing %s key"
+		if _, ok := entry["openshift_version"]; !ok {
+			return fmt.Errorf(missingKeyFmt, entry, "openshift_version")
+		}
+		if _, ok := entry["cpu_architecture"]; !ok {
+			return fmt.Errorf(missingKeyFmt, entry, "cpu_architecture")
+		}
+		if _, ok := entry["url"]; !ok {
+			return fmt.Errorf(missingKeyFmt, entry, "url")
+		}
+		if _, ok := entry["rootfs_url"]; !ok {
+			return fmt.Errorf(missingKeyFmt, entry, "rootfs_url")
+		}
+	}
+
+	return nil
 }
 
 func downloadURLToFile(url string, path string) error {
@@ -105,41 +134,34 @@ func downloadURLToFile(url string, path string) error {
 func (s *rhcosStore) Populate(ctx context.Context) error {
 	errs, _ := errgroup.WithContext(ctx)
 
-	for version := range s.versions {
-		version := version
+	for i := range s.versions {
+		version := s.versions[i]
 		errs.Go(func() error {
-			fullPath, err := s.pathForVersion(version)
-			if err != nil {
-				return err
-			}
+			openshiftVersion := version["openshift_version"]
+			arch := version["cpu_architecture"]
 
-			if _, err = os.Stat(fullPath); os.IsNotExist(err) {
-				url := s.versions[version]["iso_url"]
+			fullPath := s.PathForParams(ImageTypeFull, openshiftVersion, arch)
+			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+				url := version["url"]
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
+
 				err = downloadURLToFile(url, fullPath)
 				if err != nil {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
+
 				log.Infof("Finished downloading for version %s", version)
 			}
 
-			minimalPath, err := s.minimalPathForVersion(version)
-			if err != nil {
-				return err
-			}
-
-			if _, err = os.Stat(minimalPath); os.IsNotExist(err) {
+			minimalPath := s.PathForParams(ImageTypeMinimal, openshiftVersion, arch)
+			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
 				log.Infof("Creating minimal iso for version %s", version)
 
-				rootfsURL, err := s.rootfsURLForVersion(version)
-				if err != nil {
-					return err
-				}
-
-				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
+				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, version["rootfs_url"], minimalPath)
 				if err != nil {
 					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
 				}
+
 				log.Infof("Finished creating minimal iso for version %s", version)
 			}
 
@@ -150,64 +172,15 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	return errs.Wait()
 }
 
-func (s *rhcosStore) rootfsURLForVersion(version string) (string, error) {
-	v, ok := s.versions[version]
-	if !ok {
-		return "", fmt.Errorf("missing version entry for %s", version)
-	}
-	url, ok := v["rootfs_url"]
-	if !ok {
-		return "", fmt.Errorf("version %s missing key 'rootfs_url'", version)
-	}
-	return url, nil
-}
-
-func (s *rhcosStore) pathForVersion(version string) (string, error) {
-	v, ok := s.versions[version]
-	if !ok {
-		return "", fmt.Errorf("missing version entry for %s", version)
-	}
-	url, ok := v["iso_url"]
-	if !ok {
-		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
-	}
-	return filepath.Join(s.dataDir, filepath.Base(url)), nil
-}
-
-func (s *rhcosStore) minimalPathForVersion(version string) (string, error) {
-	v, ok := s.versions[version]
-	if !ok {
-		return "", fmt.Errorf("missing version entry for %s", version)
-	}
-	url, ok := v["iso_url"]
-	if !ok {
-		return "", fmt.Errorf("version %s missing key 'iso_url'", version)
-	}
-	return filepath.Join(s.dataDir, "minimal-"+filepath.Base(url)), nil
-}
-
-func (s *rhcosStore) BaseFile(version, imageType string) (string, error) {
-	var (
-		path string
-		err  error
-	)
-
-	switch imageType {
-	case ImageTypeFull:
-		path, err = s.pathForVersion(version)
-	case ImageTypeMinimal:
-		path, err = s.minimalPathForVersion(version)
-	default:
-		err = fmt.Errorf("unsupported image type '%s'", imageType)
-	}
-	if err != nil {
-		return "", err
-	}
-
-	return path, nil
+func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
+	return filepath.Join(s.dataDir, fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch))
 }
 
 func (s *rhcosStore) HaveVersion(version string) bool {
-	_, ok := s.versions[version]
-	return ok
+	for _, entry := range s.versions {
+		if v, ok := entry["openshift_version"]; ok && v == version {
+			return true
+		}
+	}
+	return false
 }

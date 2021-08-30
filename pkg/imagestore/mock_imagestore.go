@@ -34,21 +34,6 @@ func (m *MockImageStore) EXPECT() *MockImageStoreMockRecorder {
 	return m.recorder
 }
 
-// BaseFile mocks base method.
-func (m *MockImageStore) BaseFile(arg0, arg1 string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BaseFile", arg0, arg1)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BaseFile indicates an expected call of BaseFile.
-func (mr *MockImageStoreMockRecorder) BaseFile(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BaseFile", reflect.TypeOf((*MockImageStore)(nil).BaseFile), arg0, arg1)
-}
-
 // HaveVersion mocks base method.
 func (m *MockImageStore) HaveVersion(arg0 string) bool {
 	m.ctrl.T.Helper()
@@ -61,6 +46,20 @@ func (m *MockImageStore) HaveVersion(arg0 string) bool {
 func (mr *MockImageStoreMockRecorder) HaveVersion(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0)
+}
+
+// PathForParams mocks base method.
+func (m *MockImageStore) PathForParams(arg0, arg1, arg2 string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PathForParams", arg0, arg1, arg2)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// PathForParams indicates an expected call of PathForParams.
+func (mr *MockImageStoreMockRecorder) PathForParams(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PathForParams", reflect.TypeOf((*MockImageStore)(nil).PathForParams), arg0, arg1, arg2)
 }
 
 // Populate mocks base method.
