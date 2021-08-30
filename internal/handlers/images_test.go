@@ -76,7 +76,7 @@ var _ = Describe("ServeHTTP", func() {
 			default:
 				Fail("cannot mock with an unsupported image type")
 			}
-			mockImageStore.EXPECT().BaseFile(version, imageType).Return(imageFile, nil).AnyTimes()
+			mockImageStore.EXPECT().PathForParams(imageType, version, "x86_64").Return(imageFile).AnyTimes()
 		}
 
 		expectSuccessfulResponse := func(resp *http.Response, content []byte) {
