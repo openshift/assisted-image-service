@@ -41,9 +41,9 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		return bytes.TrimRight(contentBytes, "\x00")
 	}
 
-	It("embeds the ignition", func() {
+	It("embeds the ignition with no ramdisk content", func() {
 		ignitionContent := []byte("someignitioncontent")
-		streamReader, err := NewRHCOSStreamReader(isoFile, ignitionContent)
+		streamReader, err := NewRHCOSStreamReader(isoFile, ignitionContent, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -54,5 +54,22 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(f.Close()).To(Succeed())
 
 		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionContent))
+	})
+
+	It("embeds the ignition and ramdisk content", func() {
+		ignitionContent := []byte("someignitioncontent")
+		initrdContent := []byte("someramdiskcontent")
+		streamReader, err := NewRHCOSStreamReader(isoFile, ignitionContent, initrdContent)
+		Expect(err).NotTo(HaveOccurred())
+
+		f, err := os.CreateTemp(filesDir, "streamed*.iso")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(f, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Sync()).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+
+		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionContent))
+		Expect(isoFileContent(f.Name(), ramDiskImagePath)).To(Equal(initrdContent))
 	})
 })

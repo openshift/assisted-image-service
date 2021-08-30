@@ -12,33 +12,49 @@ import (
 
 const ignitionImagePath = "/images/ignition.img"
 
-type StreamGeneratorFunc func(isoPath string, ignitionContent []byte) (io.ReadSeeker, error)
+type StreamGeneratorFunc func(isoPath string, ignitionContent []byte, ramdiskContent []byte) (io.ReadSeeker, error)
 
-func NewRHCOSStreamReader(isoPath string, ignitionContent []byte) (io.ReadSeeker, error) {
-	areaStart, areaLength, err := GetISOFileInfo(ignitionImagePath, isoPath)
-	if err != nil {
-		return nil, err
-	}
-
-	ignitionReader := bytes.NewReader(ignitionContent)
-	if areaLength < ignitionReader.Size() {
-		return nil, errors.New(fmt.Sprintf("ignition length (%d) exceeds embed area size (%d)", ignitionReader.Size(), areaLength))
-	}
-
+func NewRHCOSStreamReader(isoPath string, ignitionContent []byte, ramdiskContent []byte) (io.ReadSeeker, error) {
 	isoReader, err := os.Open(isoPath)
 	if err != nil {
 		return nil, err
 	}
 
-	ignitionOverlay := overlay.Overlay{
-		Reader: ignitionReader,
-		Offset: areaStart,
-		Length: ignitionReader.Size(),
-	}
-	contentReader, err := overlay.NewOverlayReader(isoReader, ignitionOverlay)
+	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionContent)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create overwrite reader")
+		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
 
-	return contentReader, nil
+	if ramdiskContent != nil {
+		r, err = readerForContent(isoPath, ramDiskImagePath, r, ramdiskContent)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create overwrite reader for ramdisk")
+		}
+	}
+
+	return r, nil
+}
+
+func readerForContent(isoPath string, filePath string, base io.ReadSeeker, content []byte) (io.ReadSeeker, error) {
+	start, length, err := GetISOFileInfo(filePath, isoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	contentReader := bytes.NewReader(content)
+	if length < contentReader.Size() {
+		return nil, errors.New(fmt.Sprintf("content length (%d) exceeds embed area size (%d)", contentReader.Size(), length))
+	}
+
+	rdOverlay := overlay.Overlay{
+		Reader: contentReader,
+		Offset: start,
+		Length: contentReader.Size(),
+	}
+	r, err := overlay.NewOverlayReader(base, rdOverlay)
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }

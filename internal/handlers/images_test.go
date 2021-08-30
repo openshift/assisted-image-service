@@ -88,8 +88,9 @@ var _ = Describe("ServeHTTP", func() {
 
 		Context("with no auth", func() {
 			var (
-				server *httptest.Server
-				client *http.Client
+				server        *httptest.Server
+				client        *http.Client
+				initrdContent []byte
 			)
 
 			BeforeEach(func() {
@@ -103,9 +104,13 @@ var _ = Describe("ServeHTTP", func() {
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				mockImageStream := func(isoPath string, ignitionBytes []byte) (io.ReadSeeker, error) {
+				initrdContent = nil
+				mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
 					defer GinkgoRecover()
 					Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
+					if isoPath == minImageFilename {
+						Expect(ramdiskBytes).To(Equal(initrdContent))
+					}
 					return os.Open(isoPath)
 				}
 
@@ -131,7 +136,28 @@ var _ = Describe("ServeHTTP", func() {
 				expectSuccessfulResponse(resp, []byte("someisocontent"))
 			})
 
-			It("returns a minimal image", func() {
+			It("returns a minimal image with an initrd", func() {
+				initrdContent = []byte("someramdisk")
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+						ghttp.RespondWith(http.StatusOK, initrdContent),
+					),
+				)
+				mockImage("4.8", imagestore.ImageTypeMinimal)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal", imageID)
+				resp, err := client.Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("minimalisocontent"))
+			})
+
+			It("returns a minimal image with no initrd", func() {
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+						ghttp.RespondWith(http.StatusNoContent, initrdContent),
+					),
+				)
 				mockImage("4.8", imagestore.ImageTypeMinimal)
 				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal", imageID)
 				resp, err := client.Get(server.URL + path)
@@ -181,7 +207,7 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignitionBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
 				defer GinkgoRecover()
 				Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
 				return os.Open(isoPath)
@@ -216,7 +242,7 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignitionBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
 				defer GinkgoRecover()
 				Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
 				return os.Open(isoPath)
