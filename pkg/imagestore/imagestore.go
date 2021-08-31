@@ -150,19 +150,19 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
 
-				log.Infof("Finished downloading for version %s", version)
+				log.Infof("Finished downloading for %s-%s", openshiftVersion, arch)
 			}
 
 			minimalPath := s.PathForParams(ImageTypeMinimal, openshiftVersion, arch)
 			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
-				log.Infof("Creating minimal iso for version %s", version)
+				log.Infof("Creating minimal iso for %s-%s", openshiftVersion, arch)
 
 				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, version["rootfs_url"], minimalPath)
 				if err != nil {
 					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
 				}
 
-				log.Infof("Finished creating minimal iso for version %s", version)
+				log.Infof("Finished creating minimal iso for %s-%s", openshiftVersion, arch)
 			}
 
 			return nil
