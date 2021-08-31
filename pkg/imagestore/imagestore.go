@@ -40,7 +40,7 @@ var DefaultVersions = []map[string]string{
 type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
-	HaveVersion(version string) bool
+	HaveVersion(version, arch string) bool
 }
 
 type Config struct {
@@ -176,9 +176,11 @@ func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
 	return filepath.Join(s.dataDir, fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch))
 }
 
-func (s *rhcosStore) HaveVersion(version string) bool {
+func (s *rhcosStore) HaveVersion(version, arch string) bool {
 	for _, entry := range s.versions {
-		if v, ok := entry["openshift_version"]; ok && v == version {
+		v, versionPresent := entry["openshift_version"]
+		a, archPresent := entry["cpu_architecture"]
+		if versionPresent && v == version && archPresent && a == arch {
 			return true
 		}
 	}

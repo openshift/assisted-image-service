@@ -27,6 +27,7 @@ const (
 
 const (
 	fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
+	defaultArch     = "x86_64"
 )
 
 type ImageHandler struct {
@@ -35,6 +36,13 @@ type ImageHandler struct {
 	AssistedServiceHost   string
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
 	RequestAuthType       string
+}
+
+type imageDownloadParams struct {
+	version   string
+	imageType string
+	apiKey    string
+	arch      string
 }
 
 var _ http.Handler = &ImageHandler{}
@@ -78,7 +86,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	version, imageType, apiKey, err := h.parseQueryParams(r.URL.Query())
+	params, err := h.parseQueryParams(r.URL.Query())
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte(err.Error()))
@@ -88,7 +96,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isoReader, err := h.imageStreamForID(clusterID, version, imageType, apiKey)
+	isoReader, err := h.imageStreamForID(clusterID, params)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -101,43 +109,53 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, fileName, time.Now(), isoReader)
 }
 
-func (h *ImageHandler) parseQueryParams(values url.Values) (string, string, string, error) {
+func (h *ImageHandler) parseQueryParams(values url.Values) (*imageDownloadParams, error) {
 	version := values.Get("version")
 	if version == "" {
-		return "", "", "", fmt.Errorf("'version' parameter required")
+		return nil, fmt.Errorf("'version' parameter required")
 	}
 
-	if !h.ImageStore.HaveVersion(version) {
-		return "", "", "", fmt.Errorf("version %s not found", version)
+	arch := values.Get("arch")
+	if arch == "" {
+		arch = defaultArch
+	}
+
+	if !h.ImageStore.HaveVersion(version, arch) {
+		return nil, fmt.Errorf("version for %s %s, not found", version, arch)
 	}
 
 	imageType := values.Get("type")
 	if imageType == "" {
-		return "", "", "", fmt.Errorf("'type' parameter required")
+		return nil, fmt.Errorf("'type' parameter required")
 	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
-		return "", "", "", fmt.Errorf("invalid value '%s' for parameter 'type'", imageType)
+		return nil, fmt.Errorf("invalid value '%s' for parameter 'type'", imageType)
 	}
 
 	apiKey := values.Get("api_key")
 
-	return version, imageType, apiKey, nil
+	return &imageDownloadParams{
+		version:   version,
+		imageType: imageType,
+		apiKey:    apiKey,
+		arch:      arch,
+	}, nil
 }
 
-func (h *ImageHandler) imageStreamForID(imageID, version, imageType, apiKey string) (io.ReadSeeker, error) {
-	ignition, err := h.ignitionContent(imageID, apiKey)
+func (h *ImageHandler) imageStreamForID(imageID string, params *imageDownloadParams) (io.ReadSeeker, error) {
+	ignition, err := h.ignitionContent(imageID, params.apiKey)
 	if err != nil {
 		return nil, err
 	}
 
 	var ramdisk []byte
-	if imageType == imagestore.ImageTypeMinimal {
-		ramdisk, err = h.ramdiskContent(imageID, apiKey)
+	if params.imageType == imagestore.ImageTypeMinimal {
+		ramdisk, err = h.ramdiskContent(imageID, params.apiKey)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return h.GenerateImageStream(h.ImageStore.PathForParams(imageType, version, "x86_64"), ignition, ramdisk)
+	return h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk)
 }
 
 func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {

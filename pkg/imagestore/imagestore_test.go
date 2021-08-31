@@ -195,3 +195,45 @@ var _ = Describe("PathForParams", func() {
 		Expect(is.PathForParams("type", "version", "arch")).To(Equal(expected))
 	})
 })
+
+var _ = Describe("HaveVersion", func() {
+	var (
+		versions = `[
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture": "x86_64",
+				"url": "http://example.com/image/x86_64-48.iso",
+				"rootfs_url": "http://example.com/image/x86_64-48.img"
+			},
+			{
+				"openshift_version": "4.9",
+				"cpu_architecture": "arm64",
+				"url": "http://example.com/image/arm64-49.iso",
+				"rootfs_url": "http://example.com/image/arm64-49.img"
+			}
+		]`
+		store ImageStore
+	)
+
+	BeforeEach(func() {
+		Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+		var err error
+		store, err = NewImageStore(nil, "")
+		Expect(err).NotTo(HaveOccurred())
+	})
+	AfterEach(func() {
+		Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
+	})
+
+	It("is true for versions that are present", func() {
+		Expect(store.HaveVersion("4.8", "x86_64")).To(BeTrue())
+		Expect(store.HaveVersion("4.9", "arm64")).To(BeTrue())
+	})
+
+	It("is false for versions that are missing", func() {
+		Expect(store.HaveVersion("4.9", "x86_64")).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "arm64")).To(BeFalse())
+		Expect(store.HaveVersion("4.7", "x86_64")).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
+	})
+})
