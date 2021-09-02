@@ -3,8 +3,11 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -35,6 +38,7 @@ type ImageHandler struct {
 	AssistedServiceHost   string
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
 	RequestAuthType       string
+	Client                *http.Client
 }
 
 var _ http.Handler = &ImageHandler{}
@@ -49,7 +53,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType string) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string) http.Handler {
 	metricsConfig := metrics.Config{
 		Prefix:          "assisted_image_service",
 		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
@@ -59,12 +63,30 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedSe
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
+	client := http.DefaultClient
+	if caCertFile != "" {
+		caCert, err := ioutil.ReadFile(caCertFile)
+		if err != nil {
+			log.Fatalf("Error opening cert file %s, %s", caCertFile, err)
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		t := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: caCertPool,
+			},
+		}
+		client.Transport = t
+	}
+
 	h := &ImageHandler{
 		ImageStore:            is,
 		AssistedServiceScheme: assistedServiceScheme,
 		AssistedServiceHost:   assistedServiceHost,
 		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
 		RequestAuthType:       requestAuthType,
+		Client:                client,
 	}
 
 	return stdmiddleware.Handler("/images/:imageID", mdw, h)
@@ -160,9 +182,12 @@ func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("request to %s returned status %d: %v", u.String(), resp.StatusCode, err)
+	resp, err := h.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("request to %s returned status %d", u.String(), resp.StatusCode)
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
@@ -215,9 +240,12 @@ func (h *ImageHandler) ignitionContent(imageID string, apiKey string) ([]byte, e
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ignition request to %s returned status %d: %v", req.URL.String(), resp.StatusCode, err)
+	resp, err := h.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
 	}
 	ignitionBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
