@@ -74,7 +74,8 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedSe
 
 		t := &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs: caCertPool,
+				RootCAs:    caCertPool,
+				MinVersion: tls.VersionTLS12,
 			},
 		}
 		client.Transport = t
