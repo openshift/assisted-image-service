@@ -63,14 +63,16 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedSe
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
-	client := http.DefaultClient
+	client := &http.Client{}
 	if caCertFile != "" {
 		caCert, err := ioutil.ReadFile(caCertFile)
 		if err != nil {
 			log.Fatalf("Error opening cert file %s, %s", caCertFile, err)
 		}
 		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			log.Fatalf("Failed to append cert %s, %s", caCertFile, err)
+		}
 
 		t := &http.Transport{
 			TLSClientConfig: &tls.Config{
