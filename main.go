@@ -19,6 +19,7 @@ var Options struct {
 	DataDir               string `envconfig:"DATA_DIR"`
 	HTTPSKeyFile          string `envconfig:"HTTPS_KEY_FILE"`
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
+	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
 }
@@ -39,7 +40,7 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType))
+	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile))
 	http.Handle("/health", handlers.NewHealthHandler())
 	http.Handle("/metrics", promhttp.Handler())
 
