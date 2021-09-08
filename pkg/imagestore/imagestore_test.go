@@ -20,6 +20,43 @@ func TestImageStore(t *testing.T) {
 	RunSpecs(t, "imagestore")
 }
 
+var _ = Describe("NewImageStore", func() {
+	It("uses the default versions", func() {
+		is, err := NewImageStore(nil, "")
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(is.(*rhcosStore).versions).To(Equal(DefaultVersions))
+	})
+
+	Context("with RHCOS_VERSIONS set", func() {
+		var (
+			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
+		)
+
+		BeforeEach(func() {
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+		})
+		AfterEach(func() {
+			Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
+		})
+
+		It("initializes the versions value correctly", func() {
+			is, err := NewImageStore(nil, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			expected := []map[string]string{
+				{
+					"openshift_version": "4.8",
+					"cpu_architecture":  "x86_64",
+					"url":               "http://example.com/image/48.iso",
+					"rootfs_url":        "http://example.com/image/48.img",
+				},
+			}
+			Expect(is.(*rhcosStore).versions).To(Equal(expected))
+		})
+	})
+})
+
 var _ = Context("with a data directory configured", func() {
 	var (
 		dataDir string
@@ -29,43 +66,6 @@ var _ = Context("with a data directory configured", func() {
 		var err error
 		dataDir, err = os.MkdirTemp("", "imageStoreTest")
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	Describe("NewImageStore", func() {
-		It("uses the default versions", func() {
-			is, err := NewImageStore(nil, dataDir)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(is.(*rhcosStore).versions).To(Equal(DefaultVersions))
-		})
-
-		Context("with RHCOS_VERSIONS set", func() {
-			var (
-				versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
-			)
-
-			BeforeEach(func() {
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-			})
-			AfterEach(func() {
-				Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
-			})
-
-			It("initializes the versions value correctly", func() {
-				is, err := NewImageStore(nil, dataDir)
-				Expect(err).NotTo(HaveOccurred())
-
-				expected := []map[string]string{
-					{
-						"openshift_version": "4.8",
-						"cpu_architecture":  "x86_64",
-						"url":               "http://example.com/image/48.iso",
-						"rootfs_url":        "http://example.com/image/48.img",
-					},
-				}
-				Expect(is.(*rhcosStore).versions).To(Equal(expected))
-			})
-		})
 	})
 
 	Context("with a test server", func() {
@@ -184,14 +184,56 @@ var _ = Context("with a data directory configured", func() {
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 		})
+	})
+})
 
-		Describe("PathForParams", func() {
-			It("creates the correct path", func() {
-				is, err := NewImageStore(nil, dataDir)
-				Expect(err).NotTo(HaveOccurred())
-				expected := filepath.Join(dataDir, "rhcos-type-version-arch.iso")
-				Expect(is.PathForParams("type", "version", "arch")).To(Equal(expected))
-			})
-		})
+var _ = Describe("PathForParams", func() {
+	It("creates the correct path", func() {
+		is, err := NewImageStore(nil, "/tmp/some/dir")
+		Expect(err).NotTo(HaveOccurred())
+		expected := "/tmp/some/dir/rhcos-type-version-arch.iso"
+		Expect(is.PathForParams("type", "version", "arch")).To(Equal(expected))
+	})
+})
+
+var _ = Describe("HaveVersion", func() {
+	var (
+		versions = `[
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture": "x86_64",
+				"url": "http://example.com/image/x86_64-48.iso",
+				"rootfs_url": "http://example.com/image/x86_64-48.img"
+			},
+			{
+				"openshift_version": "4.9",
+				"cpu_architecture": "arm64",
+				"url": "http://example.com/image/arm64-49.iso",
+				"rootfs_url": "http://example.com/image/arm64-49.img"
+			}
+		]`
+		store ImageStore
+	)
+
+	BeforeEach(func() {
+		Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+		var err error
+		store, err = NewImageStore(nil, "")
+		Expect(err).NotTo(HaveOccurred())
+	})
+	AfterEach(func() {
+		Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
+	})
+
+	It("is true for versions that are present", func() {
+		Expect(store.HaveVersion("4.8", "x86_64")).To(BeTrue())
+		Expect(store.HaveVersion("4.9", "arm64")).To(BeTrue())
+	})
+
+	It("is false for versions that are missing", func() {
+		Expect(store.HaveVersion("4.9", "x86_64")).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "arm64")).To(BeFalse())
+		Expect(store.HaveVersion("4.7", "x86_64")).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
 	})
 })

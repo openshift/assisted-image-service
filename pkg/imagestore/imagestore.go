@@ -19,20 +19,20 @@ var DefaultVersions = []map[string]string{
 	{
 		"openshift_version": "4.6",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
 	},
 	{
 		"openshift_version": "4.7",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
 	},
 	{
 		"openshift_version": "4.8",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-4.8.2-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-live-rootfs.x86_64.img",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.2/rhcos-4.8.2-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.2/rhcos-live-rootfs.x86_64.img",
 	},
 }
 
@@ -40,7 +40,7 @@ var DefaultVersions = []map[string]string{
 type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
-	HaveVersion(version string) bool
+	HaveVersion(version, arch string) bool
 }
 
 type Config struct {
@@ -150,19 +150,19 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
 
-				log.Infof("Finished downloading for version %s", version)
+				log.Infof("Finished downloading for %s-%s", openshiftVersion, arch)
 			}
 
 			minimalPath := s.PathForParams(ImageTypeMinimal, openshiftVersion, arch)
 			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
-				log.Infof("Creating minimal iso for version %s", version)
+				log.Infof("Creating minimal iso for %s-%s", openshiftVersion, arch)
 
 				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, version["rootfs_url"], minimalPath)
 				if err != nil {
 					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
 				}
 
-				log.Infof("Finished creating minimal iso for version %s", version)
+				log.Infof("Finished creating minimal iso for %s-%s", openshiftVersion, arch)
 			}
 
 			return nil
@@ -176,9 +176,11 @@ func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
 	return filepath.Join(s.dataDir, fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch))
 }
 
-func (s *rhcosStore) HaveVersion(version string) bool {
+func (s *rhcosStore) HaveVersion(version, arch string) bool {
 	for _, entry := range s.versions {
-		if v, ok := entry["openshift_version"]; ok && v == version {
+		v, versionPresent := entry["openshift_version"]
+		a, archPresent := entry["cpu_architecture"]
+		if versionPresent && v == version && archPresent && a == arch {
 			return true
 		}
 	}

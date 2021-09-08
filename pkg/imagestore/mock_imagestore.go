@@ -35,17 +35,17 @@ func (m *MockImageStore) EXPECT() *MockImageStoreMockRecorder {
 }
 
 // HaveVersion mocks base method.
-func (m *MockImageStore) HaveVersion(arg0 string) bool {
+func (m *MockImageStore) HaveVersion(arg0, arg1 string) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HaveVersion", arg0)
+	ret := m.ctrl.Call(m, "HaveVersion", arg0, arg1)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
 // HaveVersion indicates an expected call of HaveVersion.
-func (mr *MockImageStoreMockRecorder) HaveVersion(arg0 interface{}) *gomock.Call {
+func (mr *MockImageStoreMockRecorder) HaveVersion(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0, arg1)
 }
 
 // PathForParams mocks base method.
