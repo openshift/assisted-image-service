@@ -73,6 +73,52 @@ var _ = Context("with test files", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(content)).To(Equal(""))
 		})
+
+		It("generates an iso - single boot file (efi)", func() {
+			dir, err := ioutil.TempDir("", "isotest")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+			isoPath := filepath.Join(dir, "test.iso")
+			Expect(os.Remove(filepath.Join(filesDir, "isolinux/isolinux.bin"))).To(Succeed())
+
+			haveBootFiles, err := haveBootFiles(filesDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(haveBootFiles).To(BeFalse())
+
+			Expect(os.WriteFile(filepath.Join(filesDir, "boot.catalog"), []byte(""), 0600)).To(Succeed())
+			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
+		})
+
+		It("generates an iso - single boot file, missing catalog file", func() {
+			dir, err := ioutil.TempDir("", "isotest")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+			isoPath := filepath.Join(dir, "test.iso")
+			Expect(os.Remove(filepath.Join(filesDir, "isolinux/isolinux.bin"))).To(Succeed())
+
+			haveBootFiles, err := haveBootFiles(filesDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(haveBootFiles).To(BeFalse())
+
+			err = Create(isoPath, filesDir, "my-vol")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("missing boot.catalog file"))
+		})
+
+		It("generates an iso - no boot files", func() {
+			dir, err := ioutil.TempDir("", "isotest")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+			isoPath := filepath.Join(dir, "test.iso")
+			Expect(os.Remove(filepath.Join(filesDir, "isolinux/isolinux.bin"))).To(Succeed())
+			Expect(os.Remove(filepath.Join(filesDir, "images/efiboot.img"))).To(Succeed())
+
+			haveBootFiles, err := haveBootFiles(filesDir)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(haveBootFiles).To(BeFalse())
+
+			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
+		})
 	})
 
 	Describe("fileExists", func() {
