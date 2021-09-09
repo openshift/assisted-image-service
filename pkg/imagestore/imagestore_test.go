@@ -111,7 +111,7 @@ var _ = Context("with a data directory configured", func() {
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-4.8-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("someisocontenthere"))
 			})
@@ -160,7 +160,7 @@ var _ = Context("with a data directory configured", func() {
 
 				is, err := NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
@@ -178,8 +178,8 @@ var _ = Context("with a data directory configured", func() {
 
 				is, err := NewImageStore(mockEditor, dataDir)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-minimal-4.8-x86_64.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-minimal-iso-4.8-x86_64.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
 
 				Expect(is.Populate(ctx)).To(Succeed())
 			})

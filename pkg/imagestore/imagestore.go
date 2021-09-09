@@ -55,8 +55,8 @@ type rhcosStore struct {
 }
 
 const (
-	ImageTypeFull    = "full"
-	ImageTypeMinimal = "minimal"
+	ImageTypeFull    = "full-iso"
+	ImageTypeMinimal = "minimal-iso"
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
