@@ -131,7 +131,7 @@ var _ = Describe("ServeHTTP", func() {
 
 			It("returns a full image", func() {
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=full", imageID)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("someisocontent"))
@@ -139,7 +139,7 @@ var _ = Describe("ServeHTTP", func() {
 
 			It("uses the arch parameter", func() {
 				mockImage("4.8", imagestore.ImageTypeFull, "arm64")
-				path := fmt.Sprintf("/images/%s?version=4.8&type=full&arch=arm64", imageID)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&arch=arm64", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("someisocontent"))
@@ -154,7 +154,7 @@ var _ = Describe("ServeHTTP", func() {
 					),
 				)
 				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal", imageID)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("minimalisocontent"))
@@ -168,7 +168,7 @@ var _ = Describe("ServeHTTP", func() {
 					),
 				)
 				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal", imageID)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("minimalisocontent"))
@@ -176,14 +176,14 @@ var _ = Describe("ServeHTTP", func() {
 
 			It("fails for a non-existant version", func() {
 				mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
-				path := fmt.Sprintf("/images/%s?version=4.7&type=full", imageID)
+				path := fmt.Sprintf("/images/%s?version=4.7&type=full-iso", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 			})
 
 			It("fails when no version is supplied", func() {
-				path := fmt.Sprintf("/images/%s?type=full", imageID)
+				path := fmt.Sprintf("/images/%s?type=full-iso", imageID)
 				resp, err := client.Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
@@ -234,7 +234,7 @@ var _ = Describe("ServeHTTP", func() {
 			defer server.Close()
 
 			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full&api_key=mytoken", imageID)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
 			resp, err := server.Client().Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("someisocontent"))
@@ -270,7 +270,7 @@ var _ = Describe("ServeHTTP", func() {
 			defer server.Close()
 
 			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full&api_key=mytoken", imageID)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
 			resp, err := server.Client().Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("someisocontent"))
