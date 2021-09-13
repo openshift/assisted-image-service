@@ -146,6 +146,27 @@ func Create(outPath string, workDir string, volumeLabel string) error {
 				},
 			},
 		}
+	} else if exists, _ := fileExists(filepath.Join(workDir, "images/efiboot.img")); exists {
+		// Creating an ISO with EFI boot only
+		efiSectors, err := efiLoadSectors(workDir)
+		if err != nil {
+			return err
+		}
+		if exists, _ := fileExists(filepath.Join(workDir, "boot.catalog")); !exists {
+			return fmt.Errorf("missing boot.catalog file")
+		}
+		options.ElTorito = &iso9660.ElTorito{
+			BootCatalog:     "boot.catalog",
+			HideBootCatalog: true,
+			Entries: []*iso9660.ElToritoEntry{
+				{
+					Platform:  iso9660.EFI,
+					Emulation: iso9660.NoEmulation,
+					BootFile:  "images/efiboot.img",
+					LoadSize:  efiSectors,
+				},
+			},
+		}
 	}
 
 	return iso.Finalize(options)

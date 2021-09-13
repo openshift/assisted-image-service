@@ -51,6 +51,9 @@ func createTestFiles(volumeID string) (string, string) {
 	f, err := os.Create(filepath.Join(filesDir, "images", "efiboot.img"))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(f.Truncate(8184422)).To(Succeed())
+	f, err = os.Create(filepath.Join(filesDir, "isolinux", "isolinux.bin"))
+	Expect(err).ToNot(HaveOccurred())
+	Expect(f.Truncate(64)).To(Succeed())
 
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/assisted_installer_custom.img"), make([]byte, RamDiskPaddingLength), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/ignition.img"), make([]byte, ignitionPaddingLength), 0600)).To(Succeed())
