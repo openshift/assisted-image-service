@@ -22,6 +22,7 @@ var Options struct {
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
+	MaxConcurrentRequests int    `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 }
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile))
+	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
 	http.Handle("/health", handlers.NewHealthHandler())
 	http.Handle("/metrics", promhttp.Handler())
 

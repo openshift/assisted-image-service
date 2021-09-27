@@ -32,6 +32,7 @@ skipper make test
 - `REQUEST_AUTH_TYPE` - determines how the auth token should be passed to the assisted service - either `header` or `param`
   - For `header` a header of the form `Authorization: Bearer <token>` is used
   - For `param` an `api_key=<token>` query parameter is added to the URL
+- `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 
 Example `RHCOS_VERSIONS`:
 ```json
