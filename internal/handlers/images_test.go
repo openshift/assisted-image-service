@@ -120,6 +120,7 @@ var _ = Describe("ServeHTTP", func() {
 					AssistedServiceHost:   u.Host,
 					AssistedServiceScheme: u.Scheme,
 					Client:                http.DefaultClient,
+					sem:                   make(chan struct{}, 100),
 				}
 				server = httptest.NewServer(handler)
 				client = server.Client()
@@ -229,6 +230,7 @@ var _ = Describe("ServeHTTP", func() {
 				AssistedServiceScheme: u.Scheme,
 				RequestAuthType:       RequestAuthTypeHeader,
 				Client:                http.DefaultClient,
+				sem:                   make(chan struct{}, 100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -265,6 +267,7 @@ var _ = Describe("ServeHTTP", func() {
 				AssistedServiceScheme: u.Scheme,
 				RequestAuthType:       RequestAuthTypeParam,
 				Client:                http.DefaultClient,
+				sem:                   make(chan struct{}, 100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()

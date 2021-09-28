@@ -40,6 +40,7 @@ type ImageHandler struct {
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
 	RequestAuthType       string
 	Client                *http.Client
+	sem                   chan struct{}
 }
 
 type imageDownloadParams struct {
@@ -61,7 +62,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int) http.Handler {
 	metricsConfig := metrics.Config{
 		Prefix:          "assisted_image_service",
 		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
@@ -98,12 +99,23 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedSe
 		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
 		RequestAuthType:       requestAuthType,
 		Client:                client,
+		sem:                   make(chan struct{}, maxRequests),
 	}
 
 	return stdmiddleware.Handler("/images/:imageID", mdw, h)
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	select {
+	case h.sem <- struct{}{}:
+	case <-r.Context().Done():
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	defer func() {
+		<-h.sem
+	}()
+
 	clusterID, err := parseImageID(r.URL.Path)
 	if err != nil {
 		log.Errorf("failed to parse cluster ID: %v\n", err)
