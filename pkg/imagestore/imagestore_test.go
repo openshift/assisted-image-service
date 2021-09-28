@@ -50,7 +50,7 @@ var _ = Context("with a data directory configured", func() {
 			var (
 				ctrl       *gomock.Controller
 				mockEditor *isoeditor.MockEditor
-				version   = map[string]string{
+				version    = map[string]string{
 					"openshift_version": "4.8",
 					"cpu_architecture":  "x86_64",
 					"rootfs_url":        "http://example.com/image/48.img",
@@ -69,7 +69,7 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
 					),
 				)
-				version["url"] = ts.URL()+"/some.iso"
+				version["url"] = ts.URL() + "/some.iso"
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -88,7 +88,7 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 					),
 				)
-				version["url"] = ts.URL()+"/fail.iso"
+				version["url"] = ts.URL() + "/fail.iso"
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -102,7 +102,7 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
 					),
 				)
-				version["url"] = ts.URL()+"/some.iso"
+				version["url"] = ts.URL() + "/some.iso"
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -117,7 +117,7 @@ var _ = Context("with a data directory configured", func() {
 						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
 					),
 				)
-				version["url"] = ts.URL()+"/dontcallthis.iso"
+				version["url"] = ts.URL() + "/dontcallthis.iso"
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -134,7 +134,7 @@ var _ = Context("with a data directory configured", func() {
 						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
 					),
 				)
-				version["url"] = ts.URL()+"/dontcallthis.iso"
+				version["url"] = ts.URL() + "/dontcallthis.iso"
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
