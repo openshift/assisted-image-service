@@ -2,7 +2,6 @@ package imagestore
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,9 +42,7 @@ type ImageStore interface {
 	HaveVersion(version, arch string) bool
 }
 
-type Config struct {
-	Versions string `envconfig:"RHCOS_VERSIONS"`
-}
+type Config struct{}
 
 type rhcosStore struct {
 	cfg       *Config
@@ -59,29 +56,21 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir string, versions []map[string]string) (ImageStore, error) {
 	cfg := &Config{}
 	err := envconfig.Process("image-store", cfg)
 	if err != nil {
 		return nil, err
 	}
-	is := rhcosStore{
-		cfg:       cfg,
-		isoEditor: ed,
-		dataDir:   dataDir,
-	}
-	if cfg.Versions == "" {
-		is.versions = DefaultVersions
-	} else {
-		err = json.Unmarshal([]byte(cfg.Versions), &is.versions)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if err := validateVersions(is.versions); err != nil {
+	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
-	return &is, nil
+	return &rhcosStore{
+		cfg:       cfg,
+		versions:  versions,
+		isoEditor: ed,
+		dataDir:   dataDir,
+	}, nil
 }
 
 func validateVersions(versions []map[string]string) error {
