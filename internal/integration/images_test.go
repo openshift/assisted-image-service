@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -109,15 +110,34 @@ func getImage(path, imageType string, version map[string]string) filesystem.File
 	return fs
 }
 
+func startServers() {
+	// Set up assisted service
+	assistedServer = ghttp.NewServer()
+	u, err := url.Parse(assistedServer.URL())
+	Expect(err).NotTo(HaveOccurred())
+
+	// Set up image handler
+	reg := prometheus.NewRegistry()
+	handler := handlers.NewImageHandler(is, reg, u.Scheme, u.Host, "", "", 1)
+	imageServer = httptest.NewServer(handler)
+	imageClient = imageServer.Client()
+}
+
 var _ = Describe("Image integration tests", func() {
 	Context("full-iso", func() {
 		BeforeEach(func() {
+			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithInitRD), "file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
 			)
+		})
+
+		AfterEach(func() {
+			assistedServer.Close()
+			imageServer.Close()
 		})
 
 		for _, version := range versions {
@@ -134,6 +154,7 @@ var _ = Describe("Image integration tests", func() {
 
 	Context("minimal-iso with initrd", func() {
 		BeforeEach(func() {
+			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithInitRD), "file_name=discovery.ign"),
@@ -144,6 +165,11 @@ var _ = Describe("Image integration tests", func() {
 					ghttp.RespondWith(http.StatusOK, initrdContent),
 				),
 			)
+		})
+
+		AfterEach(func() {
+			assistedServer.Close()
+			imageServer.Close()
 		})
 
 		for _, version := range versions {
@@ -162,6 +188,7 @@ var _ = Describe("Image integration tests", func() {
 
 	Context("minimal-iso without initrd", func() {
 		BeforeEach(func() {
+			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithoutInitRD), "file_name=discovery.ign"),
@@ -172,6 +199,11 @@ var _ = Describe("Image integration tests", func() {
 					ghttp.RespondWith(http.StatusOK, []byte("")),
 				),
 			)
+		})
+
+		AfterEach(func() {
+			assistedServer.Close()
+			imageServer.Close()
 		})
 
 		for _, version := range versions {
@@ -202,21 +234,9 @@ var _ = BeforeSuite(func() {
 
 	err = is.Populate(ctxBg)
 	Expect(err).NotTo(HaveOccurred())
-
-	// Set up assisted service
-	assistedServer = ghttp.NewServer()
-	u, err := url.Parse(assistedServer.URL())
-	Expect(err).NotTo(HaveOccurred())
-
-	// Set up image handler
-	handler := handlers.NewImageHandler(is, u.Scheme, u.Host, "", "", 1)
-	imageServer = httptest.NewServer(handler)
-	imageClient = imageServer.Client()
 })
 
 var _ = AfterSuite(func() {
 	Expect(os.RemoveAll(imageDir)).To(Succeed())
 	Expect(os.RemoveAll(scratchSpaceDir)).To(Succeed())
-	assistedServer.Close()
-	imageServer.Close()
 })

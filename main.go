@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
@@ -54,9 +55,10 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
+	reg := prometheus.NewRegistry()
+	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
 	http.Handle("/health", handlers.NewHealthHandler())
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	log.Info("Starting http handler...")
 	address := fmt.Sprintf(":%s", Options.ListenPort)
