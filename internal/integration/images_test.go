@@ -22,7 +22,6 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
-	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -219,24 +218,4 @@ var _ = Describe("Image integration tests", func() {
 			})
 		}
 	})
-})
-
-var _ = BeforeSuite(func() {
-	var err error
-
-	imageDir, err = ioutil.TempDir("", "imagesTest")
-	Expect(err).To(BeNil())
-	scratchSpaceDir, err = ioutil.TempDir("", "imagesTestScratch")
-	Expect(err).NotTo(HaveOccurred())
-
-	is, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, versions)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = is.Populate(ctxBg)
-	Expect(err).NotTo(HaveOccurred())
-})
-
-var _ = AfterSuite(func() {
-	Expect(os.RemoveAll(imageDir)).To(Succeed())
-	Expect(os.RemoveAll(scratchSpaceDir)).To(Succeed())
 })
