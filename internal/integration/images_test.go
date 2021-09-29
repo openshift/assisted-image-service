@@ -139,9 +139,11 @@ var _ = Describe("Image integration tests", func() {
 			imageServer.Close()
 		})
 
-		for _, version := range versions {
+		for i := range versions {
+			version := versions[i]
+
 			It("returns a full image", func() {
-				By("getting an iso image")
+				By("getting an iso")
 				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithInitRD, version["openshift_version"], imagestore.ImageTypeFull, version["cpu_architecture"])
 				fs := getImage(path, "full-iso", version)
 
@@ -171,7 +173,8 @@ var _ = Describe("Image integration tests", func() {
 			imageServer.Close()
 		})
 
-		for _, version := range versions {
+		for i := range versions {
+			version := versions[i]
 			It("returns a minimal image with initrd", func() {
 				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithInitRD, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
 				fs := getImage(path, "minimal-iso-initrd", version)
@@ -205,7 +208,8 @@ var _ = Describe("Image integration tests", func() {
 			imageServer.Close()
 		})
 
-		for _, version := range versions {
+		for i := range versions {
+			version := versions[i]
 			It("returns a minimal image without initrd", func() {
 				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithoutInitRD, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
 				fs := getImage(path, "minimal-iso-no-initrd", version)
