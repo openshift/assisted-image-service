@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"bytes"
@@ -11,17 +11,19 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
+	// "path/filepath"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/cavaliercoder/go-cpio"
 	diskfs "github.com/diskfs/go-diskfs"
-	"github.com/diskfs/go-diskfs/filesystem"
+	"github.com/google/uuid"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -47,22 +49,20 @@ var (
 		},
 	}
 
-	assistedServer       *ghttp.Server
-	imageIDWithInitRD    = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
-	imageIDWithoutInitRD = "bf25292a-dddd-49dc-ab9c-3fb4c1f07072"
-	ignitionContent      = []byte("someignitioncontent")
-	initrdContent        = []byte("someramdisk")
-	imageServer          *httptest.Server
-	imageClient          *http.Client
+	assistedServer *ghttp.Server
+	imageServer    *httptest.Server
+	imageClient    *http.Client
 
-	imageDir        string
-	scratchSpaceDir string
-	is              imagestore.ImageStore
-	ctxBg           = context.Background()
+	imageDir   string
+	imageStore imagestore.ImageStore
 )
 
-func verifyIgnition(fs filesystem.FileSystem) {
-	// TODO(djzager): Export isoeditor.ignitionImagePath?
+func verifyIgnition(isoPath string, expectedContent []byte) {
+	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	Expect(err).NotTo(HaveOccurred())
+	fs, err := d.GetFilesystem(0)
+	Expect(err).NotTo(HaveOccurred())
+
 	f, err := fs.OpenFile("/images/ignition.img", os.O_RDONLY)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -71,17 +71,20 @@ func verifyIgnition(fs filesystem.FileSystem) {
 	cpioReader := cpio.NewReader(gzipReader)
 	hdr, err := cpioReader.Next()
 	Expect(err).NotTo(HaveOccurred())
-	// TODO(djzager): Tie this to some constant?
 	Expect(hdr.Name).To(Equal("config.ign"))
-	Expect(hdr.Size).To(Equal(int64(len(ignitionContent))))
+	Expect(hdr.Size).To(Equal(int64(len(expectedContent))))
 
 	content, err := ioutil.ReadAll(cpioReader)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(content).To(Equal(ignitionContent))
+	Expect(content).To(Equal(expectedContent))
 }
 
-func verifyRamdisk(fs filesystem.FileSystem, expectedContent []byte) {
-	// TODO(djzager): Should we export isoeditor.ramDiskImagePath?
+func verifyRamdisk(isoPath string, expectedContent []byte) {
+	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	Expect(err).NotTo(HaveOccurred())
+	fs, err := d.GetFilesystem(0)
+	Expect(err).NotTo(HaveOccurred())
+
 	f, err := fs.OpenFile("/images/assisted_installer_custom.img", os.O_RDONLY)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -90,23 +93,16 @@ func verifyRamdisk(fs filesystem.FileSystem, expectedContent []byte) {
 	Expect(bytes.TrimRight(content, "\x00")).To(Equal(expectedContent))
 }
 
-func getImage(path, imageType string, version map[string]string) filesystem.FileSystem {
-	resp, err := imageClient.Get(imageServer.URL + path)
+func getImage(urlPath, imageType string, version map[string]string) string {
+	resp, err := imageClient.Get(imageServer.URL + urlPath)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-	isoPath := filepath.Join(scratchSpaceDir, fmt.Sprintf("test-%s-%s.%s.iso", version["openshift_version"], imageType, version["cpu_architecture"]))
-	out, err := os.Create(isoPath)
+	isoFile, err := ioutil.TempFile("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], imageType, version["cpu_architecture"]))
 	Expect(err).NotTo(HaveOccurred())
-	_, err = io.Copy(out, resp.Body)
+	_, err = io.Copy(isoFile, resp.Body)
 	Expect(err).NotTo(HaveOccurred())
-
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
-	Expect(err).NotTo(HaveOccurred())
-	fs, err := d.GetFilesystem(0)
-	Expect(err).NotTo(HaveOccurred())
-
-	return fs
+	return isoFile.Name()
 }
 
 func startServers() {
@@ -117,18 +113,27 @@ func startServers() {
 
 	// Set up image handler
 	reg := prometheus.NewRegistry()
-	handler := handlers.NewImageHandler(is, reg, u.Scheme, u.Host, "", "", 1)
+	handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", "", 1)
 	imageServer = httptest.NewServer(handler)
 	imageClient = imageServer.Client()
 }
 
 var _ = Describe("Image integration tests", func() {
+	var (
+		isoFile         string
+		imageID         string
+		initrdContent   []byte
+		ignitionContent = []byte("someignitioncontent")
+	)
+
 	Context("full-iso", func() {
 		BeforeEach(func() {
+			imageID = uuid.New().String()
+
 			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithInitRD), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
 			)
@@ -137,6 +142,7 @@ var _ = Describe("Image integration tests", func() {
 		AfterEach(func() {
 			assistedServer.Close()
 			imageServer.Close()
+			Expect(os.Remove(isoFile)).To(Succeed())
 		})
 
 		for i := range versions {
@@ -144,25 +150,28 @@ var _ = Describe("Image integration tests", func() {
 
 			It("returns a full image", func() {
 				By("getting an iso")
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithInitRD, version["openshift_version"], imagestore.ImageTypeFull, version["cpu_architecture"])
-				fs := getImage(path, "full-iso", version)
+				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeFull, version["cpu_architecture"])
+				isoFile = getImage(path, "full-iso", version)
 
 				By("verifying ignition content")
-				verifyIgnition(fs)
+				verifyIgnition(isoFile, ignitionContent)
 			})
 		}
 	})
 
 	Context("minimal-iso with initrd", func() {
 		BeforeEach(func() {
+			imageID = uuid.New().String()
+			initrdContent = []byte("someramdisk")
+
 			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithInitRD), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageIDWithInitRD)),
+					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
 					ghttp.RespondWith(http.StatusOK, initrdContent),
 				),
 			)
@@ -171,34 +180,38 @@ var _ = Describe("Image integration tests", func() {
 		AfterEach(func() {
 			assistedServer.Close()
 			imageServer.Close()
+			Expect(os.Remove(isoFile)).To(Succeed())
 		})
 
 		for i := range versions {
 			version := versions[i]
 			It("returns a minimal image with initrd", func() {
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithInitRD, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
-				fs := getImage(path, "minimal-iso-initrd", version)
+				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
+				isoFile = getImage(path, "minimal-iso-initrd", version)
 
 				By("verifying ignition content")
-				verifyIgnition(fs)
+				verifyIgnition(isoFile, ignitionContent)
 
 				By("verifying ramdisk content")
-				verifyRamdisk(fs, initrdContent)
+				verifyRamdisk(isoFile, initrdContent)
 			})
 		}
 	})
 
 	Context("minimal-iso without initrd", func() {
 		BeforeEach(func() {
+			imageID = uuid.New().String()
+			initrdContent = []byte("")
+
 			startServers()
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageIDWithoutInitRD), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageIDWithoutInitRD)),
-					ghttp.RespondWith(http.StatusOK, []byte("")),
+					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+					ghttp.RespondWith(http.StatusOK, initrdContent),
 				),
 			)
 		})
@@ -206,20 +219,47 @@ var _ = Describe("Image integration tests", func() {
 		AfterEach(func() {
 			assistedServer.Close()
 			imageServer.Close()
+			Expect(os.Remove(isoFile)).To(Succeed())
 		})
 
 		for i := range versions {
 			version := versions[i]
 			It("returns a minimal image without initrd", func() {
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageIDWithoutInitRD, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
-				fs := getImage(path, "minimal-iso-no-initrd", version)
+				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
+				isoFile = getImage(path, "minimal-iso-no-initrd", version)
 
 				By("verifying ignition content")
-				verifyIgnition(fs)
+				verifyIgnition(isoFile, ignitionContent)
 
 				By("verifying ramdisk content")
-				verifyRamdisk(fs, []byte(""))
+				verifyRamdisk(isoFile, initrdContent)
 			})
 		}
 	})
 })
+
+var _ = BeforeSuite(func() {
+	var err error
+
+	imageDir, err = ioutil.TempDir("", "imagesTest")
+	Expect(err).To(BeNil())
+
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, versions)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = imageStore.Populate(context.Background())
+	Expect(err).NotTo(HaveOccurred())
+})
+
+var _ = AfterSuite(func() {
+	Expect(os.RemoveAll(imageDir)).To(Succeed())
+})
+
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration testing in short mode")
+		return
+	}
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "image building tests")
+}
