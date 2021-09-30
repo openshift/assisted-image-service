@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	// "path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -49,193 +48,133 @@ var (
 		},
 	}
 
-	assistedServer *ghttp.Server
-	imageServer    *httptest.Server
-	imageClient    *http.Client
-
 	imageDir   string
 	imageStore imagestore.ImageStore
 )
 
-func verifyIgnition(isoPath string, expectedContent []byte) {
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
-	Expect(err).NotTo(HaveOccurred())
-	fs, err := d.GetFilesystem(0)
-	Expect(err).NotTo(HaveOccurred())
-
-	f, err := fs.OpenFile("/images/ignition.img", os.O_RDONLY)
-	Expect(err).NotTo(HaveOccurred())
-
-	gzipReader, err := gzip.NewReader(f)
-	Expect(err).NotTo(HaveOccurred())
-	cpioReader := cpio.NewReader(gzipReader)
-	hdr, err := cpioReader.Next()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(hdr.Name).To(Equal("config.ign"))
-	Expect(hdr.Size).To(Equal(int64(len(expectedContent))))
-
-	content, err := ioutil.ReadAll(cpioReader)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(content).To(Equal(expectedContent))
-}
-
-func verifyRamdisk(isoPath string, expectedContent []byte) {
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
-	Expect(err).NotTo(HaveOccurred())
-	fs, err := d.GetFilesystem(0)
-	Expect(err).NotTo(HaveOccurred())
-
-	f, err := fs.OpenFile("/images/assisted_installer_custom.img", os.O_RDONLY)
-	Expect(err).NotTo(HaveOccurred())
-
-	content, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(bytes.TrimRight(content, "\x00")).To(Equal(expectedContent))
-}
-
-func getImage(urlPath, imageType string, version map[string]string) string {
-	resp, err := imageClient.Get(imageServer.URL + urlPath)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
-	isoFile, err := ioutil.TempFile("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], imageType, version["cpu_architecture"]))
-	Expect(err).NotTo(HaveOccurred())
-	_, err = io.Copy(isoFile, resp.Body)
-	Expect(err).NotTo(HaveOccurred())
-	return isoFile.Name()
-}
-
-func startServers() {
-	// Set up assisted service
-	assistedServer = ghttp.NewServer()
-	u, err := url.Parse(assistedServer.URL())
-	Expect(err).NotTo(HaveOccurred())
-
-	// Set up image handler
-	reg := prometheus.NewRegistry()
-	handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", "", 1)
-	imageServer = httptest.NewServer(handler)
-	imageClient = imageServer.Client()
-}
-
 var _ = Describe("Image integration tests", func() {
 	var (
-		isoFile         string
-		imageID         string
-		initrdContent   []byte
-		ignitionContent = []byte("someignitioncontent")
+		isoFilename    string
+		imageID        string
+		assistedServer *ghttp.Server
+		imageServer    *httptest.Server
+		imageClient    *http.Client
 	)
 
-	Context("full-iso", func() {
-		BeforeEach(func() {
-			imageID = uuid.New().String()
+	testcases := []struct {
+		name             string
+		imageType        string
+		expectedIgnition []byte
+		expectedRamdisk  []byte
+	}{
+		{
+			name:             "full-iso",
+			imageType:        imagestore.ImageTypeFull,
+			expectedIgnition: []byte("someignitioncontent"),
+			expectedRamdisk:  nil,
+		},
+		{
+			name:             "minimal-iso-with-initrd",
+			imageType:        imagestore.ImageTypeMinimal,
+			expectedIgnition: []byte("someignitioncontent"),
+			expectedRamdisk:  []byte("someramdiskcontent"),
+		},
+		{
+			name:             "minimal-iso-without-initrd",
+			imageType:        imagestore.ImageTypeMinimal,
+			expectedIgnition: []byte("someignitioncontent"),
+			expectedRamdisk:  []byte(""),
+		},
+	}
 
-			startServers()
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
-				),
-			)
-		})
+	for i := range testcases {
+		tc := testcases[i]
 
-		AfterEach(func() {
-			assistedServer.Close()
-			imageServer.Close()
-			Expect(os.Remove(isoFile)).To(Succeed())
-		})
+		Context(tc.name, func() {
+			BeforeEach(func() {
+				imageID = uuid.New().String()
 
-		for i := range versions {
-			version := versions[i]
+				// Set up assisted service
+				assistedServer = ghttp.NewServer()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusOK, tc.expectedIgnition),
+					),
+				)
+				if tc.expectedRamdisk != nil {
+					assistedServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+							ghttp.RespondWith(http.StatusOK, tc.expectedRamdisk),
+						),
+					)
+				}
 
-			It("returns a full image", func() {
-				By("getting an iso")
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeFull, version["cpu_architecture"])
-				isoFile = getImage(path, "full-iso", version)
-
-				By("verifying ignition content")
-				verifyIgnition(isoFile, ignitionContent)
+				// Set up image handler
+				reg := prometheus.NewRegistry()
+				handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", "", 1)
+				imageServer = httptest.NewServer(handler)
+				imageClient = imageServer.Client()
 			})
-		}
-	})
 
-	Context("minimal-iso with initrd", func() {
-		BeforeEach(func() {
-			imageID = uuid.New().String()
-			initrdContent = []byte("someramdisk")
-
-			startServers()
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
-					ghttp.RespondWith(http.StatusOK, initrdContent),
-				),
-			)
-		})
-
-		AfterEach(func() {
-			assistedServer.Close()
-			imageServer.Close()
-			Expect(os.Remove(isoFile)).To(Succeed())
-		})
-
-		for i := range versions {
-			version := versions[i]
-			It("returns a minimal image with initrd", func() {
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
-				isoFile = getImage(path, "minimal-iso-initrd", version)
-
-				By("verifying ignition content")
-				verifyIgnition(isoFile, ignitionContent)
-
-				By("verifying ramdisk content")
-				verifyRamdisk(isoFile, initrdContent)
+			AfterEach(func() {
+				assistedServer.Close()
+				imageServer.Close()
+				Expect(os.Remove(isoFilename)).To(Succeed())
 			})
-		}
-	})
 
-	Context("minimal-iso without initrd", func() {
-		BeforeEach(func() {
-			imageID = uuid.New().String()
-			initrdContent = []byte("")
+			for i := range versions {
+				version := versions[i]
 
-			startServers()
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
-					ghttp.RespondWith(http.StatusOK, initrdContent),
-				),
-			)
+				It("returns a properly generated "+tc.name+" iso image", func() {
+					By("getting an iso")
+					path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], tc.imageType, version["cpu_architecture"])
+					resp, err := imageClient.Get(imageServer.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+					isoFile, err := ioutil.TempFile("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], tc.name, version["cpu_architecture"]))
+					Expect(err).NotTo(HaveOccurred())
+					_, err = io.Copy(isoFile, resp.Body)
+					Expect(err).NotTo(HaveOccurred())
+					isoFilename = isoFile.Name()
+
+					By("opening the iso")
+					d, err := diskfs.OpenWithMode(isoFilename, diskfs.ReadOnly)
+					Expect(err).NotTo(HaveOccurred())
+					fs, err := d.GetFilesystem(0)
+					Expect(err).NotTo(HaveOccurred())
+
+					By("verifying ignition content")
+					f, err := fs.OpenFile("/images/ignition.img", os.O_RDONLY)
+					Expect(err).NotTo(HaveOccurred())
+					gzipReader, err := gzip.NewReader(f)
+					Expect(err).NotTo(HaveOccurred())
+					cpioReader := cpio.NewReader(gzipReader)
+					hdr, err := cpioReader.Next()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(hdr.Name).To(Equal("config.ign"))
+					Expect(hdr.Size).To(Equal(int64(len(tc.expectedIgnition))))
+					content, err := ioutil.ReadAll(cpioReader)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(content).To(Equal(tc.expectedIgnition))
+
+					if tc.expectedRamdisk != nil {
+						By("verifying ramdisk content")
+						f, err := fs.OpenFile("/images/assisted_installer_custom.img", os.O_RDONLY)
+						Expect(err).NotTo(HaveOccurred())
+
+						content, err := ioutil.ReadAll(f)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(bytes.TrimRight(content, "\x00")).To(Equal(tc.expectedRamdisk))
+					}
+				})
+			}
 		})
-
-		AfterEach(func() {
-			assistedServer.Close()
-			imageServer.Close()
-			Expect(os.Remove(isoFile)).To(Succeed())
-		})
-
-		for i := range versions {
-			version := versions[i]
-			It("returns a minimal image without initrd", func() {
-				path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], imagestore.ImageTypeMinimal, version["cpu_architecture"])
-				isoFile = getImage(path, "minimal-iso-no-initrd", version)
-
-				By("verifying ignition content")
-				verifyIgnition(isoFile, ignitionContent)
-
-				By("verifying ramdisk content")
-				verifyRamdisk(isoFile, initrdContent)
-			})
-		}
-	})
+	}
 })
 
 var _ = BeforeSuite(func() {
