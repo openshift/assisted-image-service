@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -42,10 +41,7 @@ type ImageStore interface {
 	HaveVersion(version, arch string) bool
 }
 
-type Config struct{}
-
 type rhcosStore struct {
-	cfg       *Config
 	versions  []map[string]string
 	isoEditor isoeditor.Editor
 	dataDir   string
@@ -57,16 +53,10 @@ const (
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir string, versions []map[string]string) (ImageStore, error) {
-	cfg := &Config{}
-	err := envconfig.Process("image-store", cfg)
-	if err != nil {
-		return nil, err
-	}
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
 	return &rhcosStore{
-		cfg:       cfg,
 		versions:  versions,
 		isoEditor: ed,
 		dataDir:   dataDir,
