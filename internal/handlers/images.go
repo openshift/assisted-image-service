@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
@@ -62,8 +63,9 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int) http.Handler {
 	metricsConfig := metrics.Config{
+		Registry:        reg,
 		Prefix:          "assisted_image_service",
 		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
 		SizeBuckets:     []float64{100, 1e6, 5e8, 1e9, 1e10},

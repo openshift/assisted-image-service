@@ -20,43 +20,6 @@ func TestImageStore(t *testing.T) {
 	RunSpecs(t, "imagestore")
 }
 
-var _ = Describe("NewImageStore", func() {
-	It("uses the default versions", func() {
-		is, err := NewImageStore(nil, "")
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(is.(*rhcosStore).versions).To(Equal(DefaultVersions))
-	})
-
-	Context("with RHCOS_VERSIONS set", func() {
-		var (
-			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
-		)
-
-		BeforeEach(func() {
-			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-		})
-		AfterEach(func() {
-			Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
-		})
-
-		It("initializes the versions value correctly", func() {
-			is, err := NewImageStore(nil, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			expected := []map[string]string{
-				{
-					"openshift_version": "4.8",
-					"cpu_architecture":  "x86_64",
-					"url":               "http://example.com/image/48.iso",
-					"rootfs_url":        "http://example.com/image/48.img",
-				},
-			}
-			Expect(is.(*rhcosStore).versions).To(Equal(expected))
-		})
-	})
-})
-
 var _ = Context("with a data directory configured", func() {
 	var (
 		dataDir string
@@ -85,9 +48,13 @@ var _ = Context("with a data directory configured", func() {
 
 		Describe("Populate", func() {
 			var (
-				ctrl             *gomock.Controller
-				mockEditor       *isoeditor.MockEditor
-				versionsTemplate = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "%s", "rootfs_url": "http://example.com/image/48.img"}]`
+				ctrl       *gomock.Controller
+				mockEditor *isoeditor.MockEditor
+				version    = map[string]string{
+					"openshift_version": "4.8",
+					"cpu_architecture":  "x86_64",
+					"rootfs_url":        "http://example.com/image/48.img",
+				}
 			)
 
 			BeforeEach(func() {
@@ -102,10 +69,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
 					),
 				)
-				versions := fmt.Sprintf(versionsTemplate, ts.URL()+"/some.iso")
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-
-				is, err := NewImageStore(mockEditor, dataDir)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
@@ -123,11 +88,10 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 					),
 				)
-				versions := fmt.Sprintf(versionsTemplate, ts.URL()+"/fail.iso")
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-
-				is, err := NewImageStore(mockEditor, dataDir)
+				version["url"] = ts.URL() + "/fail.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
+
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 			})
 
@@ -138,10 +102,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
 					),
 				)
-				versions := fmt.Sprintf(versionsTemplate, ts.URL()+"/some.iso")
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-
-				is, err := NewImageStore(mockEditor, dataDir)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(fmt.Errorf("minimal iso creation failed"))
@@ -155,11 +117,10 @@ var _ = Context("with a data directory configured", func() {
 						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
 					),
 				)
-				versions := fmt.Sprintf(versionsTemplate, ts.URL()+"/dontcallthis.iso")
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-
-				is, err := NewImageStore(mockEditor, dataDir)
+				version["url"] = ts.URL() + "/dontcallthis.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
+
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
@@ -173,11 +134,10 @@ var _ = Context("with a data directory configured", func() {
 						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
 					),
 				)
-				versions := fmt.Sprintf(versionsTemplate, ts.URL()+"/dontcallthis.iso")
-				Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-
-				is, err := NewImageStore(mockEditor, dataDir)
+				version["url"] = ts.URL() + "/dontcallthis.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
+
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-minimal-iso-4.8-x86_64.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
 
@@ -189,7 +149,7 @@ var _ = Context("with a data directory configured", func() {
 
 var _ = Describe("PathForParams", func() {
 	It("creates the correct path", func() {
-		is, err := NewImageStore(nil, "/tmp/some/dir")
+		is, err := NewImageStore(nil, "/tmp/some/dir", DefaultVersions)
 		Expect(err).NotTo(HaveOccurred())
 		expected := "/tmp/some/dir/rhcos-type-version-arch.iso"
 		Expect(is.PathForParams("type", "version", "arch")).To(Equal(expected))
@@ -198,31 +158,29 @@ var _ = Describe("PathForParams", func() {
 
 var _ = Describe("HaveVersion", func() {
 	var (
-		versions = `[
+		versions = []map[string]string{
 			{
 				"openshift_version": "4.8",
-				"cpu_architecture": "x86_64",
-				"url": "http://example.com/image/x86_64-48.iso",
-				"rootfs_url": "http://example.com/image/x86_64-48.img"
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-48.iso",
+				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 			},
 			{
 				"openshift_version": "4.9",
-				"cpu_architecture": "arm64",
-				"url": "http://example.com/image/arm64-49.iso",
-				"rootfs_url": "http://example.com/image/arm64-49.img"
-			}
-		]`
+				"cpu_architecture":  "arm64",
+				"url":               "http://example.com/image/arm64-49.iso",
+				"rootfs_url":        "http://example.com/image/arm64-49.img",
+			},
+		}
 		store ImageStore
 	)
 
 	BeforeEach(func() {
-		Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
 		var err error
-		store, err = NewImageStore(nil, "")
+		store, err = NewImageStore(nil, "", versions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 	AfterEach(func() {
-		Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
 	})
 
 	It("is true for versions that are present", func() {
