@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
@@ -23,6 +25,7 @@ var Options struct {
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
 	MaxConcurrentRequests int    `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
+	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 }
 
 func main() {
@@ -32,7 +35,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir)
+
+	var versions []map[string]string
+	if Options.RHCOSVersions == "" {
+		versions = imagestore.DefaultVersions
+	} else {
+		err = json.Unmarshal([]byte(Options.RHCOSVersions), &versions)
+		if err != nil {
+			log.Fatalf("Failed to unmarshal versions: %v\n", err)
+		}
+	}
+
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, versions)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
@@ -41,9 +55,10 @@ func main() {
 		log.Fatalf("Failed to populate image store: %v\n", err)
 	}
 
-	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
+	reg := prometheus.NewRegistry()
+	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
 	http.Handle("/health", handlers.NewHealthHandler())
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	log.Info("Starting http handler...")
 	address := fmt.Sprintf(":%s", Options.ListenPort)

@@ -2,14 +2,12 @@ package imagestore
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -43,12 +41,7 @@ type ImageStore interface {
 	HaveVersion(version, arch string) bool
 }
 
-type Config struct {
-	Versions string `envconfig:"RHCOS_VERSIONS"`
-}
-
 type rhcosStore struct {
-	cfg       *Config
 	versions  []map[string]string
 	isoEditor isoeditor.Editor
 	dataDir   string
@@ -59,29 +52,15 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
-	cfg := &Config{}
-	err := envconfig.Process("image-store", cfg)
-	if err != nil {
+func NewImageStore(ed isoeditor.Editor, dataDir string, versions []map[string]string) (ImageStore, error) {
+	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
-	is := rhcosStore{
-		cfg:       cfg,
+	return &rhcosStore{
+		versions:  versions,
 		isoEditor: ed,
 		dataDir:   dataDir,
-	}
-	if cfg.Versions == "" {
-		is.versions = DefaultVersions
-	} else {
-		err = json.Unmarshal([]byte(cfg.Versions), &is.versions)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if err := validateVersions(is.versions); err != nil {
-		return nil, err
-	}
-	return &is, nil
+	}, nil
 }
 
 func validateVersions(versions []map[string]string) error {

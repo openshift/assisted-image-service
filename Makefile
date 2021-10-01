@@ -14,6 +14,12 @@ lint:
 test:
 	go test ./...
 
+test-short:
+	go test -short ./...
+
+test-integration:
+	go test ./integration_test/...
+
 generate:
 	go generate $(shell go list ./...)
 	$(MAKE) format
