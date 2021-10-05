@@ -22,6 +22,7 @@ import (
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -41,7 +42,7 @@ type ImageHandler struct {
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
 	RequestAuthType       string
 	Client                *http.Client
-	sem                   chan struct{}
+	sem                   *semaphore.Weighted
 }
 
 type imageDownloadParams struct {
@@ -63,7 +64,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int64) http.Handler {
 	metricsConfig := metrics.Config{
 		Registry:        reg,
 		Prefix:          "assisted_image_service",
@@ -101,22 +102,19 @@ func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assiste
 		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
 		RequestAuthType:       requestAuthType,
 		Client:                client,
-		sem:                   make(chan struct{}, maxRequests),
+		sem:                   semaphore.NewWeighted(maxRequests),
 	}
 
 	return stdmiddleware.Handler("/images/:imageID", mdw, h)
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	select {
-	case h.sem <- struct{}{}:
-	case <-r.Context().Done():
+	if err := h.sem.Acquire(r.Context(), 1); err != nil {
+		log.Errorf("Failed to acquire semaphore: %v", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	defer func() {
-		<-h.sem
-	}()
+	defer h.sem.Release(1)
 
 	clusterID, err := parseImageID(r.URL.Path)
 	if err != nil {

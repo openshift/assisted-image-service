@@ -24,7 +24,7 @@ var Options struct {
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
-	MaxConcurrentRequests int    `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
+	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 }
 
