@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -41,7 +43,7 @@ type ImageHandler struct {
 	GenerateImageStream   isoeditor.StreamGeneratorFunc
 	RequestAuthType       string
 	Client                *http.Client
-	sem                   chan struct{}
+	sem                   *semaphore.Weighted
 }
 
 type imageDownloadParams struct {
@@ -63,7 +65,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, requestAuthType, caCertFile string, maxRequests int64) http.Handler {
 	metricsConfig := metrics.Config{
 		Registry:        reg,
 		Prefix:          "assisted_image_service",
@@ -101,22 +103,19 @@ func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assiste
 		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
 		RequestAuthType:       requestAuthType,
 		Client:                client,
-		sem:                   make(chan struct{}, maxRequests),
+		sem:                   semaphore.NewWeighted(maxRequests),
 	}
 
 	return stdmiddleware.Handler("/images/:imageID", mdw, h)
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	select {
-	case h.sem <- struct{}{}:
-	case <-r.Context().Done():
+	if err := h.sem.Acquire(r.Context(), 1); err != nil {
+		log.Errorf("Failed to acquire semaphore: %v", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	defer func() {
-		<-h.sem
-	}()
+	defer h.sem.Release(1)
 
 	clusterID, err := parseImageID(r.URL.Path)
 	if err != nil {
@@ -135,7 +134,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isoReader, err := h.imageStreamForID(clusterID, params)
+	isoReader, err := h.imageStreamForID(r.Context(), clusterID, params)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -180,15 +179,15 @@ func (h *ImageHandler) parseQueryParams(values url.Values) (*imageDownloadParams
 	}, nil
 }
 
-func (h *ImageHandler) imageStreamForID(imageID string, params *imageDownloadParams) (io.ReadSeeker, error) {
-	ignition, err := h.ignitionContent(imageID, params.apiKey)
+func (h *ImageHandler) imageStreamForID(ctx context.Context, imageID string, params *imageDownloadParams) (io.ReadSeeker, error) {
+	ignition, err := h.ignitionContent(ctx, imageID, params.apiKey)
 	if err != nil {
 		return nil, err
 	}
 
 	var ramdisk []byte
 	if params.imageType == imagestore.ImageTypeMinimal {
-		ramdisk, err = h.ramdiskContent(imageID, params.apiKey)
+		ramdisk, err = h.ramdiskContent(ctx, imageID, params.apiKey)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +196,7 @@ func (h *ImageHandler) imageStreamForID(imageID string, params *imageDownloadPar
 	return h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk)
 }
 
-func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {
+func (h *ImageHandler) ramdiskContent(ctx context.Context, imageID, apiKey string) ([]byte, error) {
 	var ramdiskBytes []byte
 	if h.AssistedServiceHost == "" {
 		return nil, nil
@@ -208,7 +207,7 @@ func (h *ImageHandler) ramdiskContent(imageID, apiKey string) ([]byte, error) {
 		Host:   h.AssistedServiceHost,
 		Path:   fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +251,7 @@ func (h *ImageHandler) setRequestAuth(req *http.Request, apiKey string) error {
 	return nil
 }
 
-func (h *ImageHandler) ignitionContent(imageID string, apiKey string) ([]byte, error) {
+func (h *ImageHandler) ignitionContent(ctx context.Context, imageID string, apiKey string) ([]byte, error) {
 	if h.AssistedServiceHost == "" {
 		return nil, nil
 	}
@@ -266,7 +265,7 @@ func (h *ImageHandler) ignitionContent(imageID string, apiKey string) ([]byte, e
 	queryValues.Set("file_name", "discovery.ign")
 	u.RawQuery = queryValues.Encode()
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
