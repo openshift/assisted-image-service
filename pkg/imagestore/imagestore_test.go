@@ -237,3 +237,76 @@ var _ = Describe("HaveVersion", func() {
 		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
 	})
 })
+
+var _ = Describe("NewImageStore", func() {
+
+	It("should not error with valid version", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-48.iso",
+				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should error when RHCOS_IMAGES are not set i.e. versions is an empty slice", func() {
+		versions := []map[string]string{}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal("invalid versions: must not be empty"))
+
+	})
+
+	It("should error when openshift_version is not set", func() {
+		versions := []map[string]string{
+			{
+				"cpu_architecture": "x86_64",
+				"url":              "http://example.com/image/x86_64-48.iso",
+				"rootfs_url":       "http://example.com/image/x86_64-48.img",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should error when cpu_architecture is not set", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.8",
+				"url":               "http://example.com/image/x86_64-48.iso",
+				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should error when url is not set", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should error when rootfs_url is not set", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-48.iso",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+	})
+
+})
