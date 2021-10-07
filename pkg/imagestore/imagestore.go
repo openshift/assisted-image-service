@@ -85,6 +85,9 @@ func NewImageStore(ed isoeditor.Editor, dataDir string) (ImageStore, error) {
 }
 
 func validateVersions(versions []map[string]string) error {
+	if len(versions) == 0 {
+		return fmt.Errorf("invalid versions: must not be empty")
+	}
 	for _, entry := range versions {
 		missingKeyFmt := "invalid version entry %+v: missing %s key"
 		if _, ok := entry["openshift_version"]; !ok {
