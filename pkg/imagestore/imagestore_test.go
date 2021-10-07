@@ -29,18 +29,15 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	Context("with RHCOS_VERSIONS set", func() {
-		var (
-			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
-		)
-
-		BeforeEach(func() {
-			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
-		})
+		var versions string
 		AfterEach(func() {
 			Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
 		})
 
 		It("initializes the versions value correctly", func() {
+			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
 			is, err := NewImageStore(nil, "")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -53,6 +50,48 @@ var _ = Describe("NewImageStore", func() {
 				},
 			}
 			Expect(is.(*rhcosStore).versions).To(Equal(expected))
+		})
+
+		It("should error when RHCOS_IMAGES is set as an empty slice/array", func() {
+			versions = "[]"
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+			_, err := NewImageStore(nil, "")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("invalid versions: must not be empty"))
+
+		})
+
+		It("should error when openshift_version is not set", func() {
+			versions = `[{"cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+			_, err := NewImageStore(nil, "")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should error when cpu_architecture is not set", func() {
+			versions = `[{"openshift_version": "4.8", "url": "http://example.com/image/48.iso", "rootfs_url": "http://example.com/image/48.img"}]`
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+			_, err := NewImageStore(nil, "")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should error when url is not set", func() {
+			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "rootfs_url": "http://example.com/image/48.img"}]`
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+			_, err := NewImageStore(nil, "")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should error when rootfs_url is not set", func() {
+			versions = `[{"openshift_version": "4.8", "cpu_architecture": "x86_64", "url": "http://example.com/image/48.iso"}]`
+			Expect(os.Setenv("RHCOS_VERSIONS", versions)).To(Succeed())
+
+			_, err := NewImageStore(nil, "")
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
