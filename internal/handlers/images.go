@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -14,10 +12,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/cavaliercoder/go-cpio"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
@@ -251,7 +247,7 @@ func (h *ImageHandler) setRequestAuth(req *http.Request, apiKey string) error {
 	return nil
 }
 
-func (h *ImageHandler) ignitionContent(ctx context.Context, imageID string, apiKey string) ([]byte, error) {
+func (h *ImageHandler) ignitionContent(ctx context.Context, imageID string, apiKey string) (*isoeditor.IgnitionContent, error) {
 	if h.AssistedServiceHost == "" {
 		return nil, nil
 	}
@@ -286,29 +282,5 @@ func (h *ImageHandler) ignitionContent(ctx context.Context, imageID string, apiK
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Create CPIO archive
-	archiveBuffer := new(bytes.Buffer)
-	cpioWriter := cpio.NewWriter(archiveBuffer)
-	if err := cpioWriter.WriteHeader(&cpio.Header{Name: "config.ign", Mode: 0o100_644, Size: int64(len(ignitionBytes))}); err != nil {
-		return nil, errors.Wrap(err, "Failed to write CPIO header")
-	}
-	if _, err := cpioWriter.Write(ignitionBytes); err != nil {
-
-		return nil, errors.Wrap(err, "Failed to write CPIO archive")
-	}
-	if err := cpioWriter.Close(); err != nil {
-		return nil, errors.Wrap(err, "Failed to close CPIO archive")
-	}
-
-	// Run gzip compression
-	compressedBuffer := new(bytes.Buffer)
-	gzipWriter := gzip.NewWriter(compressedBuffer)
-	if _, err := gzipWriter.Write(archiveBuffer.Bytes()); err != nil {
-		return nil, errors.Wrap(err, "Failed to gzip archive")
-	}
-	if err := gzipWriter.Close(); err != nil {
-		return nil, errors.Wrap(err, "Failed to gzip archive")
-	}
-
-	return compressedBuffer.Bytes(), nil
+	return &isoeditor.IgnitionContent{Config: ignitionBytes}, nil
 }
