@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -25,14 +26,13 @@ func TestHandlers(t *testing.T) {
 
 var _ = Describe("ServeHTTP", func() {
 	var (
-		ctrl                 *gomock.Controller
-		mockImageStore       *imagestore.MockImageStore
-		fullImageFilename    string
-		minImageFilename     string
-		imageID              = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
-		assistedServer       *ghttp.Server
-		ignitionContent      = "someignitioncontent"
-		ignitionArchiveBytes = []byte{31, 139, 8, 0, 0, 0, 0, 0, 0, 255, 50, 48, 55, 48, 55, 48, 52, 128, 0, 48, 109, 97, 232, 104, 98, 128, 29, 24, 162, 113, 141, 113, 168, 67, 7, 78, 48, 70, 114, 126, 94, 90, 102, 186, 94, 102, 122, 30, 3, 3, 3, 67, 113, 126, 110, 106, 102, 122, 94, 102, 73, 102, 126, 94, 114, 126, 94, 73, 106, 94, 9, 3, 138, 123, 8, 1, 98, 213, 225, 116, 79, 72, 144, 163, 167, 143, 107, 144, 162, 162, 34, 200, 61, 128, 0, 0, 0, 255, 255, 191, 236, 44, 242, 12, 1, 0, 0}
+		ctrl              *gomock.Controller
+		mockImageStore    *imagestore.MockImageStore
+		fullImageFilename string
+		minImageFilename  string
+		imageID           = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+		assistedServer    *ghttp.Server
+		ignitionContent   = "someignitioncontent"
 	)
 
 	Context("with image files", func() {
@@ -106,9 +106,9 @@ var _ = Describe("ServeHTTP", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				initrdContent = nil
-				mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
 					defer GinkgoRecover()
-					Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					if isoPath == minImageFilename {
 						Expect(ramdiskBytes).To(Equal(initrdContent))
 					}
@@ -218,9 +218,9 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
 				defer GinkgoRecover()
-				Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
+				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 				return os.Open(isoPath)
 			}
 
@@ -255,9 +255,9 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignitionBytes []byte, ramdiskBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
 				defer GinkgoRecover()
-				Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
+				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 				return os.Open(isoPath)
 			}
 
