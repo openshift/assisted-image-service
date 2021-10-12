@@ -50,14 +50,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
-	err = is.Populate(context.Background())
-	if err != nil {
-		log.Fatalf("Failed to populate image store: %v\n", err)
-	}
+
+	readinessHandler := handlers.NewReadinessHandler()
+
+	go func() {
+		err = is.Populate(context.Background())
+		if err != nil {
+			log.Fatalf("Failed to populate image store: %v\n", err)
+		}
+		readinessHandler.Enable()
+	}()
 
 	reg := prometheus.NewRegistry()
 	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
-	http.Handle("/health", handlers.NewHealthHandler())
+	http.Handle("/health", readinessHandler)
+	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	log.Info("Starting http handler...")
