@@ -298,3 +298,22 @@ var _ = Describe("parseImageID", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+
+var _ = Describe("readiness handler", func() {
+	It("Not ready to Ready", func() {
+		readinessHandler := NewReadinessHandler()
+		server := httptest.NewServer(readinessHandler)
+		defer server.Close()
+
+		resp, err := server.Client().Get(server.URL + "/ready")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+
+		By("Enable readiness handler")
+		readinessHandler.Enable()
+
+		resp, err = server.Client().Get(server.URL + "/ready")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	})
+})

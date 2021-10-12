@@ -72,7 +72,12 @@ Downloads the RHCOS image for the specified image ID.
 
 ### `GET /health`
 
+Returns 503 until the images are downloaded
 Returns 200 if the service is ready to respond to requests
+
+### `GET /live`
+
+Returns 200 if the service is running
 
 ### `GET /metrics`
 
