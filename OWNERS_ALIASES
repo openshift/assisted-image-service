@@ -5,7 +5,6 @@ aliases:
     - eranco74
     - filanov
     - gamli75
-    - ronniel1
   code-reviewers:
     - avishayt
     - empovit
@@ -13,19 +12,14 @@ aliases:
     - filanov
     - gamli75
     - ori-amizur
-    - oshercc
-    - razregev
-    - ronniel1
     - tsorya
     - yevgeny-shnaidman
-    - yuvigold
     - nmagnezi
     - carbonin
     - rollandf
     - danielerez
     - ybettan
     - slaviered
-    - sacharya
     - rwsu
     - omertuc
     - eliorerz
@@ -38,8 +32,9 @@ aliases:
     - pawanpinjarkar
     - sagidayan
   ci-approvers:
-    - yuvigold
-    - oshercc
+    - lranjbar
+    - osherdp
+    - eliorerz
   reviewers-only:
     - jakub-dzon
     - pkliczewski
@@ -49,4 +44,3 @@ aliases:
     - rewantsoni
     - nbalacha
     - priyanka19-98
-
