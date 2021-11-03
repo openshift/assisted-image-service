@@ -29,9 +29,6 @@ skipper make test
 - `HTTPS_CERT_FILE` - tls cert file path
 - `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
 - `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
-- `REQUEST_AUTH_TYPE` - determines how the auth token should be passed to the assisted service - either `header` or `param`
-  - For `header` a header of the form `Authorization: Bearer <token>` is used
-  - For `param` an `api_key=<token>` query parameter is added to the URL
 - `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 
 Example `RHCOS_VERSIONS`:
@@ -69,7 +66,12 @@ Downloads the RHCOS image for the specified image ID.
 - `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
 - `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
 - `type`: `full-iso` to download the ISO including the rootfs, `minimal-iso` to download the iso without the rootfs
-- `api_key`: the api token to pass through to the assisted service calls if authentication is required
+- `api_key`: the api token to pass through to the assisted service calls if local authentication is required
+- `image_token`: the token to pass through to the Image-Token assisted service header if image pre-signed authentication is required
+
+#### Headers
+
+- `Authorization`: this header is passed directly through to assisted service requests to handle RHSSO authentication
 
 ### `GET /health`
 
@@ -83,3 +85,14 @@ Returns 200 if the service is running
 ### `GET /metrics`
 
 Prometheus metrics scraping endpoint
+
+## Authentication
+
+Authentication tokens are accepted in various ways to support different deployment models and assisted service authentication backends
+The following table shows how each authentication input is translated when making calls to assisted service
+
+| Image Service                 | Assisted Service          |
+|-------------------------------|---------------------------|
+| `api_key` query parameter     | `api_key` query parameter |
+| `image_token` query parameter | `Image-Token` header      |
+| `Authorization` header        | `Authorization` header    |
