@@ -23,7 +23,6 @@ var Options struct {
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
-	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 }
@@ -62,7 +61,7 @@ func main() {
 	}()
 
 	reg := prometheus.NewRegistry()
-	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
+	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
 	http.Handle("/health", readinessHandler)
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))

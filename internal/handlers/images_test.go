@@ -206,7 +206,7 @@ var _ = Describe("ServeHTTP", func() {
 			})
 		})
 
-		It("passes the token in a header with header auth", func() {
+		It("passes Authorization header through to assisted requests", func() {
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
@@ -229,7 +229,6 @@ var _ = Describe("ServeHTTP", func() {
 				GenerateImageStream:   mockImageStream,
 				AssistedServiceHost:   u.Host,
 				AssistedServiceScheme: u.Scheme,
-				RequestAuthType:       RequestAuthTypeHeader,
 				Client:                http.DefaultClient,
 				sem:                   semaphore.NewWeighted(100),
 			}
@@ -237,13 +236,17 @@ var _ = Describe("ServeHTTP", func() {
 			defer server.Close()
 
 			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
-			resp, err := server.Client().Get(server.URL + path)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+			req, err := http.NewRequest(http.MethodGet, server.URL+path, nil)
+			Expect(err).NotTo(HaveOccurred())
+			req.Header.Set("Authorization", "Bearer mytoken")
+
+			resp, err := server.Client().Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("someisocontent"))
 		})
 
-		It("passes the token in a param with param auth", func() {
+		It("passes api_key param through to assisted requests", func() {
 			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -266,7 +269,6 @@ var _ = Describe("ServeHTTP", func() {
 				GenerateImageStream:   mockImageStream,
 				AssistedServiceHost:   u.Host,
 				AssistedServiceScheme: u.Scheme,
-				RequestAuthType:       RequestAuthTypeParam,
 				Client:                http.DefaultClient,
 				sem:                   semaphore.NewWeighted(100),
 			}
@@ -275,6 +277,43 @@ var _ = Describe("ServeHTTP", func() {
 
 			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
 			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
+			resp, err := server.Client().Get(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			expectSuccessfulResponse(resp, []byte("someisocontent"))
+		})
+
+		It("passes image_token param through to assisted requests header", func() {
+			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+			assistedServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign"),
+					ghttp.VerifyHeader(http.Header{"Image-Token": []string{"mytoken"}}),
+					ghttp.RespondWith(http.StatusOK, ignitionContent),
+				),
+			)
+
+			u, err := url.Parse(assistedServer.URL())
+			Expect(err).NotTo(HaveOccurred())
+
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
+				defer GinkgoRecover()
+				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+				return os.Open(isoPath)
+			}
+
+			handler := &ImageHandler{
+				ImageStore:            mockImageStore,
+				GenerateImageStream:   mockImageStream,
+				AssistedServiceHost:   u.Host,
+				AssistedServiceScheme: u.Scheme,
+				Client:                http.DefaultClient,
+				sem:                   semaphore.NewWeighted(100),
+			}
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&image_token=mytoken", imageID)
 			resp, err := server.Client().Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("someisocontent"))

@@ -115,7 +115,7 @@ var _ = Describe("Image integration tests", func() {
 
 				// Set up image handler
 				reg := prometheus.NewRegistry()
-				handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", "", 1)
+				handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", 1)
 				imageServer = httptest.NewServer(handler)
 				imageClient = imageServer.Client()
 			})
