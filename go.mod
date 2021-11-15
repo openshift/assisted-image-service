@@ -15,5 +15,6 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/slok/go-http-metrics v0.9.0
+	github.com/thoas/go-funk v0.9.1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )

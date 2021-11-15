@@ -3,6 +3,7 @@ package imagestore
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,6 +30,10 @@ var _ = Context("with a data directory configured", func() {
 		var err error
 		dataDir, err = os.MkdirTemp("", "imageStoreTest")
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(dataDir)
 	})
 
 	Context("with a test server", func() {
@@ -127,21 +132,40 @@ var _ = Context("with a data directory configured", func() {
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
-			It("doesn't create the minimal iso when it's already present", func() {
-				ts.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/dontcallthis.iso"),
-						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
-					),
-				)
-				version["url"] = ts.URL() + "/dontcallthis.iso"
+			It("recreates the minimal iso even when it's already present", func() {
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-minimal-iso-4.8-x86_64.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
+				fullPath := filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso")
+				Expect(os.WriteFile(fullPath, []byte("moreisocontent"), 0600)).To(Succeed())
+
+				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-4.8-x86_64.iso")
+				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, "http://example.com/image/48.img", minimalPath).Return(nil)
 
 				Expect(is.Populate(ctx)).To(Succeed())
+			})
+
+			It("cleans up files that are not configured isos", func() {
+				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-x86_64.iso")
+				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
+
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				_, err = os.Stat(oldISOPath)
+				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 		})
 	})

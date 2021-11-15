@@ -10,6 +10,7 @@ import (
 
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -114,6 +115,10 @@ func downloadURLToFile(url string, path string) error {
 }
 
 func (s *rhcosStore) Populate(ctx context.Context) error {
+	if err := s.cleanDataDir(); err != nil {
+		return err
+	}
+
 	errs, _ := errgroup.WithContext(ctx)
 
 	for i := range s.versions {
@@ -155,7 +160,36 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 }
 
 func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
-	return filepath.Join(s.dataDir, fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch))
+	return filepath.Join(s.dataDir, isoFileName(imageType, version, arch))
+}
+
+func isoFileName(imageType, version, arch string) string {
+	return fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch)
+}
+
+func (s *rhcosStore) cleanDataDir() error {
+	var expectedFiles []string
+	for _, version := range s.versions {
+		// Only add full isos here as we want to regenerate the minimal image on each deploy
+		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version["openshift_version"], version["cpu_architecture"]))
+	}
+
+	dataDirFiles, err := os.ReadDir(s.dataDir)
+	if err != nil {
+		return err
+	}
+
+	for _, dataDirFile := range dataDirFiles {
+		if !funk.ContainsString(expectedFiles, dataDirFile.Name()) {
+			fileName := filepath.Join(s.dataDir, dataDirFile.Name())
+			log.Infof("Removing %s from data directory", fileName)
+			if err := os.RemoveAll(fileName); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *rhcosStore) HaveVersion(version, arch string) bool {
