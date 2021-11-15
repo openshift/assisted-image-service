@@ -34,24 +34,27 @@ skipper make test
 Example `RHCOS_VERSIONS`:
 ```json
 [
-    {
-        "openshift_version": "4.6",
-        "cpu_architecture": "x86_64",
-        "url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
-        "rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img"
-    },
-    {
-        "openshift_version": "4.7",
-        "cpu_architecture": "x86_64",
-        "url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
-        "rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img"
-    },
-    {
-        "openshift_version": "4.8",
-        "cpu_architecture": "x86_64",
-        "url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-4.8.2-x86_64-live.x86_64.iso",
-        "rootfs_url": "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.2/rhcos-live-rootfs.x86_64.img"
-    }
+	{
+		"openshift_version": "4.6",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
+		"version":           "46.82.202012051820-0"
+	},
+	{
+		"openshift_version": "4.7",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.33/rhcos-4.7.33-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.33/rhcos-live-rootfs.x86_64.img",
+		"version":           "47.84.202109241831-0"
+	},
+	{
+		"openshift_version": "4.8",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.14/rhcos-4.8.14-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.14/rhcos-live-rootfs.x86_64.img",
+		"version":           "48.84.202109241901-0"
+	}
 ]
 ```
 
