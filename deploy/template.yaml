@@ -1,0 +1,99 @@
+---
+parameters:
+- name: IMAGE_SERVICE_IMAGE
+  value: quay.io/app-sre/assisted-image-service
+- name: IMAGE_TAG
+  value: ''
+  required: true
+- name: OS_IMAGES
+  value: '[{"openshift_version":"4.6","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso","rootfs_url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img","version":"46.82.202012051820-0"},{"openshift_version":"4.7","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.33/rhcos-4.7.33-x86_64-live.x86_64.iso","rootfs_url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.33/rhcos-live-rootfs.x86_64.img","version":"47.84.202109241831-0"},{"openshift_version":"4.8","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.14/rhcos-4.8.14-x86_64-live.x86_64.iso","rootfs_url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.8/4.8.14/rhcos-live-rootfs.x86_64.img","version":"48.84.202109241901-0"},{"openshift_version":"4.9","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-x86_64-live.x86_64.iso","rootfs_url":"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.9/4.9.0/rhcos-live-rootfs.x86_64.img","version":"49.84.202110081407-0"},{"openshift_version":"4.9","cpu_architecture":"arm64","url":"https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-aarch64-live.aarch64.iso","rootfs_url":"https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-aarch64-live-rootfs.aarch64.img","version":"49.84.202110080947-0"}]' # os images
+  required: false
+- name: PV_SIZE
+  value: 10Gi
+- name: REPLICAS_COUNT
+  value: "3"
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: assisted-installer
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: assisted-image-service
+  spec:
+    ports:
+    - port: 8080
+      protocol: TCP
+    selector:
+      service: image-service
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    name: assisted-image-service
+  spec:
+    podManagementPolicy: Parallel
+    replicas: ${{REPLICAS_COUNT}}
+    selector:
+      matchLabels:
+        service: image-service
+    serviceName: assisted-image-service
+    template:
+      metadata:
+        labels:
+          service: image-service
+      spec:
+        containers:
+        - image: ${IMAGE_SERVICE_IMAGE}:${IMAGE_TAG}
+          name: assisted-image-service
+          env:
+          - name: LISTEN_PORT
+            value: "8080"
+          - name: RHCOS_VERSIONS
+            value: ${OS_IMAGES}
+          - name: ASSISTED_SERVICE_SCHEME
+            value: http
+          - name: ASSISTED_SERVICE_HOST
+            value: "assisted-service:8090"
+          - name: DATA_DIR
+            value: "/data"
+          ports:
+          - protocol: TCP
+            containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 400Mi
+            limits:
+              cpu: 200m
+              memory: 800Mi
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          volumeMounts:
+          - name: assisted-image-service
+            mountPath: "/data"
+        serviceAccountName: assisted-service
+    volumeClaimTemplates:
+    - metadata:
+        name: assisted-image-service
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: ${PV_SIZE}
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    name: assisted-image-service
+  spec:
+    minAvailable: 2
+    selector:
+      matchLabels:
+        service: image-service
