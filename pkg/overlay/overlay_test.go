@@ -107,3 +107,17 @@ var _ = Describe("OverlayReader", func() {
 		}
 	})
 })
+
+var _ = Describe("AppendReader", func() {
+
+	base := "abcdefghij"
+	appendString := "overlay"
+	expected := base + appendString
+
+	reader, err := NewAppendReader(strings.NewReader(base), strings.NewReader(appendString))
+	Expect(err).NotTo(HaveOccurred())
+
+	output, err := io.ReadAll(reader)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(string(output)).To(Equal(expected))
+})

@@ -59,6 +59,25 @@ func NewOverlayReader(base io.ReadSeeker, overlay Overlay) (io.ReadSeeker, error
 	return newReader(base, overlay, length)
 }
 
+func NewAppendReader(base io.ReadSeeker, reader io.ReadSeeker) (io.ReadSeeker, error) {
+	length, err := base.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	appendLength, err := reader.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	overlay := Overlay{
+		Reader: reader,
+		Offset: length,
+		Length: appendLength,
+	}
+	return newReader(base, overlay, length)
+}
+
 func (or *overlayReader) seek(index int64) (err error) {
 	if or.Overlay.contains(index) {
 		_, err = or.Overlay.Reader.Seek(index-or.Overlay.Offset, io.SeekStart)
