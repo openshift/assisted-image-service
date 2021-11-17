@@ -10,6 +10,7 @@ import (
 
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -19,18 +20,35 @@ var DefaultVersions = []map[string]string{
 		"cpu_architecture":  "x86_64",
 		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-4.6.8-x86_64-live.x86_64.iso",
 		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.6/4.6.8/rhcos-live-rootfs.x86_64.img",
+		"version":           "46.82.202012051820-0",
 	},
 	{
 		"openshift_version": "4.7",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.13/rhcos-4.7.13-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.13/rhcos-live-rootfs.x86_64.img",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.33/rhcos-4.7.33-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.7/4.7.33/rhcos-live-rootfs.x86_64.img",
+		"version":           "47.84.202109241831-0",
 	},
 	{
 		"openshift_version": "4.8",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.2/rhcos-4.8.2-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.2/rhcos-live-rootfs.x86_64.img",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.14/rhcos-4.8.14-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/4.8.14/rhcos-live-rootfs.x86_64.img",
+		"version":           "48.84.202109241901-0",
+	},
+	{
+		"openshift_version": "4.9",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.9/4.9.0/rhcos-live-rootfs.x86_64.img",
+		"version":           "49.84.202110081407-0",
+	},
+	{
+		"openshift_version": "4.9",
+		"cpu_architecture":  "arm64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-aarch64-live.aarch64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-aarch64-live-rootfs.aarch64.img",
+		"version":           "49.84.202110080947-0",
 	},
 }
 
@@ -81,6 +99,9 @@ func validateVersions(versions []map[string]string) error {
 		if _, ok := entry["rootfs_url"]; !ok {
 			return fmt.Errorf(missingKeyFmt, entry, "rootfs_url")
 		}
+		if _, ok := entry["version"]; !ok {
+			return fmt.Errorf(missingKeyFmt, entry, "version")
+		}
 	}
 
 	return nil
@@ -114,17 +135,21 @@ func downloadURLToFile(url string, path string) error {
 }
 
 func (s *rhcosStore) Populate(ctx context.Context) error {
+	if err := s.cleanDataDir(); err != nil {
+		return err
+	}
+
 	errs, _ := errgroup.WithContext(ctx)
 
 	for i := range s.versions {
-		version := s.versions[i]
+		imageInfo := s.versions[i]
 		errs.Go(func() error {
-			openshiftVersion := version["openshift_version"]
-			arch := version["cpu_architecture"]
+			imageVersion := imageInfo["version"]
+			arch := imageInfo["cpu_architecture"]
 
-			fullPath := s.PathForParams(ImageTypeFull, openshiftVersion, arch)
+			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, imageVersion, arch))
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-				url := version["url"]
+				url := imageInfo["url"]
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
 
 				err = downloadURLToFile(url, fullPath)
@@ -132,19 +157,19 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
 
-				log.Infof("Finished downloading for %s-%s", openshiftVersion, arch)
+				log.Infof("Finished downloading for %s-%s (%s)", imageInfo["openshift_version"], arch, imageVersion)
 			}
 
-			minimalPath := s.PathForParams(ImageTypeMinimal, openshiftVersion, arch)
+			minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, imageVersion, arch))
 			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
-				log.Infof("Creating minimal iso for %s-%s", openshiftVersion, arch)
+				log.Infof("Creating minimal iso for %s-%s", imageVersion, arch)
 
-				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, version["rootfs_url"], minimalPath)
+				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, imageInfo["rootfs_url"], minimalPath)
 				if err != nil {
-					return fmt.Errorf("failed to create minimal iso template for version %s: %v", version, err)
+					return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
 				}
 
-				log.Infof("Finished creating minimal iso for %s-%s", openshiftVersion, arch)
+				log.Infof("Finished creating minimal iso for %s-%s (%s)", imageInfo["openshift_version"], arch, imageVersion)
 			}
 
 			return nil
@@ -154,8 +179,43 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	return errs.Wait()
 }
 
-func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
-	return filepath.Join(s.dataDir, fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch))
+func (s *rhcosStore) PathForParams(imageType, openshiftVersion, arch string) string {
+	var version string
+	for _, entry := range s.versions {
+		if entry["openshift_version"] == openshiftVersion && entry["cpu_architecture"] == arch {
+			version = entry["version"]
+		}
+	}
+	return filepath.Join(s.dataDir, isoFileName(imageType, version, arch))
+}
+
+func isoFileName(imageType, version, arch string) string {
+	return fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch)
+}
+
+func (s *rhcosStore) cleanDataDir() error {
+	var expectedFiles []string
+	for _, version := range s.versions {
+		// Only add full isos here as we want to regenerate the minimal image on each deploy
+		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version["version"], version["cpu_architecture"]))
+	}
+
+	dataDirFiles, err := os.ReadDir(s.dataDir)
+	if err != nil {
+		return err
+	}
+
+	for _, dataDirFile := range dataDirFiles {
+		if !funk.ContainsString(expectedFiles, dataDirFile.Name()) {
+			fileName := filepath.Join(s.dataDir, dataDirFile.Name())
+			log.Infof("Removing %s from data directory", fileName)
+			if err := os.RemoveAll(fileName); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *rhcosStore) HaveVersion(version, arch string) bool {

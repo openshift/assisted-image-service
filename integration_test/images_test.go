@@ -33,18 +33,21 @@ var (
 			"cpu_architecture":  "arm64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live.aarch64.iso",
 			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live-rootfs.aarch64.img",
+			"version":           "arm-latest",
 		},
 		{
 			"openshift_version": "4.8",
 			"cpu_architecture":  "x86_64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/latest/rhcos-live.x86_64.iso",
 			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/latest/rhcos-live-rootfs.x86_64.img",
+			"version":           "4.8-latest",
 		},
 		{
 			"openshift_version": "pre-release",
 			"cpu_architecture":  "x86_64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live.x86_64.iso",
 			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live-rootfs.x86_64.img",
+			"version":           "x86_64-latest",
 		},
 	}
 

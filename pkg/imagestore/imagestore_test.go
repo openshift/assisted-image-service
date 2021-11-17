@@ -3,6 +3,7 @@ package imagestore
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,6 +32,10 @@ var _ = Context("with a data directory configured", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	AfterEach(func() {
+		os.RemoveAll(dataDir)
+	})
+
 	Context("with a test server", func() {
 		var (
 			ts  *ghttp.Server
@@ -54,6 +59,7 @@ var _ = Context("with a data directory configured", func() {
 					"openshift_version": "4.8",
 					"cpu_architecture":  "x86_64",
 					"rootfs_url":        "http://example.com/image/48.img",
+					"version":           "48.84.202109241901-0",
 				}
 			)
 
@@ -76,7 +82,7 @@ var _ = Context("with a data directory configured", func() {
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("someisocontenthere"))
 			})
@@ -121,27 +127,46 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
-			It("doesn't create the minimal iso when it's already present", func() {
-				ts.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/dontcallthis.iso"),
-						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
-					),
-				)
-				version["url"] = ts.URL() + "/dontcallthis.iso"
+			It("recreates the minimal iso even when it's already present", func() {
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-minimal-iso-4.8-x86_64.iso"), []byte("minimalisocontent"), 0600)).To(Succeed())
+				fullPath := filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso")
+				Expect(os.WriteFile(fullPath, []byte("moreisocontent"), 0600)).To(Succeed())
+
+				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso")
+				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, "http://example.com/image/48.img", minimalPath).Return(nil)
 
 				Expect(is.Populate(ctx)).To(Succeed())
+			})
+
+			It("cleans up files that are not configured isos", func() {
+				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-47.84.202109241831-0-x86_64.iso")
+				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
+
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				_, err = os.Stat(oldISOPath)
+				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 		})
 	})
@@ -149,10 +174,17 @@ var _ = Context("with a data directory configured", func() {
 
 var _ = Describe("PathForParams", func() {
 	It("creates the correct path", func() {
-		is, err := NewImageStore(nil, "/tmp/some/dir", DefaultVersions)
+		versions := []map[string]string{{
+			"openshift_version": "4.8",
+			"cpu_architecture":  "x86_64",
+			"url":               "http://example.com/image/x86_64-48.iso",
+			"rootfs_url":        "http://example.com/image/x86_64-48.img",
+			"version":           "48.84.202109241901-0",
+		}}
+		is, err := NewImageStore(nil, "/tmp/some/dir", versions)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-type-version-arch.iso"
-		Expect(is.PathForParams("type", "version", "arch")).To(Equal(expected))
+		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
+		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
 	})
 })
 
@@ -164,12 +196,14 @@ var _ = Describe("HaveVersion", func() {
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
 				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+				"version":           "48.84.202109241901-0",
 			},
 			{
 				"openshift_version": "4.9",
 				"cpu_architecture":  "arm64",
 				"url":               "http://example.com/image/arm64-49.iso",
 				"rootfs_url":        "http://example.com/image/arm64-49.img",
+				"version":           "49.84.202110081407-0",
 			},
 		}
 		store ImageStore
@@ -197,7 +231,6 @@ var _ = Describe("HaveVersion", func() {
 })
 
 var _ = Describe("NewImageStore", func() {
-
 	It("should not error with valid version", func() {
 		versions := []map[string]string{
 			{
@@ -205,6 +238,7 @@ var _ = Describe("NewImageStore", func() {
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
 				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+				"version":           "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", versions)
@@ -225,6 +259,7 @@ var _ = Describe("NewImageStore", func() {
 				"cpu_architecture": "x86_64",
 				"url":              "http://example.com/image/x86_64-48.iso",
 				"rootfs_url":       "http://example.com/image/x86_64-48.img",
+				"version":          "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", versions)
@@ -237,6 +272,7 @@ var _ = Describe("NewImageStore", func() {
 				"openshift_version": "4.8",
 				"url":               "http://example.com/image/x86_64-48.iso",
 				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+				"version":           "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", versions)
@@ -249,6 +285,7 @@ var _ = Describe("NewImageStore", func() {
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
 				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+				"version":           "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", versions)
@@ -261,10 +298,23 @@ var _ = Describe("NewImageStore", func() {
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
+				"version":           "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", versions)
 		Expect(err).To(HaveOccurred())
 	})
 
+	It("should error when version is not set", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-48.iso",
+				"rootfs_url":        "http://example.com/image/x86_64-48.img",
+			},
+		}
+		_, err := NewImageStore(nil, "", versions)
+		Expect(err).To(HaveOccurred())
+	})
 })
