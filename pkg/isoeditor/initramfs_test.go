@@ -1,0 +1,48 @@
+package isoeditor
+
+import (
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("NewInitRamFSStreamReader", func() {
+	var (
+		ignitionContent      = []byte("someignitioncontent")
+		ignitionArchiveBytes = []byte{
+			31, 139, 8, 0, 0, 0, 0, 0, 0, 255, 50, 48, 55, 48, 55, 48,
+			52, 128, 0, 48, 109, 97, 232, 104, 98, 128, 29, 24, 162, 113, 141, 113,
+			168, 67, 7, 78, 48, 70, 114, 126, 94, 90, 102, 186, 94, 102, 122, 30,
+			3, 3, 3, 67, 113, 126, 110, 106, 102, 122, 94, 102, 73, 102, 126, 94,
+			114, 126, 94, 73, 106, 94, 9, 3, 138, 123, 8, 1, 98, 213, 225, 116,
+			79, 72, 144, 163, 167, 143, 107, 144, 162, 162, 34, 200, 61, 128, 0, 0,
+			0, 255, 255, 191, 236, 44, 242, 12, 1, 0, 0}
+	)
+
+	filesDir, _ := createTestFiles("Assisted123")
+	initrdPath := filepath.Join(filesDir, "images/ignition.img")
+
+	It("appends the ignition", func() {
+		streamReader, err := NewInitRamFSStreamReader(initrdPath, &IgnitionContent{ignitionContent})
+		Expect(err).NotTo(HaveOccurred())
+
+		var output, expected strings.Builder
+		_, err = io.Copy(&output, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+
+		initReader, err := os.Open(initrdPath)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(&expected, initReader)
+		Expect(err).NotTo(HaveOccurred())
+		err = initReader.Close()
+		Expect(err).NotTo(HaveOccurred())
+		_, err = expected.Write(ignitionArchiveBytes)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(output.String()).To(Equal(expected.String()))
+	})
+})
