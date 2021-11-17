@@ -35,13 +35,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
-	err = is.Populate(context.Background())
-	if err != nil {
-		log.Fatalf("Failed to populate image store: %v\n", err)
-	}
+
+	readinessHandler := handlers.NewReadinessHandler()
+
+	go func() {
+		err = is.Populate(context.Background())
+		if err != nil {
+			log.Fatalf("Failed to populate image store: %v\n", err)
+		}
+		readinessHandler.Enable()
+	}()
 
 	http.Handle("/images/", handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.RequestAuthType, Options.HTTPSCAFile))
-	http.Handle("/health", handlers.NewHealthHandler())
+	http.Handle("/health", readinessHandler)
+	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.Handler())
 
 	log.Info("Starting http handler...")
