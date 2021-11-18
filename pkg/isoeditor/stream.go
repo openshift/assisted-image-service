@@ -12,9 +12,11 @@ import (
 
 const ignitionImagePath = "/images/ignition.img"
 
-type StreamGeneratorFunc func(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte) (io.ReadSeeker, error)
+type ImageReader = overlay.OverlayReader
 
-func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte) (io.ReadSeeker, error) {
+type StreamGeneratorFunc func(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte) (ImageReader, error)
+
+func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte) (ImageReader, error) {
 	isoReader, err := os.Open(isoPath)
 	if err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 	return r, nil
 }
 
-func readerForContent(isoPath string, filePath string, base io.ReadSeeker, contentReader *bytes.Reader) (io.ReadSeeker, error) {
+func readerForContent(isoPath string, filePath string, base io.ReadSeeker, contentReader *bytes.Reader) (overlay.OverlayReader, error) {
 	start, length, err := GetISOFileInfo(filePath, isoPath)
 	if err != nil {
 		return nil, err

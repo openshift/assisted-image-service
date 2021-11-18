@@ -5,6 +5,13 @@ import (
 	"io"
 )
 
+type BaseStream = io.ReadSeeker
+
+type OverlayReader interface {
+	BaseStream
+	io.ReadSeeker
+}
+
 type Overlay struct {
 	Reader io.ReadSeeker
 	Offset int64
@@ -20,14 +27,14 @@ func (ol Overlay) contains(index int64) bool {
 }
 
 type overlayReader struct {
-	Base    io.ReadSeeker
+	Base    BaseStream
 	Overlay Overlay
 
 	readIndex   int64
 	totalLength int64
 }
 
-func newReader(base io.ReadSeeker, overlay Overlay, length int64) (*overlayReader, error) {
+func newReader(base BaseStream, overlay Overlay, length int64) (*overlayReader, error) {
 	if overlay.end() > length {
 		length = overlay.end()
 	}
@@ -48,7 +55,7 @@ func newReader(base io.ReadSeeker, overlay Overlay, length int64) (*overlayReade
 	return &or, nil
 }
 
-func NewOverlayReader(base io.ReadSeeker, overlay Overlay) (io.ReadSeeker, error) {
+func NewOverlayReader(base BaseStream, overlay Overlay) (OverlayReader, error) {
 	length, err := base.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
@@ -59,7 +66,7 @@ func NewOverlayReader(base io.ReadSeeker, overlay Overlay) (io.ReadSeeker, error
 	return newReader(base, overlay, length)
 }
 
-func NewAppendReader(base io.ReadSeeker, reader io.ReadSeeker) (io.ReadSeeker, error) {
+func NewAppendReader(base BaseStream, reader io.ReadSeeker) (OverlayReader, error) {
 	length, err := base.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
