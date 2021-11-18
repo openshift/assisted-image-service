@@ -9,7 +9,7 @@ type BaseStream = io.ReadSeeker
 
 type OverlayReader interface {
 	BaseStream
-	io.ReadSeeker
+	io.ReadSeekCloser
 }
 
 type Overlay struct {
@@ -147,4 +147,11 @@ func (or *overlayReader) Read(p []byte) (int, error) {
 		return bytesRead, readErr
 	}
 	return bytesRead, seekErr
+}
+
+func (or *overlayReader) Close() error {
+	if closer, hasClose := or.Base.(io.Closer); hasClose {
+		return closer.Close()
+	}
+	return nil
 }
