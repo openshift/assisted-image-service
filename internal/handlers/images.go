@@ -144,6 +144,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer isoReader.Close()
 
 	//TODO: set modified time correctly (MGMT-7274)
 
