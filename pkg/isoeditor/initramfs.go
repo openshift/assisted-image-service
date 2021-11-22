@@ -1,14 +1,13 @@
 package isoeditor
 
 import (
-	"io"
 	"os"
 
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 	"github.com/pkg/errors"
 )
 
-func NewInitRamFSStreamReader(irfsPath string, ignitionContent *IgnitionContent) (io.ReadSeeker, error) {
+func NewInitRamFSStreamReader(irfsPath string, ignitionContent *IgnitionContent) (overlay.OverlayReader, error) {
 	irfsReader, err := os.Open(irfsPath)
 	if err != nil {
 		return nil, err

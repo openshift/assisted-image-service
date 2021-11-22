@@ -106,7 +106,7 @@ var _ = Describe("ServeHTTP", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				initrdContent = nil
-				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 					if isoPath == minImageFilename {
@@ -218,7 +218,7 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (isoeditor.ImageReader, error) {
 				defer GinkgoRecover()
 				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 				return os.Open(isoPath)
@@ -258,7 +258,7 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (isoeditor.ImageReader, error) {
 				defer GinkgoRecover()
 				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 				return os.Open(isoPath)
@@ -295,7 +295,7 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (io.ReadSeeker, error) {
+			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes []byte) (isoeditor.ImageReader, error) {
 				defer GinkgoRecover()
 				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
 				return os.Open(isoPath)
