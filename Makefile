@@ -1,4 +1,4 @@
-IMAGE := $(or ${IMAGE}, quay.io/ocpmetal/assisted-image-service:latest)
+IMAGE := $(or ${IMAGE}, quay.io/edge-infrastructure/assisted-image-service:latest)
 PWD = $(shell pwd)
 LISTEN_PORT := $(or ${LISTEN_PORT}, 8080)
 
