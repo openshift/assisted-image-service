@@ -168,6 +168,25 @@ var _ = Context("with a data directory configured", func() {
 				_, err = os.Stat(oldISOPath)
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
+
+			It("cleans up corrupted downloads", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere", http.Header{"Content-Length": []string{"1"}}),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				err = is.Populate(ctx)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("unexpected EOF"))
+
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).To(MatchError(fs.ErrNotExist))
+			})
 		})
 	})
 })
