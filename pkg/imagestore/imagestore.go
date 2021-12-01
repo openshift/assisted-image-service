@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
@@ -115,20 +116,29 @@ func downloadURLToFile(url string, path string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("Request to %s returned error code %d", url, resp.StatusCode)
+		return fmt.Errorf("request to %s returned error code %d", url, resp.StatusCode)
 	}
 
-	f, err := os.Create(path)
+	t, err := renameio.TempFile("", path)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create a temp file for %s: %v", path, err)
 	}
-	defer f.Close()
 
-	count, err := io.Copy(f, resp.Body)
+	defer func() {
+		if err1 := t.Cleanup(); err1 != nil {
+			log.WithError(err1).Errorf("Unable to clean up temp file %s", t.Name())
+		}
+	}()
+
+	count, err := io.Copy(t, resp.Body)
 	if err != nil {
 		return err
 	} else if count != resp.ContentLength {
-		return fmt.Errorf("Wrote %d bytes, but expected to write %d", count, resp.ContentLength)
+		return fmt.Errorf("wrote %d bytes, but expected to write %d", count, resp.ContentLength)
+	}
+
+	if err := t.CloseAtomicallyReplace(); err != nil {
+		return fmt.Errorf("unable to atomically replace %s with temp file %s: %v", path, t.Name(), err)
 	}
 
 	return nil
