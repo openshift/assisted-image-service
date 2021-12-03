@@ -318,6 +318,70 @@ var _ = Describe("ServeHTTP", func() {
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("someisocontent"))
 		})
+
+		It("returns an auth failure if assisted auth fails when querying ignition", func() {
+			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+			assistedServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign"),
+					ghttp.RespondWith(http.StatusUnauthorized, ""),
+				),
+			)
+
+			u, err := url.Parse(assistedServer.URL())
+			Expect(err).NotTo(HaveOccurred())
+
+			handler := &ImageHandler{
+				ImageStore:            mockImageStore,
+				AssistedServiceHost:   u.Host,
+				AssistedServiceScheme: u.Scheme,
+				Client:                http.DefaultClient,
+				sem:                   semaphore.NewWeighted(100),
+			}
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+			resp, err := server.Client().Get(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+		})
+
+		It("returns an auth failure if assisted auth fails when querying initrd", func() {
+			assistedServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
+					ghttp.RespondWith(http.StatusOK, ignitionContent),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
+					),
+					ghttp.RespondWith(http.StatusUnauthorized, ""),
+				),
+			)
+
+			u, err := url.Parse(assistedServer.URL())
+			Expect(err).NotTo(HaveOccurred())
+
+			handler := &ImageHandler{
+				ImageStore:            mockImageStore,
+				AssistedServiceHost:   u.Host,
+				AssistedServiceScheme: u.Scheme,
+				Client:                http.DefaultClient,
+				sem:                   semaphore.NewWeighted(100),
+			}
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+			path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
+			resp, err := server.Client().Get(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+		})
 	})
 })
 

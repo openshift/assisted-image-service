@@ -121,19 +121,19 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignition, err := h.ignitionContent(r, imageID)
+	ignition, statusCode, err := h.ignitionContent(r, imageID)
 	if err != nil {
 		log.Errorf("Error retrieving ignition content: %v\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(statusCode)
 		return
 	}
 
 	var ramdisk []byte
 	if params.imageType == imagestore.ImageTypeMinimal {
-		ramdisk, err = h.ramdiskContent(r, imageID)
+		ramdisk, statusCode, err = h.ramdiskContent(r, imageID)
 		if err != nil {
 			log.Errorf("Error retrieving ramdisk content: %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(statusCode)
 			return
 		}
 	}
@@ -181,10 +181,13 @@ func (h *ImageHandler) parseQueryParams(values url.Values) (*imageDownloadParams
 	}, nil
 }
 
-func (h *ImageHandler) ramdiskContent(imageServiceRequest *http.Request, imageID string) ([]byte, error) {
+// ignitionContent returns the ramdisk data on success and the error and the corresponding http status code
+// The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
+// The returned code should only be used if an error is also returned
+func (h *ImageHandler) ramdiskContent(imageServiceRequest *http.Request, imageID string) ([]byte, int, error) {
 	var ramdiskBytes []byte
 	if h.AssistedServiceHost == "" {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	u := url.URL{
@@ -194,33 +197,36 @@ func (h *ImageHandler) ramdiskContent(imageServiceRequest *http.Request, imageID
 	}
 	req, err := http.NewRequestWithContext(imageServiceRequest.Context(), "GET", u.String(), nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	h.setRequestAuth(imageServiceRequest, req)
 
 	resp, err := h.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("request to %s returned status %d", u.String(), resp.StatusCode)
+		return nil, resp.StatusCode, fmt.Errorf("request to %s returned status %d", u.String(), resp.StatusCode)
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	ramdiskBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	return ramdiskBytes, nil
+	return ramdiskBytes, 0, nil
 }
 
-func (h *ImageHandler) ignitionContent(imageServiceRequest *http.Request, imageID string) (*isoeditor.IgnitionContent, error) {
+// ignitionContent returns the ignition data on success and the error and the corresponding http status code
+// The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
+// The returned code should only be used if an error is also returned
+func (h *ImageHandler) ignitionContent(imageServiceRequest *http.Request, imageID string) (*isoeditor.IgnitionContent, int, error) {
 	if h.AssistedServiceHost == "" {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	u := url.URL{
@@ -234,23 +240,23 @@ func (h *ImageHandler) ignitionContent(imageServiceRequest *http.Request, imageI
 
 	req, err := http.NewRequestWithContext(imageServiceRequest.Context(), "GET", u.String(), nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	h.setRequestAuth(imageServiceRequest, req)
 
 	resp, err := h.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
+		return nil, resp.StatusCode, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
 	}
 	ignitionBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	return &isoeditor.IgnitionContent{Config: ignitionBytes}, nil
+	return &isoeditor.IgnitionContent{Config: ignitionBytes}, 0, nil
 }
 
 func (h *ImageHandler) setRequestAuth(imageRequest, assistedRequest *http.Request) {
