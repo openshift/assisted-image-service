@@ -25,6 +25,7 @@ var Options struct {
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
+	OSImages              string `envconfig:"OS_IMAGES"`
 }
 
 func main() {
@@ -35,11 +36,16 @@ func main() {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
 
+	versionsJSON := Options.OSImages
+	if versionsJSON == "" {
+		versionsJSON = Options.RHCOSVersions
+	}
+
 	var versions []map[string]string
-	if Options.RHCOSVersions == "" {
+	if versionsJSON == "" {
 		versions = imagestore.DefaultVersions
 	} else {
-		err = json.Unmarshal([]byte(Options.RHCOSVersions), &versions)
+		err = json.Unmarshal([]byte(versionsJSON), &versions)
 		if err != nil {
 			log.Fatalf("Failed to unmarshal versions: %v\n", err)
 		}

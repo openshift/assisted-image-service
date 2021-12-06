@@ -23,7 +23,7 @@ skipper make test
 ## Configuration
 
 - `DATA_DIR` - Path at which to store downloaded RHCOS images.
-- `RHCOS_VERSIONS` - JSON string indicating the supported versions and their required urls.
+- `RHCOS_VERSIONS`/`OS_IMAGES` - JSON string indicating the supported versions and their required urls. `OS_IMAGES` takes precedence.
 - `LISTEN_PORT` - Image Service listen port
 - `HTTPS_KEY_FILE` - tls key file path
 - `HTTPS_CERT_FILE` - tls cert file path
@@ -31,7 +31,7 @@ skipper make test
 - `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
 - `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 
-Example `RHCOS_VERSIONS`:
+Example `OS_IMAGES`:
 ```json
 [
 	{
