@@ -1,0 +1,28 @@
+---
+parameters:
+- name: NAMESPACE
+  value: ''
+  required: true
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: assisted-image-service-monitoring
+objects:
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    labels:
+      prometheus: app-sre
+    name: servicemonitor-image-service
+  spec:
+    endpoints:
+    - interval: 30s
+      path: /metrics
+      port: image-service
+      scheme: http
+    namespaceSelector:
+      matchNames:
+      - ${NAMESPACE}
+    selector:
+      matchLabels:
+        name: assisted-image-service

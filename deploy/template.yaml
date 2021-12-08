@@ -21,10 +21,13 @@ objects:
   kind: Service
   metadata:
     name: assisted-image-service
+    labels:
+      name: assisted-image-service
   spec:
     ports:
     - port: 8080
       protocol: TCP
+      name: image-service
     selector:
       service: image-service
 - apiVersion: apps/v1
