@@ -149,6 +149,7 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//TODO: set modified time correctly (MGMT-7274)
 
 	fileName := fmt.Sprintf("%s-discovery.iso", imageID)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	http.ServeContent(w, r, fileName, time.Now(), isoReader)
 }
 

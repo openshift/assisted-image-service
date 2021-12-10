@@ -82,6 +82,7 @@ var _ = Describe("ServeHTTP", func() {
 
 		expectSuccessfulResponse := func(resp *http.Response, content []byte) {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get("Content-Disposition")).To(Equal(fmt.Sprintf("attachment; filename=%s-discovery.iso", imageID)))
 			respContent, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(respContent).To(Equal(content))
