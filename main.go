@@ -26,6 +26,7 @@ var Options struct {
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 	OSImages              string `envconfig:"OS_IMAGES"`
+	AllowedDomains        string `envconfig:"ALLOWED_DOMAINS"`
 }
 
 func main() {
@@ -67,7 +68,12 @@ func main() {
 	}()
 
 	reg := prometheus.NewRegistry()
-	http.Handle("/images/", handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests))
+	imageHandler := handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests)
+	if Options.AllowedDomains != "" {
+		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)
+	}
+
+	http.Handle("/images/", imageHandler)
 	http.Handle("/health", readinessHandler)
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
