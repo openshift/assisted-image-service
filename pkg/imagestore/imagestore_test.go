@@ -61,6 +61,12 @@ var _ = Context("with a data directory configured", func() {
 					"rootfs_url":        "http://example.com/image/48.img",
 					"version":           "48.84.202109241901-0",
 				}
+				versionPatch = map[string]string{
+					"openshift_version": "4.8.1",
+					"cpu_architecture":  "x86_64",
+					"rootfs_url":        "http://example.com/image/481.img",
+					"version":           "48.84.202109241901-0",
+				}
 			)
 
 			BeforeEach(func() {
@@ -82,7 +88,7 @@ var _ = Context("with a data directory configured", func() {
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(content)).To(Equal("someisocontenthere"))
 			})
@@ -127,7 +133,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/48.img", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
@@ -137,10 +143,10 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
-				fullPath := filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso")
+				fullPath := filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso")
 				Expect(os.WriteFile(fullPath, []byte("moreisocontent"), 0600)).To(Succeed())
 
-				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso")
+				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-4.8-48.84.202109241901-0-x86_64.iso")
 				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, "http://example.com/image/48.img", minimalPath).Return(nil)
@@ -148,8 +154,27 @@ var _ = Context("with a data directory configured", func() {
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
+			It("downloads image with x.y.z openshift_version correctly", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/somepatchversion.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
+				is, err := NewImageStore(mockEditor, dataDir, []map[string]string{versionPatch})
+				Expect(err).NotTo(HaveOccurred())
+
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "http://example.com/image/481.img", gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8.1-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("someisocontenthere"))
+			})
+
 			It("cleans up files that are not configured isos", func() {
-				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-47.84.202109241831-0-x86_64.iso")
+				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
 				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
 
 				ts.AppendHandlers(
@@ -184,7 +209,7 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("unexpected EOF"))
 
-				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 		})
@@ -202,7 +227,7 @@ var _ = Describe("PathForParams", func() {
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", versions)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
+		expected := "/tmp/some/dir/rhcos-full-4.8-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
 	})
 })

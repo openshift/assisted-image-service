@@ -154,10 +154,11 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	for i := range s.versions {
 		imageInfo := s.versions[i]
 		errs.Go(func() error {
+			openshiftVersion := imageInfo["openshift_version"]
 			imageVersion := imageInfo["version"]
 			arch := imageInfo["cpu_architecture"]
 
-			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, imageVersion, arch))
+			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				url := imageInfo["url"]
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
@@ -167,19 +168,19 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
 
-				log.Infof("Finished downloading for %s-%s (%s)", imageInfo["openshift_version"], arch, imageVersion)
+				log.Infof("Finished downloading for %s-%s (%s)", openshiftVersion, arch, imageVersion)
 			}
 
-			minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, imageVersion, arch))
+			minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, openshiftVersion, imageVersion, arch))
 			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
-				log.Infof("Creating minimal iso for %s-%s", imageVersion, arch)
+				log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
 
 				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, imageInfo["rootfs_url"], minimalPath)
 				if err != nil {
 					return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
 				}
 
-				log.Infof("Finished creating minimal iso for %s-%s (%s)", imageInfo["openshift_version"], arch, imageVersion)
+				log.Infof("Finished creating minimal iso for %s-%s (%s)", openshiftVersion, arch, imageVersion)
 			}
 
 			return nil
@@ -196,18 +197,18 @@ func (s *rhcosStore) PathForParams(imageType, openshiftVersion, arch string) str
 			version = entry["version"]
 		}
 	}
-	return filepath.Join(s.dataDir, isoFileName(imageType, version, arch))
+	return filepath.Join(s.dataDir, isoFileName(imageType, openshiftVersion, version, arch))
 }
 
-func isoFileName(imageType, version, arch string) string {
-	return fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch)
+func isoFileName(imageType, openshiftVersion, version, arch string) string {
+	return fmt.Sprintf("rhcos-%s-%s-%s-%s.iso", imageType, openshiftVersion, version, arch)
 }
 
 func (s *rhcosStore) cleanDataDir() error {
 	var expectedFiles []string
 	for _, version := range s.versions {
 		// Only add full isos here as we want to regenerate the minimal image on each deploy
-		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version["version"], version["cpu_architecture"]))
+		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version["openshift_version"], version["version"], version["cpu_architecture"]))
 	}
 
 	dataDirFiles, err := os.ReadDir(s.dataDir)
