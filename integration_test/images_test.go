@@ -200,7 +200,7 @@ var _ = BeforeSuite(func() {
 	imageDir, err = ioutil.TempDir("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, versions)
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, false, versions)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = imageStore.Populate(context.Background())

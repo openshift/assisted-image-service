@@ -2,6 +2,7 @@ package imagestore
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,9 +69,10 @@ type ImageStore interface {
 }
 
 type rhcosStore struct {
-	versions  []map[string]string
-	isoEditor isoeditor.Editor
-	dataDir   string
+	versions   []map[string]string
+	isoEditor  isoeditor.Editor
+	dataDir    string
+	httpClient *http.Client
 }
 
 const (
@@ -78,14 +80,20 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir string, versions []map[string]string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
+	transportConfig := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify}, //nolint:gosec // Optionally ignore TLS (G402 error)
+	}
+	httpClient := &http.Client{Transport: transportConfig}
+
 	return &rhcosStore{
-		versions:  versions,
-		isoEditor: ed,
-		dataDir:   dataDir,
+		versions:   versions,
+		isoEditor:  ed,
+		dataDir:    dataDir,
+		httpClient: httpClient,
 	}, nil
 }
 
@@ -115,8 +123,9 @@ func validateVersions(versions []map[string]string) error {
 	return nil
 }
 
-func downloadURLToFile(url string, path string) error {
-	resp, err := http.Get(url)
+func (s *rhcosStore) downloadURLToFile(url string, path string) error {
+	resp, err := s.httpClient.Get(url)
+
 	if err != nil {
 		return err
 	}
@@ -170,7 +179,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				url := imageInfo["url"]
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
 
-				err = downloadURLToFile(url, fullPath)
+				err = s.downloadURLToFile(url, fullPath)
 				if err != nil {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
