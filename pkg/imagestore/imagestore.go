@@ -51,6 +51,13 @@ var DefaultVersions = []map[string]string{
 		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.9/4.9.0/rhcos-4.9.0-aarch64-live-rootfs.aarch64.img",
 		"version":           "49.84.202110080947-0",
 	},
+	{
+		"openshift_version": "4.10",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-0.nightly-2021-11-29-191648/rhcos-4.10.0-0.nightly-2021-11-29-191648-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-0.nightly-2021-11-29-191648/rhcos-4.10.0-0.nightly-2021-11-29-191648-x86_64-live-rootfs.x86_64.img",
+		"version":           "410.84.202111291603-0",
+	},
 }
 
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
