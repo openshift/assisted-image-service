@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	testRootFSURL = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
+	testRootFSURL     = "https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img"
+	testFCOSRootFSURL = "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live-rootfs.x86_64.img"
 )
 
 var _ = Context("with test files", func() {
@@ -64,6 +65,21 @@ var _ = Context("with test files", func() {
 		It("missing iso file", func() {
 			editor := NewEditor(workDir)
 			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, minimalISOPath)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("CreateFCOSMinimalISOTemplate", func() {
+		It("iso created successfully", func() {
+			editor := NewEditor(workDir)
+
+			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, minimalISOPath)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("missing iso file", func() {
+			editor := NewEditor(workDir)
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
