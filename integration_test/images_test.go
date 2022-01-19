@@ -49,6 +49,20 @@ var (
 			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live-rootfs.x86_64.img",
 			"version":           "x86_64-latest",
 		},
+		{
+			"openshift_version": "fcos-pre-release",
+			"cpu_architecture":  "x86_64",
+			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live.x86_64.iso",
+			"rootfs_url":        "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live-rootfs.x86_64.img",
+			"version":           "x86_64-latest",
+		},
+		{
+			"openshift_version": "fcos-pre-release",
+			"cpu_architecture":  "arm64",
+			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
+			"rootfs_url":        "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live-initramfs.aarch64.imgg",
+			"version":           "arm-latest",
+		},
 	}
 
 	imageDir   string
