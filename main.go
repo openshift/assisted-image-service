@@ -27,6 +27,7 @@ var Options struct {
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 	OSImages              string `envconfig:"OS_IMAGES"`
 	AllowedDomains        string `envconfig:"ALLOWED_DOMAINS"`
+	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 }
 
 func main() {
@@ -52,7 +53,7 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, versions)
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.InsecureSkipVerify, versions)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
