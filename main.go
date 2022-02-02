@@ -22,6 +22,7 @@ var Options struct {
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	RequestAuthType       string `envconfig:"REQUEST_AUTH_TYPE"`
+	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 }
 
 func main() {
@@ -31,7 +32,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir)
+
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.InsecureSkipVerify)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
