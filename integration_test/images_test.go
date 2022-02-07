@@ -45,8 +45,8 @@ var (
 		{
 			"openshift_version": "pre-release",
 			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live.x86_64.iso",
-			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live-rootfs.x86_64.img",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live.x86_64.iso",
+			"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live-rootfs.x86_64.img",
 			"version":           "x86_64-latest",
 		},
 		{
