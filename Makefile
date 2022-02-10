@@ -2,6 +2,11 @@ IMAGE := $(or ${IMAGE}, quay.io/edge-infrastructure/assisted-image-service:lates
 PWD = $(shell pwd)
 LISTEN_PORT := $(or ${LISTEN_PORT}, 8080)
 
+CI ?= false
+ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+REPORTS ?= $(ROOT_DIR)/reports
+COVER_PROFILE := $(or ${COVER_PROFILE},$(REPORTS)/unit_coverage.out)
+
 build:
 	podman build -f Dockerfile.image-service . -t $(IMAGE)
 
@@ -11,8 +16,14 @@ build-openshift-ci-test-bin:
 lint:
 	golangci-lint run -v
 
-test:
-	go test ./...
+test: $(REPORTS)
+	go test -count=1 -cover -coverprofile=$(COVER_PROFILE) ./...
+	$(MAKE) _coverage
+
+_coverage:
+ifeq ($(CI), true)
+	COVER_PROFILE=$(COVER_PROFILE) ./hack/publish-codecov.sh
+endif
 
 test-short:
 	go test -short ./...
@@ -44,3 +55,9 @@ certs:
 	openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout certs/tls.key -out certs/tls.crt -subj "/CN=localhost"
 
 all: lint test build run
+
+$(REPORTS):
+	-mkdir -p $(REPORTS)
+
+clean:
+	-rm -rf $(REPORTS)
