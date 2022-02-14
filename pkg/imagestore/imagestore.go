@@ -84,10 +84,13 @@ func NewImageStore(ed isoeditor.Editor, dataDir string, insecureSkipVerify bool,
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
-	transportConfig := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify}, //nolint:gosec // Optionally ignore TLS (G402 error)
+	transportConfig, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, fmt.Errorf("expected http.DefaultTransport to be of type *http.Transport")
 	}
-	httpClient := &http.Client{Transport: transportConfig}
+	myTransport := transportConfig.Clone()
+	myTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureSkipVerify} //nolint:gosec // Optionally ignore TLS (G402 error)
+	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
 		versions:   versions,
