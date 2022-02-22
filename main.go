@@ -82,7 +82,8 @@ func main() {
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
-	imageHandler := handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests)
+	asc := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
+	imageHandler := handlers.NewImageHandler(is, asc, Options.MaxConcurrentRequests)
 	if Options.AllowedDomains != "" {
 		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)
 	}

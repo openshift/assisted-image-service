@@ -129,9 +129,7 @@ var _ = Describe("Image integration tests", func() {
 					)
 				}
 
-				// Set up image handler
-				handler := handlers.NewImageHandler(imageStore, u.Scheme, u.Host, "", 1)
-				imageServer = httptest.NewServer(handler)
+				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1))
 				imageClient = imageServer.Client()
 			})
 

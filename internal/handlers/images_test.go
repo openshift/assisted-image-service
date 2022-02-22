@@ -111,12 +111,10 @@ var _ = Describe("ServeHTTP", func() {
 				}
 
 				handler := &ImageHandler{
-					ImageStore:            mockImageStore,
-					GenerateImageStream:   mockImageStream,
-					AssistedServiceHost:   u.Host,
-					AssistedServiceScheme: u.Scheme,
-					Client:                http.DefaultClient,
-					sem:                   semaphore.NewWeighted(100),
+					ImageStore:          mockImageStore,
+					GenerateImageStream: mockImageStream,
+					client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+					sem:                 semaphore.NewWeighted(100),
 				}
 				server = httptest.NewServer(handler)
 				client = server.Client()
@@ -220,12 +218,10 @@ var _ = Describe("ServeHTTP", func() {
 			}
 
 			handler := &ImageHandler{
-				ImageStore:            mockImageStore,
-				GenerateImageStream:   mockImageStream,
-				AssistedServiceHost:   u.Host,
-				AssistedServiceScheme: u.Scheme,
-				Client:                http.DefaultClient,
-				sem:                   semaphore.NewWeighted(100),
+				ImageStore:          mockImageStore,
+				GenerateImageStream: mockImageStream,
+				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				sem:                 semaphore.NewWeighted(100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -260,12 +256,10 @@ var _ = Describe("ServeHTTP", func() {
 			}
 
 			handler := &ImageHandler{
-				ImageStore:            mockImageStore,
-				GenerateImageStream:   mockImageStream,
-				AssistedServiceHost:   u.Host,
-				AssistedServiceScheme: u.Scheme,
-				Client:                http.DefaultClient,
-				sem:                   semaphore.NewWeighted(100),
+				ImageStore:          mockImageStore,
+				GenerateImageStream: mockImageStream,
+				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				sem:                 semaphore.NewWeighted(100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -297,12 +291,10 @@ var _ = Describe("ServeHTTP", func() {
 			}
 
 			handler := &ImageHandler{
-				ImageStore:            mockImageStore,
-				GenerateImageStream:   mockImageStream,
-				AssistedServiceHost:   u.Host,
-				AssistedServiceScheme: u.Scheme,
-				Client:                http.DefaultClient,
-				sem:                   semaphore.NewWeighted(100),
+				ImageStore:          mockImageStore,
+				GenerateImageStream: mockImageStream,
+				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				sem:                 semaphore.NewWeighted(100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -327,11 +319,9 @@ var _ = Describe("ServeHTTP", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			handler := &ImageHandler{
-				ImageStore:            mockImageStore,
-				AssistedServiceHost:   u.Host,
-				AssistedServiceScheme: u.Scheme,
-				Client:                http.DefaultClient,
-				sem:                   semaphore.NewWeighted(100),
+				ImageStore: mockImageStore,
+				client:     NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				sem:        semaphore.NewWeighted(100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -362,11 +352,9 @@ var _ = Describe("ServeHTTP", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			handler := &ImageHandler{
-				ImageStore:            mockImageStore,
-				AssistedServiceHost:   u.Host,
-				AssistedServiceScheme: u.Scheme,
-				Client:                http.DefaultClient,
-				sem:                   semaphore.NewWeighted(100),
+				ImageStore: mockImageStore,
+				client:     NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				sem:        semaphore.NewWeighted(100),
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
