@@ -74,10 +74,15 @@ func main() {
 		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)
 	}
 
+	bootArtifactsHandler := &handlers.BootArtifactsHandler{
+		ImageStore: is,
+	}
+
 	http.Handle("/images/", imageHandler)
 	http.Handle("/health", readinessHandler)
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	http.Handle("/boot-artifacts/", bootArtifactsHandler)
 
 	log.Info("Starting http handler...")
 	address := fmt.Sprintf(":%s", Options.ListenPort)

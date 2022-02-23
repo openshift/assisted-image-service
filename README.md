@@ -77,6 +77,15 @@ Downloads the RHCOS image for the specified image ID.
 
 - `Authorization`: this header is passed directly through to assisted service requests to handle RHSSO authentication
 
+### `GET /boot-artifacts/{artifact}`
+
+Downloads the artifact specified from the ISO.
+
+#### Query parameters
+
+- `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
+- `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
+
 ### `GET /health`
 
 Returns 503 until the images are downloaded

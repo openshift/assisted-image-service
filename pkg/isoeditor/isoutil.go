@@ -246,3 +246,22 @@ func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
 	defaultSectorSize := uint32(2 * 1024)
 	return int64(isoFile.Location() * defaultSectorSize), isoFile.Size(), nil
 }
+
+// Gets a readWrite seeker of a specific file from the ISO image
+func GetFileFromISO(isoPath, filePath string) (filesystem.File, error) {
+	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	fs, err := d.GetFilesystem(0)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := fs.OpenFile(filePath, os.O_RDONLY)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
