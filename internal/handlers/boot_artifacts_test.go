@@ -32,6 +32,7 @@ var _ = Describe("ServeHTTP", func() {
 		mockISO := func(imageFileName string) string {
 			filesDir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(filesDir)
 
 			temp, err := os.CreateTemp("", imageFileName)
 			Expect(err).ToNot(HaveOccurred())
