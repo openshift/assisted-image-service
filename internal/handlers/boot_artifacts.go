@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"time"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -71,16 +70,15 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	defer fileReader.Close()
 
-	modTime := time.Now()
 	fileInfo, err := os.Stat(isoFileName)
 	if err != nil {
 		log.Errorf("Error reading file info for %s", isoFileName)
-	} else {
-		modTime = fileInfo.ModTime()
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", artifact))
-	http.ServeContent(w, r, artifact, modTime, fileReader)
+	http.ServeContent(w, r, artifact, fileInfo.ModTime(), fileReader)
 }
 
 func (b *BootArtifactsHandler) parseQueryParams(values url.Values) (string, string, error) {
@@ -91,6 +89,10 @@ func (b *BootArtifactsHandler) parseQueryParams(values url.Values) (string, stri
 	arch := values.Get("arch")
 	if arch == "" {
 		arch = defaultArch
+	}
+
+	if !b.ImageStore.HaveVersion(version, arch) {
+		return "", "", fmt.Errorf("version for %s %s, not found", version, arch)
 	}
 
 	return version, arch, nil

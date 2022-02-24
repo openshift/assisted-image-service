@@ -107,7 +107,7 @@ var _ = Describe("ServeHTTP", func() {
 			path := fmt.Sprintf("/boot-artifacts/%s?version=4.7", rootfsArtifact)
 			resp, err := client.Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+			Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 		})
 
 		It("fails when no version is supplied", func() {
