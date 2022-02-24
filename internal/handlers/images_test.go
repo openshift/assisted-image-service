@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -18,11 +17,6 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"golang.org/x/sync/semaphore"
 )
-
-func TestHandlers(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "handlers")
-}
 
 var _ = Describe("ServeHTTP", func() {
 	var (

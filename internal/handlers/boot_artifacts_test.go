@@ -8,19 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"testing"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 )
-
-func TestHandlers(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "handlers")
-}
 
 var _ = Describe("ServeHTTP", func() {
 	var (
@@ -58,7 +51,7 @@ var _ = Describe("ServeHTTP", func() {
 			mockImageStore = imagestore.NewMockImageStore(ctrl)
 
 			fullImageFilename = mockISO("image_handler_test")
-			handler := &handlers.BootArtifactsHandler{
+			handler := &BootArtifactsHandler{
 				ImageStore: mockImageStore,
 			}
 			server = httptest.NewServer(handler)
