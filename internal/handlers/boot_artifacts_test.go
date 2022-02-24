@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/golang/mock/gomock"
@@ -29,30 +27,11 @@ var _ = Describe("ServeHTTP", func() {
 	)
 
 	Context("with image files", func() {
-
-		mockISO := func(imageFileName string) string {
-			filesDir, err := os.MkdirTemp("", "isotest")
-			Expect(err).ToNot(HaveOccurred())
-			defer os.RemoveAll(filesDir)
-
-			temp, err := os.CreateTemp("", imageFileName)
-			Expect(err).ToNot(HaveOccurred())
-
-			isoFile := temp.Name()
-			Expect(os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)).To(Succeed())
-			Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), []byte("this is rootfs"), 0600)).To(Succeed())
-			Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/vmlinuz"), []byte("this is kernel"), 0600)).To(Succeed())
-
-			cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-o", isoFile, filesDir)
-			Expect(cmd.Run()).To(Succeed())
-			return isoFile
-		}
-
 		BeforeEach(func() {
 			ctrl = gomock.NewController(GinkgoT())
 			mockImageStore = imagestore.NewMockImageStore(ctrl)
 
-			fullImageFilename = mockISO("image_handler_test")
+			fullImageFilename = createTestISO()
 			handler := &BootArtifactsHandler{
 				ImageStore: mockImageStore,
 			}

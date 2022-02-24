@@ -18,6 +18,8 @@ type isoHandler struct {
 	client              *AssistedServiceClient
 }
 
+var _ http.Handler = &isoHandler{}
+
 type imageDownloadParams struct {
 	version   string
 	imageType string
@@ -103,7 +105,7 @@ func (h *isoHandler) parseQueryParams(values url.Values) (*imageDownloadParams, 
 	}, nil
 }
 
-var pathRegexp = regexp.MustCompile(`^/images/(.+)`)
+var pathRegexp = regexp.MustCompile(`^/images/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(/pxe-initrd)?`)
 
 func parseImageID(path string) (string, error) {
 	match := pathRegexp.FindStringSubmatch(path)

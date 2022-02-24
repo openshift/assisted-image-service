@@ -2,32 +2,41 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
+	"github.com/slok/go-http-metrics/middleware"
+	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 	"golang.org/x/sync/semaphore"
 )
 
 const defaultArch = "x86_64"
 
 type ImageHandler struct {
-	isos http.Handler
-	sem  *semaphore.Weighted
+	iso    http.Handler
+	initrd http.Handler
+	sem    *semaphore.Weighted
 }
 
 var _ http.Handler = &ImageHandler{}
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64) http.Handler {
+func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw middleware.Middleware) http.Handler {
 	isos := &isoHandler{
 		ImageStore:          is,
 		GenerateImageStream: isoeditor.NewRHCOSStreamReader,
 		client:              assistedServiceClient,
 	}
+	initrds := &initrdHandler{
+		ImageStore: is,
+		client:     assistedServiceClient,
+	}
 
-	h := &ImageHandler{
-		isos: isos,
-		sem:  semaphore.NewWeighted(maxRequests),
+	return &ImageHandler{
+		iso:    stdmiddleware.Handler("/images/:imageID", mdw, isos),
+		initrd: stdmiddleware.Handler("/images/:imageID/pxe-initrd", mdw, initrds),
+		sem:    semaphore.NewWeighted(maxRequests),
 	}
 }
 
@@ -39,5 +48,15 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer h.sem.Release(1)
 
-	h.isos.ServeHTTP(w, r)
+	matched, err := regexp.MatchString(`/images/.*/pxe-initrd`, r.URL.Path)
+	if err != nil {
+		log.Errorf("Failed to test path match to initrd: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if matched {
+		h.initrd.ServeHTTP(w, r)
+	} else {
+		h.iso.ServeHTTP(w, r)
+	}
 }
