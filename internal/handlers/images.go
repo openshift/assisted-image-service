@@ -13,11 +13,7 @@ import (
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
-	"github.com/slok/go-http-metrics/middleware"
-	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -53,17 +49,7 @@ func parseImageID(path string) (string, error) {
 	return match[1], nil
 }
 
-func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assistedServiceScheme, assistedServiceHost, caCertFile string, maxRequests int64) http.Handler {
-	metricsConfig := metrics.Config{
-		Registry:        reg,
-		Prefix:          "assisted_image_service",
-		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
-		SizeBuckets:     []float64{100, 1e6, 5e8, 1e9, 1e10},
-	}
-	mdw := middleware.New(middleware.Config{
-		Recorder: metrics.NewRecorder(metricsConfig),
-	})
-
+func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, caCertFile string, maxRequests int64) http.Handler {
 	client := &http.Client{}
 	if caCertFile != "" {
 		caCert, err := ioutil.ReadFile(caCertFile)
@@ -84,7 +70,7 @@ func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assiste
 		client.Transport = t
 	}
 
-	h := &ImageHandler{
+	return &ImageHandler{
 		ImageStore:            is,
 		AssistedServiceScheme: assistedServiceScheme,
 		AssistedServiceHost:   assistedServiceHost,
@@ -92,8 +78,6 @@ func NewImageHandler(is imagestore.ImageStore, reg *prometheus.Registry, assiste
 		Client:                client,
 		sem:                   semaphore.NewWeighted(maxRequests),
 	}
-
-	return stdmiddleware.Handler("/images/:imageID", mdw, h)
 }
 
 func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
