@@ -143,7 +143,7 @@ func (or *overlayReader) Read(p []byte) (int, error) {
 
 	seekErr := or.seek(or.readIndex + int64(bytesRead))
 
-	if seekErr == nil || (readErr != nil && readErr != io.EOF) {
+	if readErr != nil && readErr != io.EOF {
 		return bytesRead, readErr
 	}
 	return bytesRead, seekErr

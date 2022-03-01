@@ -108,16 +108,51 @@ var _ = Describe("OverlayReader", func() {
 	})
 })
 
+// A reader that returns EOF in the same call as the last bytes
+type earlyEOFReader struct {
+	data []byte
+}
+
+func (r *earlyEOFReader) Read(p []byte) (int, error) {
+	num := copy(p, r.data)
+	return num, io.EOF
+}
+
+func (r *earlyEOFReader) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		return 0, nil
+	case io.SeekCurrent:
+		return 0, nil
+	case io.SeekEnd:
+		return int64(len(r.data)), nil
+	default:
+		return 0, nil
+	}
+}
+
 var _ = Describe("AppendReader", func() {
+	It("Appends strings", func() {
+		base := "abcdefghij"
+		appendString := "overlay"
+		expected := base + appendString
 
-	base := "abcdefghij"
-	appendString := "overlay"
-	expected := base + appendString
+		reader, err := NewAppendReader(strings.NewReader(base), strings.NewReader(appendString))
+		Expect(err).NotTo(HaveOccurred())
 
-	reader, err := NewAppendReader(strings.NewReader(base), strings.NewReader(appendString))
-	Expect(err).NotTo(HaveOccurred())
+		output, err := io.ReadAll(reader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(output)).To(Equal(expected))
+	})
+	It("Doesn't error early if the base returns EOF with the last bytes", func() {
+		base := "abcdefghij"
+		appendString := "overlay"
+		reader, err := NewAppendReader(&earlyEOFReader{data: []byte(base)}, strings.NewReader(appendString))
+		Expect(err).NotTo(HaveOccurred())
 
-	output, err := io.ReadAll(reader)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(string(output)).To(Equal(expected))
+		// enough to get past the base, but not to the end of the expected output
+		buf := make([]byte, 14)
+		_, err = reader.Read(buf)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
