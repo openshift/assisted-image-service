@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -39,9 +40,10 @@ func parseArtifact(path string) (string, error) {
 }
 
 func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		log.Error("Only GET method is supported with this endpoint.")
-		http.NotFound(w, r)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		log.Error("Only GET and HEAD methods are supported with this endpoint.")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", strings.Join([]string{http.MethodGet, http.MethodHead}, ", "))
 		return
 	}
 

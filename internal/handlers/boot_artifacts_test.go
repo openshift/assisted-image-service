@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -102,6 +103,15 @@ var _ = Describe("ServeHTTP", func() {
 			expectSuccessfulResponse(resp, []byte("this is rootfs"), "rootfs.img")
 		})
 
+		It("supports HEAD requests", func() {
+			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+			path := fmt.Sprintf("/boot-artifacts/%s?version=4.8", rootfsArtifact)
+			resp, err := client.Head(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.Header.Get("Content-Disposition")).To(Equal("attachment; filename=rootfs.img"))
+		})
+
 		It("fails for a non-existent version", func() {
 			mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, "4.7", defaultArch).Return("").AnyTimes()
 			mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
@@ -130,6 +140,13 @@ var _ = Describe("ServeHTTP", func() {
 			resp, err := client.Get(server.URL + "/boot-artifacts/")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+		})
+
+		It("fails for unsupported methods", func() {
+			reader := strings.NewReader(`{"stuff": "data"}`)
+			resp, err := client.Post(server.URL+"/boot-artifacts/", "application/json", reader)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusMethodNotAllowed))
 		})
 	})
 })
