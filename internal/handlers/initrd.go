@@ -8,7 +8,6 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
-	log "github.com/sirupsen/logrus"
 )
 
 type initrdHandler struct {
@@ -21,20 +20,13 @@ var _ http.Handler = &initrdHandler{}
 func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	imageID, err := parseImageID(r.URL.Path)
 	if err != nil {
-		log.Errorf("failed to parse image ID: %v\n", err)
-		http.NotFound(w, r)
+		httpErrorf(w, http.StatusNotFound, "failed to parse image ID: %v\n", err)
 		return
 	}
 
 	version := r.URL.Query().Get("version")
 	if version == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		errStr := "'version' parameter required for initrd download"
-		log.Errorf(errStr)
-		_, err = w.Write([]byte(errStr))
-		if err != nil {
-			log.Errorf("failed to write response: %v", err)
-		}
+		httpErrorf(w, http.StatusBadRequest, "'version' parameter required for initrd download")
 		return
 	}
 
@@ -44,46 +36,32 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !h.ImageStore.HaveVersion(version, arch) {
-		w.WriteHeader(http.StatusBadRequest)
-		errStr := fmt.Sprintf("version for %s %s, not found", version, arch)
-		log.Errorf(errStr)
-		_, err = w.Write([]byte(errStr))
-		if err != nil {
-			log.Errorf("failed to write response: %v", err)
-		}
+		httpErrorf(w, http.StatusBadRequest, "version for %s %s, not found", version, arch)
 		return
 	}
 
 	isoPath := h.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
 	fsFile, err := isoeditor.GetFileFromISO(isoPath, "/images/pxeboot/initrd.img")
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Errorf("failed to get base initrd: %v", err)
-		_, err = w.Write([]byte(err.Error()))
-		if err != nil {
-			log.Errorf("failed to write response: %v", err)
-		}
+		httpErrorf(w, http.StatusInternalServerError, "failed to get base initrd: %v", err)
 		return
 	}
 
 	ignition, code, err := h.client.ignitionContent(r, imageID)
 	if err != nil {
-		log.Errorf("Error retrieving ignition content: %v", err)
-		w.WriteHeader(code)
+		httpErrorf(w, code, "Error retrieving ignition content: %v", err)
 		return
 	}
 
 	ignitionReader, err := ignition.Archive()
 	if err != nil {
-		log.Errorf("Failed to create ignition archive: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		httpErrorf(w, http.StatusInternalServerError, "Failed to create ignition archive: %v", err)
 		return
 	}
 
 	initrdReader, err := overlay.NewAppendReader(fsFile, ignitionReader)
 	if err != nil {
-		log.Errorf("Failed to create append reader for initrd: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		httpErrorf(w, http.StatusInternalServerError, "Failed to create append reader for initrd: %v", err)
 		return
 	}
 	defer initrdReader.Close()

@@ -49,34 +49,26 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 
 	artifact, err := parseArtifact(r.URL.Path)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to parse artifact: %v", err)
-		log.Error(msg)
-		http.Error(w, msg, http.StatusNotFound)
+		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
 		return
 	}
 	version, arch, err := b.parseQueryParams(r.URL.Query())
 	if err != nil {
-		msg := fmt.Sprintf("Failed to parse query parameters: %v", err)
-		log.Error(msg)
-		http.Error(w, msg, http.StatusBadRequest)
+		httpErrorf(w, http.StatusBadRequest, "Failed to parse query parameters: %v", err)
 		return
 	}
 
 	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
 	fileReader, err := isoeditor.GetFileFromISO(isoFileName, fmt.Sprintf("/images/pxeboot/%s", artifact))
 	if err != nil {
-		msg := fmt.Sprintf("Error creating file reader stream: %v", err)
-		log.Error(msg)
-		http.Error(w, msg, http.StatusInternalServerError)
+		httpErrorf(w, http.StatusInternalServerError, "Error creating file reader stream: %v", err)
 		return
 	}
 	defer fileReader.Close()
 
 	fileInfo, err := os.Stat(isoFileName)
 	if err != nil {
-		msg := fmt.Sprintf("Error reading file info for %s", isoFileName)
-		log.Error(msg)
-		http.Error(w, msg, http.StatusInternalServerError)
+		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", isoFileName)
 		return
 	}
 
