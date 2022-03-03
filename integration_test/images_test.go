@@ -23,7 +23,6 @@ import (
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -131,8 +130,7 @@ var _ = Describe("Image integration tests", func() {
 				}
 
 				// Set up image handler
-				reg := prometheus.NewRegistry()
-				handler := handlers.NewImageHandler(imageStore, reg, u.Scheme, u.Host, "", 1)
+				handler := handlers.NewImageHandler(imageStore, u.Scheme, u.Host, "", 1)
 				imageServer = httptest.NewServer(handler)
 				imageClient = imageServer.Client()
 			})

@@ -13,6 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	"github.com/slok/go-http-metrics/middleware"
+	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 )
 
 var Options struct {
@@ -69,12 +72,29 @@ func main() {
 	}()
 
 	reg := prometheus.NewRegistry()
-	imageHandler := handlers.NewImageHandler(is, reg, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests)
+	metricsConfig := metrics.Config{
+		Registry:        reg,
+		Prefix:          "assisted_image_service",
+		DurationBuckets: []float64{.1, 1, 10, 50, 100, 300, 600},
+		SizeBuckets:     []float64{100, 1e6, 5e8, 1e9, 1e10},
+	}
+	mdw := middleware.New(middleware.Config{
+		Recorder: metrics.NewRecorder(metricsConfig),
+	})
+
+	imageHandler := handlers.NewImageHandler(is, Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile, Options.MaxConcurrentRequests)
 	if Options.AllowedDomains != "" {
 		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)
 	}
 
-	http.Handle("/images/", imageHandler)
+	var bootArtifactsHandler http.Handler = &handlers.BootArtifactsHandler{ImageStore: is}
+	if Options.AllowedDomains != "" {
+		bootArtifactsHandler = handlers.WithCORSMiddleware(bootArtifactsHandler, Options.AllowedDomains)
+	}
+
+	http.Handle("/images/", stdmiddleware.Handler("/images/:imageID", mdw, imageHandler))
+	http.Handle("/boot-artifacts/", stdmiddleware.Handler("", mdw, bootArtifactsHandler))
+
 	http.Handle("/health", readinessHandler)
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
