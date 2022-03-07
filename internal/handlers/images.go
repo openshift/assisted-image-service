@@ -1,82 +1,42 @@
 package handlers
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
-	"net/url"
 	"regexp"
-	"time"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	log "github.com/sirupsen/logrus"
+	"github.com/slok/go-http-metrics/middleware"
+	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 	"golang.org/x/sync/semaphore"
 )
 
-const (
-	fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
-	defaultArch     = "x86_64"
-)
+const defaultArch = "x86_64"
 
 type ImageHandler struct {
-	ImageStore            imagestore.ImageStore
-	AssistedServiceScheme string
-	AssistedServiceHost   string
-	GenerateImageStream   isoeditor.StreamGeneratorFunc
-	Client                *http.Client
-	sem                   *semaphore.Weighted
-}
-
-type imageDownloadParams struct {
-	version   string
-	imageType string
-	arch      string
+	iso    http.Handler
+	initrd http.Handler
+	sem    *semaphore.Weighted
 }
 
 var _ http.Handler = &ImageHandler{}
 
-var pathRegexp = regexp.MustCompile(`^/images/(.+)`)
-
-func parseImageID(path string) (string, error) {
-	match := pathRegexp.FindStringSubmatch(path)
-	if match == nil {
-		return "", fmt.Errorf("malformed download path: %s", path)
+func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw middleware.Middleware) http.Handler {
+	isos := &isoHandler{
+		ImageStore:          is,
+		GenerateImageStream: isoeditor.NewRHCOSStreamReader,
+		client:              assistedServiceClient,
 	}
-	return match[1], nil
-}
-
-func NewImageHandler(is imagestore.ImageStore, assistedServiceScheme, assistedServiceHost, caCertFile string, maxRequests int64) http.Handler {
-	client := &http.Client{}
-	if caCertFile != "" {
-		caCert, err := ioutil.ReadFile(caCertFile)
-		if err != nil {
-			log.Fatalf("Error opening cert file %s, %s", caCertFile, err)
-		}
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			log.Fatalf("Failed to append cert %s, %s", caCertFile, err)
-		}
-
-		t := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:    caCertPool,
-				MinVersion: tls.VersionTLS12,
-			},
-		}
-		client.Transport = t
+	initrds := &initrdHandler{
+		ImageStore: is,
+		client:     assistedServiceClient,
 	}
 
 	return &ImageHandler{
-		ImageStore:            is,
-		AssistedServiceScheme: assistedServiceScheme,
-		AssistedServiceHost:   assistedServiceHost,
-		GenerateImageStream:   isoeditor.NewRHCOSStreamReader,
-		Client:                client,
-		sem:                   semaphore.NewWeighted(maxRequests),
+		iso:    stdmiddleware.Handler("/images/:imageID", mdw, isos),
+		initrd: stdmiddleware.Handler("/images/:imageID/pxe-initrd", mdw, initrds),
+		sem:    semaphore.NewWeighted(maxRequests),
 	}
 }
 
@@ -88,173 +48,15 @@ func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer h.sem.Release(1)
 
-	imageID, err := parseImageID(r.URL.Path)
+	matched, err := regexp.MatchString(`/images/.*/pxe-initrd`, r.URL.Path)
 	if err != nil {
-		log.Errorf("failed to parse image ID: %v\n", err)
-		http.NotFound(w, r)
-		return
-	}
-
-	params, err := h.parseQueryParams(r.URL.Query())
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, err = w.Write([]byte(err.Error()))
-		if err != nil {
-			log.Errorf("Failed to write response: %v\n", err)
-		}
-		return
-	}
-
-	ignition, statusCode, err := h.ignitionContent(r, imageID)
-	if err != nil {
-		log.Errorf("Error retrieving ignition content: %v\n", err)
-		w.WriteHeader(statusCode)
-		return
-	}
-
-	var ramdisk []byte
-	if params.imageType == imagestore.ImageTypeMinimal {
-		ramdisk, statusCode, err = h.ramdiskContent(r, imageID)
-		if err != nil {
-			log.Errorf("Error retrieving ramdisk content: %v\n", err)
-			w.WriteHeader(statusCode)
-			return
-		}
-	}
-
-	isoReader, err := h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk)
-	if err != nil {
-		log.Errorf("Error creating image stream: %v\n", err)
+		log.Errorf("Failed to test path match to initrd: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	defer isoReader.Close()
-
-	//TODO: set modified time correctly (MGMT-7274)
-
-	fileName := fmt.Sprintf("%s-discovery.iso", imageID)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
-	http.ServeContent(w, r, fileName, time.Now(), isoReader)
-}
-
-func (h *ImageHandler) parseQueryParams(values url.Values) (*imageDownloadParams, error) {
-	version := values.Get("version")
-	if version == "" {
-		return nil, fmt.Errorf("'version' parameter required")
-	}
-
-	arch := values.Get("arch")
-	if arch == "" {
-		arch = defaultArch
-	}
-
-	if !h.ImageStore.HaveVersion(version, arch) {
-		return nil, fmt.Errorf("version for %s %s, not found", version, arch)
-	}
-
-	imageType := values.Get("type")
-	if imageType == "" {
-		return nil, fmt.Errorf("'type' parameter required")
-	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
-		return nil, fmt.Errorf("invalid value '%s' for parameter 'type'", imageType)
-	}
-
-	return &imageDownloadParams{
-		version:   version,
-		imageType: imageType,
-		arch:      arch,
-	}, nil
-}
-
-// ignitionContent returns the ramdisk data on success and the error and the corresponding http status code
-// The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
-// The returned code should only be used if an error is also returned
-func (h *ImageHandler) ramdiskContent(imageServiceRequest *http.Request, imageID string) ([]byte, int, error) {
-	var ramdiskBytes []byte
-	if h.AssistedServiceHost == "" {
-		return nil, 0, nil
-	}
-
-	u := url.URL{
-		Scheme: h.AssistedServiceScheme,
-		Host:   h.AssistedServiceHost,
-		Path:   fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
-	}
-	req, err := http.NewRequestWithContext(imageServiceRequest.Context(), "GET", u.String(), nil)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-	h.setRequestAuth(imageServiceRequest, req)
-
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, resp.StatusCode, fmt.Errorf("request to %s returned status %d", u.String(), resp.StatusCode)
-	}
-
-	if resp.StatusCode == http.StatusNoContent {
-		return nil, 0, nil
-	}
-
-	ramdiskBytes, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return ramdiskBytes, 0, nil
-}
-
-// ignitionContent returns the ignition data on success and the error and the corresponding http status code
-// The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
-// The returned code should only be used if an error is also returned
-func (h *ImageHandler) ignitionContent(imageServiceRequest *http.Request, imageID string) (*isoeditor.IgnitionContent, int, error) {
-	if h.AssistedServiceHost == "" {
-		return nil, 0, nil
-	}
-
-	u := url.URL{
-		Scheme: h.AssistedServiceScheme,
-		Host:   h.AssistedServiceHost,
-		Path:   fmt.Sprintf(fileRouteFormat, imageID),
-	}
-	queryValues := url.Values{}
-	queryValues.Set("file_name", "discovery.ign")
-	u.RawQuery = queryValues.Encode()
-
-	req, err := http.NewRequestWithContext(imageServiceRequest.Context(), "GET", u.String(), nil)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-	h.setRequestAuth(imageServiceRequest, req)
-
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
-	}
-	ignitionBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	return &isoeditor.IgnitionContent{Config: ignitionBytes}, 0, nil
-}
-
-func (h *ImageHandler) setRequestAuth(imageRequest, assistedRequest *http.Request) {
-	queryValues := imageRequest.URL.Query()
-	authHeader := imageRequest.Header.Get("Authorization")
-
-	if queryValues.Get("api_key") != "" {
-		params := assistedRequest.URL.Query()
-		params.Set("api_key", queryValues.Get("api_key"))
-		assistedRequest.URL.RawQuery = params.Encode()
-	} else if queryValues.Get("image_token") != "" {
-		assistedRequest.Header.Set("Image-Token", queryValues.Get("image_token"))
-	} else if authHeader != "" {
-		assistedRequest.Header.Set("Authorization", authHeader)
+	if matched {
+		h.initrd.ServeHTTP(w, r)
+	} else {
+		h.iso.ServeHTTP(w, r)
 	}
 }

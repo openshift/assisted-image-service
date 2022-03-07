@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/slok/go-http-metrics/middleware"
 )
 
 var (
@@ -129,9 +130,9 @@ var _ = Describe("Image integration tests", func() {
 					)
 				}
 
-				// Set up image handler
-				handler := handlers.NewImageHandler(imageStore, u.Scheme, u.Host, "", 1)
-				imageServer = httptest.NewServer(handler)
+				asc := handlers.NewAssistedServiceClient(u.Scheme, u.Host, "")
+				mdw := middleware.New(middleware.Config{})
+				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw))
 				imageClient = imageServer.Client()
 			})
 
