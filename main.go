@@ -84,11 +84,13 @@ func main() {
 
 	asc := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
 	imageHandler := handlers.NewImageHandler(is, asc, Options.MaxConcurrentRequests, mdw)
+	imageHandler = readinessHandler.WithMiddleware(imageHandler)
 	if Options.AllowedDomains != "" {
 		imageHandler = handlers.WithCORSMiddleware(imageHandler, Options.AllowedDomains)
 	}
 
 	var bootArtifactsHandler http.Handler = &handlers.BootArtifactsHandler{ImageStore: is}
+	bootArtifactsHandler = readinessHandler.WithMiddleware(bootArtifactsHandler)
 	if Options.AllowedDomains != "" {
 		bootArtifactsHandler = handlers.WithCORSMiddleware(bootArtifactsHandler, Options.AllowedDomains)
 	}
