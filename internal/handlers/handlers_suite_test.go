@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,10 +9,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 )
 
 func TestHandlers(t *testing.T) {
 	RegisterFailHandler(Fail)
+	log.SetOutput(io.Discard)
 	RunSpecs(t, "handlers")
 }
 
