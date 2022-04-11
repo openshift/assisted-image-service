@@ -82,7 +82,11 @@ func main() {
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
-	asc := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
+	asc, err := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
+	if err != nil {
+		log.Fatalf("Failed to create AssistedServiceClient: %v\n", err)
+	}
+
 	imageHandler := handlers.NewImageHandler(is, asc, Options.MaxConcurrentRequests, mdw)
 	imageHandler = readinessHandler.WithMiddleware(imageHandler)
 	if Options.AllowedDomains != "" {

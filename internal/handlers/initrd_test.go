@@ -52,9 +52,12 @@ var _ = Describe("ServeHTTP", func() {
 		u, err := url.Parse(assistedServer.URL())
 		Expect(err).NotTo(HaveOccurred())
 
+		asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+		Expect(err).NotTo(HaveOccurred())
+
 		server = httptest.NewServer(&initrdHandler{
 			ImageStore: mockImageStore,
-			client:     NewAssistedServiceClient(u.Scheme, u.Host, ""),
+			client:     asc,
 		})
 
 		client = server.Client()

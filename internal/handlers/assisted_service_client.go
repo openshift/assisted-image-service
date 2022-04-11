@@ -10,7 +10,6 @@ import (
 	"net/url"
 
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	log "github.com/sirupsen/logrus"
 )
 
 type AssistedServiceClient struct {
@@ -21,16 +20,16 @@ type AssistedServiceClient struct {
 
 const fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
 
-func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCertFile string) *AssistedServiceClient {
+func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCertFile string) (*AssistedServiceClient, error) {
 	client := &http.Client{}
 	if caCertFile != "" {
 		caCert, err := ioutil.ReadFile(caCertFile)
 		if err != nil {
-			log.Fatalf("Error opening cert file %s, %s", caCertFile, err)
+			return nil, fmt.Errorf("failed to open cert file %s, %s", caCertFile, err)
 		}
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
-			log.Fatalf("Failed to append cert %s, %s", caCertFile, err)
+			return nil, fmt.Errorf("failed to append cert %s, %s", caCertFile, err)
 		}
 
 		t := &http.Transport{
@@ -46,7 +45,7 @@ func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCert
 		assistedServiceScheme: assistedServiceScheme,
 		assistedServiceHost:   assistedServiceHost,
 		client:                client,
-	}
+	}, nil
 }
 
 // ignitionContent returns the ramdisk data on success and the error and the corresponding http status code

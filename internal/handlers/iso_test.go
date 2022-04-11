@@ -109,10 +109,13 @@ var _ = Describe("ServeHTTP", func() {
 					return os.Open(isoPath)
 				}
 
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
 				handler := &isoHandler{
 					ImageStore:          mockImageStore,
 					GenerateImageStream: mockImageStream,
-					client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+					client:              asc,
 				}
 				server = httptest.NewServer(handler)
 				client = server.Client()
@@ -215,10 +218,13 @@ var _ = Describe("ServeHTTP", func() {
 				return os.Open(isoPath)
 			}
 
+			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+			Expect(err).NotTo(HaveOccurred())
+
 			handler := &isoHandler{
 				ImageStore:          mockImageStore,
 				GenerateImageStream: mockImageStream,
-				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				client:              asc,
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -252,10 +258,13 @@ var _ = Describe("ServeHTTP", func() {
 				return os.Open(isoPath)
 			}
 
+			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+			Expect(err).NotTo(HaveOccurred())
+
 			handler := &isoHandler{
 				ImageStore:          mockImageStore,
 				GenerateImageStream: mockImageStream,
-				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				client:              asc,
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -286,10 +295,13 @@ var _ = Describe("ServeHTTP", func() {
 				return os.Open(isoPath)
 			}
 
+			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+			Expect(err).NotTo(HaveOccurred())
+
 			handler := &isoHandler{
 				ImageStore:          mockImageStore,
 				GenerateImageStream: mockImageStream,
-				client:              NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				client:              asc,
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -313,9 +325,12 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
+			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+			Expect(err).NotTo(HaveOccurred())
+
 			handler := &isoHandler{
 				ImageStore: mockImageStore,
-				client:     NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				client:     asc,
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
@@ -345,9 +360,12 @@ var _ = Describe("ServeHTTP", func() {
 			u, err := url.Parse(assistedServer.URL())
 			Expect(err).NotTo(HaveOccurred())
 
+			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+			Expect(err).NotTo(HaveOccurred())
+
 			handler := &isoHandler{
 				ImageStore: mockImageStore,
-				client:     NewAssistedServiceClient(u.Scheme, u.Host, ""),
+				client:     asc,
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()

@@ -130,7 +130,9 @@ var _ = Describe("Image integration tests", func() {
 					)
 				}
 
-				asc := handlers.NewAssistedServiceClient(u.Scheme, u.Host, "")
+				asc, err := handlers.NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
 				mdw := middleware.New(middleware.Config{})
 				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw))
 				imageClient = imageServer.Client()
