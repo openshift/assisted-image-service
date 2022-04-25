@@ -33,8 +33,10 @@ var _ = Describe("ServeHTTP", func() {
 			114, 126, 94, 73, 106, 94, 9, 3, 138, 123, 8, 1, 98, 213, 225, 116,
 			79, 72, 144, 163, 167, 143, 107, 144, 162, 162, 34, 200, 61, 128, 0, 0,
 			0, 255, 255, 191, 236, 44, 242, 12, 1, 0, 0}
-		server *httptest.Server
-		client *http.Client
+		server       *httptest.Server
+		client       *http.Client
+		lastModified string
+		header       = http.Header{}
 	)
 
 	BeforeEach(func() {
@@ -42,11 +44,13 @@ var _ = Describe("ServeHTTP", func() {
 		mockImageStore = imagestore.NewMockImageStore(ctrl)
 		imageFilename = createTestISO()
 
+		lastModified = "Fri, 22 Apr 2022 18:11:09 GMT"
+		header.Set("Last-Modified", lastModified)
 		assistedServer = ghttp.NewServer()
 		assistedServer.AppendHandlers(
 			ghttp.CombineHandlers(
 				ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
-				ghttp.RespondWith(http.StatusOK, ignitionContent),
+				ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 			),
 		)
 		u, err := url.Parse(assistedServer.URL())
@@ -77,6 +81,11 @@ var _ = Describe("ServeHTTP", func() {
 	expectSuccessfulResponse := func(resp *http.Response, content []byte) {
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 		Expect(resp.Header.Get("Content-Disposition")).To(Equal(fmt.Sprintf("attachment; filename=%s-initrd.img", imageID)))
+		_, err := http.ParseTime(resp.Header.Get("Last-Modified"))
+		Expect(err).NotTo(HaveOccurred())
+		if lastModified != "" {
+			Expect(resp.Header.Get("Last-Modified")).To(Equal(lastModified))
+		}
 		respContent, err := io.ReadAll(resp.Body)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(respContent).To(Equal(content))
@@ -113,5 +122,21 @@ var _ = Describe("ServeHTTP", func() {
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.11&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+	})
+
+	It("returns a valid last-modified header when provided an invalid one", func() {
+		lastModified = ""
+		header.Set("Last-Modified", "somenonsense")
+		assistedServer.SetHandler(0,
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
+				ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+			),
+		)
+
+		mockImage("4.9", "x86_64")
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		expectSuccessfulResponse(resp, append(initrdContent, ignitionArchiveBytes...))
 	})
 })

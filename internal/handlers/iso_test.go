@@ -26,6 +26,8 @@ var _ = Describe("ServeHTTP", func() {
 		imageID           = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
 		assistedServer    *ghttp.Server
 		ignitionContent   = "someignitioncontent"
+		lastModified      string
+		header            = http.Header{}
 	)
 
 	Context("with image files", func() {
@@ -50,6 +52,9 @@ var _ = Describe("ServeHTTP", func() {
 			minImageFilename = minImageFile.Name()
 
 			assistedServer = ghttp.NewServer()
+
+			lastModified = "Fri, 22 Apr 2022 18:11:09 GMT"
+			header.Set("Last-Modified", lastModified)
 		})
 
 		AfterEach(func() {
@@ -76,6 +81,11 @@ var _ = Describe("ServeHTTP", func() {
 		expectSuccessfulResponse := func(resp *http.Response, content []byte) {
 			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			Expect(resp.Header.Get("Content-Disposition")).To(Equal(fmt.Sprintf("attachment; filename=%s-discovery.iso", imageID)))
+			_, err := http.ParseTime(resp.Header.Get("Last-Modified"))
+			Expect(err).NotTo(HaveOccurred())
+			if lastModified != "" {
+				Expect(resp.Header.Get("Last-Modified")).To(Equal(lastModified))
+			}
 			respContent, err := io.ReadAll(resp.Body)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(respContent).To(Equal(content))
@@ -92,7 +102,7 @@ var _ = Describe("ServeHTTP", func() {
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
-						ghttp.RespondWith(http.StatusOK, ignitionContent),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 					),
 				)
 
@@ -198,6 +208,23 @@ var _ = Describe("ServeHTTP", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 			})
+
+			It("returns a valid last-modified header when provided an invalid one", func() {
+				lastModified = ""
+				header.Set("Last-Modified", "somenonsense")
+				assistedServer.SetHandler(0,
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+				resp, err := client.Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
 		})
 
 		It("passes Authorization header through to assisted requests", func() {
@@ -205,7 +232,7 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
 					ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
+					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
 			)
 
@@ -245,7 +272,7 @@ var _ = Describe("ServeHTTP", func() {
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign&api_key=mytoken"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
+					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
 			)
 
@@ -282,7 +309,7 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign"),
 					ghttp.VerifyHeader(http.Header{"Image-Token": []string{"mytoken"}}),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
+					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
 			)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
+	log "github.com/sirupsen/logrus"
 )
 
 type initrdHandler struct {
@@ -47,7 +48,7 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignition, code, err := h.client.ignitionContent(r, imageID)
+	ignition, lastModified, code, err := h.client.ignitionContent(r, imageID)
 	if err != nil {
 		httpErrorf(w, code, "Error retrieving ignition content: %v", err)
 		return
@@ -68,5 +69,10 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	fileName := fmt.Sprintf("%s-initrd.img", imageID)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
-	http.ServeContent(w, r, fileName, time.Now(), initrdReader)
+	modTime, err := http.ParseTime(lastModified)
+	if err != nil {
+		log.Warnf("Error parsing last modified time %s: %v", lastModified, err)
+		modTime = time.Now()
+	}
+	http.ServeContent(w, r, fileName, modTime, initrdReader)
 }
