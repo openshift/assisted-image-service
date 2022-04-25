@@ -26,6 +26,7 @@ var Options struct {
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
+	HTTPListenPort        string `envconfig:"HTTP_LISTEN_PORT"`
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 	OSImages              string `envconfig:"OS_IMAGES"`
@@ -106,11 +107,23 @@ func main() {
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
-	log.Info("Starting http handler...")
-	address := fmt.Sprintf(":%s", Options.ListenPort)
+	httpsListen := func(port string) {
+		log.Infof("Starting https handler on %s...", port)
+		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%s", port), Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
+	}
+
+	httpListen := func(port string) {
+		log.Infof("Starting http handler on %s...", port)
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	}
+
 	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
-		log.Fatal(http.ListenAndServeTLS(address, Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
+		go httpsListen(Options.ListenPort)
+		if Options.HTTPListenPort != "" {
+			go httpListen(Options.HTTPListenPort)
+		}
+		select {}
 	} else {
-		log.Fatal(http.ListenAndServe(address, nil))
+		httpListen(Options.ListenPort)
 	}
 }
