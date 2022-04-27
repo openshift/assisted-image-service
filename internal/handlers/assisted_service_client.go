@@ -91,9 +91,9 @@ func (c *AssistedServiceClient) ramdiskContent(imageServiceRequest *http.Request
 // ignitionContent returns the ignition data on success and the error and the corresponding http status code
 // The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
 // The returned code should only be used if an error is also returned
-func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Request, imageID string) (*isoeditor.IgnitionContent, int, error) {
+func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Request, imageID string) (*isoeditor.IgnitionContent, string, int, error) {
 	if c.assistedServiceHost == "" {
-		return nil, 0, nil
+		return nil, "", 0, nil
 	}
 
 	u := url.URL{
@@ -107,23 +107,23 @@ func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Reques
 
 	req, err := http.NewRequestWithContext(imageServiceRequest.Context(), "GET", u.String(), nil)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, "", http.StatusInternalServerError, err
 	}
 	setRequestAuth(imageServiceRequest, req)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, "", http.StatusInternalServerError, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
+		return nil, "", resp.StatusCode, fmt.Errorf("ignition request to %s returned status %d", req.URL.String(), resp.StatusCode)
 	}
 	ignitionBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
+		return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	return &isoeditor.IgnitionContent{Config: ignitionBytes}, 0, nil
+	return &isoeditor.IgnitionContent{Config: ignitionBytes}, resp.Header.Get("Last-Modified"), 0, nil
 }
 
 func setRequestAuth(imageRequest, assistedRequest *http.Request) {

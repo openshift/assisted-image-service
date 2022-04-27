@@ -44,7 +44,7 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignition, statusCode, err := h.client.ignitionContent(r, imageID)
+	ignition, lastModified, statusCode, err := h.client.ignitionContent(r, imageID)
 	if err != nil {
 		log.Errorf("Error retrieving ignition content: %v\n", err)
 		w.WriteHeader(statusCode)
@@ -69,11 +69,14 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer isoReader.Close()
 
-	//TODO: set modified time correctly (MGMT-7274)
-
 	fileName := fmt.Sprintf("%s-discovery.iso", imageID)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
-	http.ServeContent(w, r, fileName, time.Now(), isoReader)
+	modTime, err := http.ParseTime(lastModified)
+	if err != nil {
+		log.Warnf("Error parsing last modified time %s: %v", lastModified, err)
+		modTime = time.Now()
+	}
+	http.ServeContent(w, r, fileName, modTime, isoReader)
 }
 
 func (h *isoHandler) parseQueryParams(values url.Values) (*imageDownloadParams, error) {
