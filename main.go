@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/internal/handlers"
@@ -107,23 +110,59 @@ func main() {
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
-	httpsListen := func(port string) {
-		log.Infof("Starting https handler on %s...", port)
-		log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%s", port), Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
+	// Run listen on http and https ports if HTTPSCertFile/HTTPSKeyFile set
+	var httpsServer, httpServer http.Server
+
+	httpsListen := func() {
+		log.Infof("Starting https handler on %s...", httpsServer.Addr)
+		if err := httpsServer.ListenAndServeTLS(Options.HTTPSCertFile, Options.HTTPSKeyFile); err != http.ErrServerClosed {
+			log.Fatalf("HTTPS listener closed: %v", err)
+		}
 	}
 
-	httpListen := func(port string) {
-		log.Infof("Starting http handler on %s...", port)
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	httpListen := func() {
+		log.Infof("Starting http handler on %s...", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("HTTP listener closed: %v", err)
+		}
 	}
+
+	// Interrupt servers on SIGINT/SIGTERM
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
-		go httpsListen(Options.ListenPort)
-		if Options.HTTPListenPort != "" {
-			go httpListen(Options.HTTPListenPort)
+		httpsServer = http.Server{
+			Addr: fmt.Sprintf(":%s", Options.ListenPort),
 		}
-		select {}
+		go httpsListen()
+		if Options.HTTPListenPort != "" {
+			httpServer = http.Server{
+				Addr: fmt.Sprintf(":%s", Options.HTTPListenPort),
+			}
+			go httpListen()
+		}
 	} else {
-		httpListen(Options.ListenPort)
+		httpServer = http.Server{
+			Addr: fmt.Sprintf(":%s", Options.ListenPort),
+		}
+		go httpListen()
+	}
+	<-stop
+	if err := httpsServer.Shutdown(context.TODO()); err != nil {
+		log.Info("HTTPS shutdown failed: %v", err)
+		if err := httpsServer.Close(); err != nil {
+			log.Info("HTTPS emergency shutdown failed: %v", err)
+		}
+	} else {
+		log.Info("HTTPS server terminated gracefully")
+	}
+	if err := httpServer.Shutdown(context.TODO()); err != nil {
+		log.Infof("HTTP shutdown failed: %v", err)
+		if err := httpServer.Close(); err != nil {
+			log.Info("HTTP emergency shutdown failed: %v", err)
+		}
+	} else {
+		log.Info("HTTP server terminated gracefully")
 	}
 }
