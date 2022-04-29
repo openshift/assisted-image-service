@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/servers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -26,6 +29,7 @@ var Options struct {
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
 	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
+	HTTPListenPort        string `envconfig:"HTTP_LISTEN_PORT"`
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
 	RHCOSVersions         string `envconfig:"RHCOS_VERSIONS"`
 	OSImages              string `envconfig:"OS_IMAGES"`
@@ -100,11 +104,12 @@ func main() {
 	http.Handle("/live", handlers.NewLivenessHandler())
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
-	log.Info("Starting http handler...")
-	address := fmt.Sprintf(":%s", Options.ListenPort)
-	if Options.HTTPSKeyFile != "" && Options.HTTPSCertFile != "" {
-		log.Fatal(http.ListenAndServeTLS(address, Options.HTTPSCertFile, Options.HTTPSKeyFile, nil))
-	} else {
-		log.Fatal(http.ListenAndServe(address, nil))
-	}
+	// Interrupt servers on SIGINT/SIGTERM
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	// Run listen on http and https ports if HTTPSCertFile/HTTPSKeyFile set
+	serverInfo := servers.New(Options.HTTPListenPort, Options.ListenPort, Options.HTTPSKeyFile, Options.HTTPSCertFile)
+	<-stop
+	serverInfo.Shutdown()
 }
