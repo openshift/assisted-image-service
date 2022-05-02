@@ -97,7 +97,6 @@ func main() {
 		bootArtifactsHandler = handlers.WithCORSMiddleware(bootArtifactsHandler, Options.AllowedDomains)
 	}
 
-	http.Handle("/images/", imageHandler)
 	http.Handle("/boot-artifacts/", stdmiddleware.Handler("", mdw, bootArtifactsHandler))
 
 	http.Handle("/health", readinessHandler)
@@ -110,6 +109,13 @@ func main() {
 
 	// Run listen on http and https ports if HTTPSCertFile/HTTPSKeyFile set
 	serverInfo := servers.New(Options.HTTPListenPort, Options.ListenPort, Options.HTTPSKeyFile, Options.HTTPSCertFile)
+	if serverInfo.HasBothHandlers {
+		// Make sure we filter requests when both http+https ports are open
+		// Allow only pxe-initrd via HTTP in imageHandler
+		imageHandler = handlers.WithInitrdViaHTTP(imageHandler)
+	}
+	http.Handle("/images/", imageHandler)
+
 	serverInfo.ListenAndServe()
 	<-stop
 	serverInfo.Shutdown()

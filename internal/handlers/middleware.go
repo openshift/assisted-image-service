@@ -26,3 +26,22 @@ func WithCORSMiddleware(handler http.Handler, domains string) http.Handler {
 	})
 	return corsHandler.Handler(handler)
 }
+
+func WithInitrdViaHTTP(handler http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check plain HTTP requests
+		if r.TLS == nil {
+			if _, err := parseImageID(r.URL.Path); err != nil {
+				// Invalid UUID format
+				http.NotFound(w, r)
+				return
+			}
+			if !strings.HasSuffix(r.URL.Path, "/pxe-initrd") {
+				// Only "/pxe-initrd" is allowed to be fetched
+				http.NotFound(w, r)
+				return
+			}
+		}
+		handler.ServeHTTP(w, r)
+	}
+}
