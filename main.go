@@ -110,6 +110,7 @@ func main() {
 
 	// Run listen on http and https ports if HTTPSCertFile/HTTPSKeyFile set
 	serverInfo := servers.New(Options.HTTPListenPort, Options.ListenPort, Options.HTTPSKeyFile, Options.HTTPSCertFile)
+	serverInfo.ListenAndServe()
 	<-stop
 	serverInfo.Shutdown()
 }
