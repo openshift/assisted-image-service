@@ -54,6 +54,38 @@ linters:
     - gosec
     - unconvert
     - goimports
+    - exportloopref
+    - asciicheck
+    - decorder
+    - depguard
+    - dogsled
+    - durationcheck
+    - grouper
+    - tenv
+    - containedctx
+    - contextcheck
+    - dupl
+    - errchkjson
+    - errname
+    - exhaustive
+    - forbidigo
+    - gochecknoinits
+    - gocognit
+    - ifshort
+    - maintidx
+    - makezero
+    - nakedret
+    - nilerr
+    - nilnil
+    - nolintlint
+    - predeclared
+    - promlinter
+    - tagliatelle
+    - tenv
+    - thelper
+    - tparallel
+    - unparam
+    - wastedassign
 
 linters-settings:
   govet:
