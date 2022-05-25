@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -71,57 +70,5 @@ var _ = Describe("WithCORSMiddleware", func() {
 
 		respHeaderValue = doRequestWithOrigin(http.MethodHead, "")
 		Expect(respHeaderValue).To(Equal(""))
-	})
-})
-
-var _ = Describe("WithInitrdViaHTTPMiddleware", func() {
-	var (
-		server *httptest.Server
-		client *http.Client
-	)
-
-	BeforeEach(func() {
-		mux := http.NewServeMux()
-		mux.Handle("/images/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(w, "Hello!")
-		}))
-		server = httptest.NewServer(WithInitrdViaHTTP(mux))
-		client = server.Client()
-	})
-
-	AfterEach(func() {
-		server.Close()
-	})
-
-	doRequestWithPath := func(path string, queryString map[string]string) int {
-		requestUrl, err := url.Parse(server.URL)
-		Expect(err).NotTo(HaveOccurred())
-		requestUrl.Path = path
-		q := requestUrl.Query()
-		for k, v := range queryString {
-			q.Add(k, v)
-		}
-		requestUrl.RawQuery = q.Encode()
-
-		req, err := http.NewRequest(http.MethodGet, requestUrl.String(), nil)
-		Expect(err).NotTo(HaveOccurred())
-		resp, err := client.Do(req)
-		Expect(err).NotTo(HaveOccurred())
-
-		return resp.StatusCode
-	}
-
-	It("filters http requests", func() {
-		respStatus := doRequestWithPath("/images/a7acfb01-d89f-40c8-82d7-02b20cf00173/pxe-initrd", map[string]string{"arch": "x86_64", "version": "4.9"})
-		Expect(respStatus).To(Equal(200))
-
-		respStatus = doRequestWithPath("/images/a7acfb01-d89f-40c8-82d7-02b20cf00173/pxe-initrd", map[string]string{"arch": "no-such-arch"})
-		Expect(respStatus).To(Equal(200))
-
-		respStatus = doRequestWithPath("/images/foo/", map[string]string{})
-		Expect(respStatus).To(Equal(404))
-
-		respStatus = doRequestWithPath("/images/a7acfb01-d89f-40c8-82d7-02b20cf00173", map[string]string{})
-		Expect(respStatus).To(Equal(404))
 	})
 })
