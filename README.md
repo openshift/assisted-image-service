@@ -31,6 +31,7 @@ skipper make test
 - `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
 - `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 - `ALLOWED_DOMAINS` - When set, determines how the service responds to requests with `Origin` headers
+- `HTTP_LISTEN_PORT` - When set, plain http listener is started on that port
 
 Example `OS_IMAGES`:
 ```json
