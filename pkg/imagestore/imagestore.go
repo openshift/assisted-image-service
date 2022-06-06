@@ -55,9 +55,30 @@ var DefaultVersions = []map[string]string{
 	{
 		"openshift_version": "4.10",
 		"cpu_architecture":  "x86_64",
-		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-0.nightly-2021-11-29-191648/rhcos-4.10.0-0.nightly-2021-11-29-191648-x86_64-live.x86_64.iso",
-		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-0.nightly-2021-11-29-191648/rhcos-4.10.0-0.nightly-2021-11-29-191648-x86_64-live-rootfs.x86_64.img",
-		"version":           "410.84.202111291603-0",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.10/4.10.3/rhcos-4.10.3-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.10/4.10.3/rhcos-4.10.3-x86_64-live-rootfs.x86_64.img",
+		"version":           "410.84.202201251210-0",
+	},
+	{
+		"openshift_version": "4.10",
+		"cpu_architecture":  "arm64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.10/4.10.3/rhcos-4.10.3-aarch64-live.aarch64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/4.10/4.10.3/rhcos-4.10.3-aarch64-live-rootfs.aarch64.img",
+		"version":           "410.84.202201251210-0",
+	},
+	{
+		"openshift_version": "4.11",
+		"cpu_architecture":  "x86_64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.11.0-0.nightly-2022-04-16-163450/rhcos-4.11.0-0.nightly-2022-04-16-163450-x86_64-live.x86_64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.11.0-0.nightly-2022-04-16-163450/rhcos-4.11.0-0.nightly-2022-04-16-163450-x86_64-live-rootfs.x86_64.img",
+		"version":           "411.85.202203242008-0",
+	},
+	{
+		"openshift_version": "4.11",
+		"cpu_architecture":  "arm64",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/pre-release/4.11.0-0.nightly-arm64-2022-04-19-171931/rhcos-4.11.0-0.nightly-arm64-2022-04-19-171931-aarch64-live.aarch64.iso",
+		"rootfs_url":        "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/pre-release/4.11.0-0.nightly-arm64-2022-04-19-171931/rhcos-4.11.0-0.nightly-arm64-2022-04-19-171931-aarch64-live-rootfs.aarch64.img",
+		"version":           "411.86.202204190940-0",
 	},
 }
 
