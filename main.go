@@ -35,6 +35,8 @@ var Options struct {
 	OSImages              string `envconfig:"OS_IMAGES"`
 	AllowedDomains        string `envconfig:"ALLOWED_DOMAINS"`
 	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
+	ImageServiceScheme    string `envconfig:"IMAGE_SERVICE_SCHEME"`
+	ImageServiceHost      string `envconfig:"IMAGE_SERVICE_HOST"`
 }
 
 func main() {
@@ -60,7 +62,7 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.InsecureSkipVerify, versions)
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceScheme, Options.ImageServiceHost, Options.InsecureSkipVerify, versions)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -69,10 +70,12 @@ type ImageStore interface {
 }
 
 type rhcosStore struct {
-	versions   []map[string]string
-	isoEditor  isoeditor.Editor
-	dataDir    string
-	httpClient *http.Client
+	versions           []map[string]string
+	isoEditor          isoeditor.Editor
+	dataDir            string
+	httpClient         *http.Client
+	imageServiceScheme string
+	imageServiceHost   string
 }
 
 const (
@@ -80,7 +83,7 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceScheme, imageServiceHost string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -93,10 +96,12 @@ func NewImageStore(ed isoeditor.Editor, dataDir string, insecureSkipVerify bool,
 	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
-		versions:   versions,
-		isoEditor:  ed,
-		dataDir:    dataDir,
-		httpClient: httpClient,
+		versions:           versions,
+		isoEditor:          ed,
+		dataDir:            dataDir,
+		httpClient:         httpClient,
+		imageServiceScheme: imageServiceScheme,
+		imageServiceHost:   imageServiceHost,
 	}, nil
 }
 
@@ -114,9 +119,6 @@ func validateVersions(versions []map[string]string) error {
 		}
 		if _, ok := entry["url"]; !ok {
 			return fmt.Errorf(missingKeyFmt, entry, "url")
-		}
-		if _, ok := entry["rootfs_url"]; !ok {
-			return fmt.Errorf(missingKeyFmt, entry, "rootfs_url")
 		}
 		if _, ok := entry["version"]; !ok {
 			return fmt.Errorf(missingKeyFmt, entry, "version")
@@ -209,7 +211,17 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
 
 			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
-			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, imageInfo["rootfs_url"], minimalPath)
+			var rootfsURL string
+			if s.imageServiceScheme == "" || s.imageServiceHost == "" {
+				if _, ok := imageInfo["rootfs_url"]; !ok {
+					return fmt.Errorf("invalid version entry %+v: missing rootfs_url key", imageInfo)
+				}
+				rootfsURL = imageInfo["rootfs_url"]
+			} else {
+				rootfsURL = buildRootfsURL(s.imageServiceScheme, s.imageServiceHost, arch, openshiftVersion)
+			}
+
+			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
 			if err != nil {
 				return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
 			}
@@ -233,6 +245,19 @@ func (s *rhcosStore) PathForParams(imageType, openshiftVersion, arch string) str
 
 func isoFileName(imageType, openshiftVersion, version, arch string) string {
 	return fmt.Sprintf("rhcos-%s-%s-%s-%s.iso", imageType, openshiftVersion, version, arch)
+}
+
+func buildRootfsURL(scheme, host, arch, version string) string {
+	downloadURL := url.URL{
+		Scheme: scheme,
+		Host:   host,
+		Path:   "/boot-artifacts/rootfs",
+	}
+	queryValues := url.Values{}
+	queryValues.Set("arch", arch)
+	queryValues.Set("version", version)
+	downloadURL.RawQuery = queryValues.Encode()
+	return downloadURL.String()
 }
 
 func (s *rhcosStore) cleanDataDir() error {
