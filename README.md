@@ -72,7 +72,7 @@ Downloads the RHCOS image for the specified image ID.
 
 - `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
 - `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
-- `type`: `full-iso` to download the ISO including the rootfs, `minimal-iso` to download the iso without the rootfs
+- `type`: `full-iso` to download the ISO including the rootfs, `minimal-iso` to download the ISO without the rootfs
 - `api_key`: the api token to pass through to the assisted service calls if local authentication is required
 - `image_token`: the token to pass through to the Image-Token assisted service header if image pre-signed authentication is required
 
