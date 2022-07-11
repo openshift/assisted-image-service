@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -233,13 +235,16 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 
 			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
 			var rootfsURL string
-			if s.imageServiceScheme == "" || s.imageServiceHost == "" {
+			if s.imageServiceHost == "" {
 				if _, ok := imageInfo["rootfs_url"]; !ok {
 					return fmt.Errorf("invalid version entry %+v: missing rootfs_url key", imageInfo)
 				}
 				rootfsURL = imageInfo["rootfs_url"]
 			} else {
-				rootfsURL = buildRootfsURL(s.imageServiceScheme, s.imageServiceHost, arch, openshiftVersion)
+				rootfsURL, err = buildRootfsURL(s.imageServiceScheme, s.imageServiceHost, arch, openshiftVersion)
+				if err != nil {
+					return fmt.Errorf("failed to build rootfs URL: %v", err)
+				}
 			}
 
 			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
@@ -268,17 +273,45 @@ func isoFileName(imageType, openshiftVersion, version, arch string) string {
 	return fmt.Sprintf("rhcos-%s-%s-%s-%s.iso", imageType, openshiftVersion, version, arch)
 }
 
-func buildRootfsURL(scheme, host, arch, version string) string {
+func buildRootfsURL(scheme, host, arch, version string) (string, error) {
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "http") {
+		// url can't parse host with colon when scheme is missing
+		host = fmt.Sprintf("%s://%s", scheme, host)
+	}
+
+	base, err := url.Parse(host)
+	if err != nil {
+		return "", err
+	}
+
+	// if a scheme is not passed, use the one from the url
+	if scheme == "" {
+		scheme = base.Scheme
+	}
+
+	// if the url didn't have a scheme, fail
+	if scheme == "" {
+		return "", fmt.Errorf("Missing url scheme")
+	}
+
+	urlHost := base.Host
+	urlPath := base.Path
+
+	if base.Scheme == "" {
+		// base.Host is empty when scheme is missing from host
+		urlPath = host
+	}
+
 	downloadURL := url.URL{
 		Scheme: scheme,
-		Host:   host,
-		Path:   "/boot-artifacts/rootfs",
+		Host:   urlHost,
+		Path:   path.Join(urlPath, "/boot-artifacts/rootfs"),
 	}
 	queryValues := url.Values{}
 	queryValues.Set("arch", arch)
 	queryValues.Set("version", version)
 	downloadURL.RawQuery = queryValues.Encode()
-	return downloadURL.String()
+	return downloadURL.String(), nil
 }
 
 func (s *rhcosStore) cleanDataDir() error {

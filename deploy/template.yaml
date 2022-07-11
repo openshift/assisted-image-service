@@ -77,6 +77,9 @@ parameters:
   value: 15Gi
 - name: REPLICAS_COUNT
   value: "3"
+- name: IMAGE_SERVICE_BASE_URL
+  value: ''
+  required: true
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -123,6 +126,8 @@ objects:
             value: http
           - name: ASSISTED_SERVICE_HOST
             value: "assisted-service:8090"
+          - name: IMAGE_SERVICE_HOST
+            value: ${IMAGE_SERVICE_BASE_URL}
           - name: DATA_DIR
             value: "/data"
           ports:

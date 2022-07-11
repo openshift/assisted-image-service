@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -248,6 +250,140 @@ var _ = Context("with a data directory configured", func() {
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", gomock.Any()).Return(nil)
 				Expect(is.Populate(ctx)).NotTo(Succeed())
+			})
+
+			It("downloads an image correctly - imageServiceHost contains path", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := path.Join(imageServiceHost, "api/assisted-images")
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceScheme, host, false, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				rootfs := fmt.Sprintf("http://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("someisocontenthere"))
+			})
+
+			It("downloads an image correctly - use scheme from imageServiceHost", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := url.URL{
+					Scheme: "https",
+					Host:   imageServiceHost,
+					Path:   "api/assisted-images",
+				}
+				is, err := NewImageStore(mockEditor, dataDir, "", host.String(), false, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("someisocontenthere"))
+			})
+
+			It("downloads an image correctly - specified scheme takes priority", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := url.URL{
+					Scheme: "https",
+					Host:   imageServiceHost,
+					Path:   "api/assisted-images",
+				}
+				is, err := NewImageStore(mockEditor, dataDir, "http", host.String(), false, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				rootfs := fmt.Sprintf("http://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("someisocontenthere"))
+			})
+
+			It("downloads an image correctly - hostname with colon", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := "1.1.1.1:6016/api/assisted-images"
+				is, err := NewImageStore(mockEditor, dataDir, "http", host, false, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				rootfs := fmt.Sprintf("http://1.1.1.1:6016/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(content)).To(Equal("someisocontenthere"))
+			})
+
+			It("downloads fails when scheme is missing", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := url.URL{
+					Scheme: "",
+					Host:   imageServiceHost,
+					Path:   "api/assisted-images",
+				}
+				is, err := NewImageStore(mockEditor, dataDir, "", host.String(), false, []map[string]string{version})
+				Expect(err).ToNot(HaveOccurred())
+
+				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				err = is.Populate(ctx)
+				Expect(err).ToNot(Succeed())
+				Expect(err.Error()).To(Equal("failed to build rootfs URL: Missing url scheme"))
+			})
+
+			It("downloads fails when imageServiceHost is invalid", func() {
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				host := "a:b"
+				is, err := NewImageStore(mockEditor, dataDir, "http", host, false, []map[string]string{version})
+				Expect(err).ToNot(HaveOccurred())
+
+				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, gomock.Any()).Return(nil)
+				err = is.Populate(ctx)
+				Expect(err).ToNot(Succeed())
+				Expect(err.Error()).To(Equal("failed to build rootfs URL: parse \"http://a:b\": invalid port \":b\" after host"))
 			})
 		})
 	})
