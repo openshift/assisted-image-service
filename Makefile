@@ -1,6 +1,8 @@
 IMAGE := $(or ${IMAGE}, quay.io/edge-infrastructure/assisted-image-service:latest)
 PWD = $(shell pwd)
 LISTEN_PORT := $(or ${LISTEN_PORT}, 8080)
+IMAGE_SERVICE_SCHEME := $(or ${IMAGE_SERVICE_SCHEME}, http)
+IMAGE_SERVICE_HOST := $(or ${IMAGE_SERVICE_HOST}, localhost:8080)
 
 CI ?= false
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -45,6 +47,7 @@ run: certs
 		-e LISTEN_PORT=$(LISTEN_PORT) \
 		-e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt \
 		-e ASSISTED_SERVICE_SCHEME=${ASSISTED_SERVICE_SCHEME} -e ASSISTED_SERVICE_HOST=${ASSISTED_SERVICE_HOST} \
+		-e IMAGE_SERVICE_SCHEME=${IMAGE_SERVICE_SCHEME} -e IMAGE_SERVICE_HOST=${IMAGE_SERVICE_HOST} \
 		-e REQUEST_AUTH_TYPE=${REQUEST_AUTH_TYPE} \
 		-e RHCOS_VERSIONS='${RHCOS_VERSIONS}' \
 		-e OS_IMAGES='${OS_IMAGES}' \

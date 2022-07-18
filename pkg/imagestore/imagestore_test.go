@@ -66,13 +66,11 @@ var _ = Context("with a data directory configured", func() {
 				version    = map[string]string{
 					"openshift_version": "4.8",
 					"cpu_architecture":  "x86_64",
-					"rootfs_url":        "http://example.com/image/48.img",
 					"version":           "48.84.202109241901-0",
 				}
 				versionPatch = map[string]string{
 					"openshift_version": "4.8.1",
 					"cpu_architecture":  "x86_64",
-					"rootfs_url":        "http://example.com/image/481.img",
 					"version":           "48.84.202109241901-0",
 				}
 			)
@@ -227,24 +225,7 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 
-			It("creates a minimal ISO when imageServiceBaseURL is not set (rootfs fallback)", func() {
-				ts.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", "/some.iso"),
-						ghttp.RespondWith(http.StatusOK, "minimalisocontent"),
-					),
-				)
-				version["url"] = ts.URL() + "/some.iso"
-
-				// Create ImageStore with an empty imageServiceBaseURL; should fallback to rootfs from OS_IMAGES.
-				is, err := NewImageStore(mockEditor, dataDir, "", "", false, []map[string]string{version})
-				Expect(err).NotTo(HaveOccurred())
-
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), version["rootfs_url"], gomock.Any()).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
-			})
-
-			It("fails when rootfs_url and imageServiceBaseURL are not set", func() {
+			It("fails when imageServiceScheme and imageServiceHost are not set", func() {
 				is, err := NewImageStore(mockEditor, dataDir, "", "", false, []map[string]string{version})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -395,7 +376,6 @@ var _ = Describe("PathForParams", func() {
 			"openshift_version": "4.8",
 			"cpu_architecture":  "x86_64",
 			"url":               "http://example.com/image/x86_64-48.iso",
-			"rootfs_url":        "http://example.com/image/x86_64-48.img",
 			"version":           "48.84.202109241901-0",
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceScheme, imageServiceHost, false, versions)
@@ -412,14 +392,12 @@ var _ = Describe("HaveVersion", func() {
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
-				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 				"version":           "48.84.202109241901-0",
 			},
 			{
 				"openshift_version": "4.9",
 				"cpu_architecture":  "arm64",
 				"url":               "http://example.com/image/arm64-49.iso",
-				"rootfs_url":        "http://example.com/image/arm64-49.img",
 				"version":           "49.84.202110081407-0",
 			},
 		}
@@ -454,7 +432,6 @@ var _ = Describe("NewImageStore", func() {
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
-				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 				"version":           "48.84.202109241901-0",
 			},
 		}
@@ -475,7 +452,6 @@ var _ = Describe("NewImageStore", func() {
 			{
 				"cpu_architecture": "x86_64",
 				"url":              "http://example.com/image/x86_64-48.iso",
-				"rootfs_url":       "http://example.com/image/x86_64-48.img",
 				"version":          "48.84.202109241901-0",
 			},
 		}
@@ -488,7 +464,6 @@ var _ = Describe("NewImageStore", func() {
 			{
 				"openshift_version": "4.8",
 				"url":               "http://example.com/image/x86_64-48.iso",
-				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 				"version":           "48.84.202109241901-0",
 			},
 		}
@@ -501,7 +476,6 @@ var _ = Describe("NewImageStore", func() {
 			{
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
-				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 				"version":           "48.84.202109241901-0",
 			},
 		}
@@ -515,7 +489,6 @@ var _ = Describe("NewImageStore", func() {
 				"openshift_version": "4.8",
 				"cpu_architecture":  "x86_64",
 				"url":               "http://example.com/image/x86_64-48.iso",
-				"rootfs_url":        "http://example.com/image/x86_64-48.img",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceScheme, imageServiceHost, false, versions)
