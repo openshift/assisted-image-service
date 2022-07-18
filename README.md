@@ -29,8 +29,9 @@ skipper make test
 - `HTTPS_CERT_FILE` - tls cert file path
 - `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
 - `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
-- `IMAGE_SERVICE_SCHEME` - protocol to use to query the image service
-- `IMAGE_SERVICE_HOST` - host or host:port to use to query the image service
+- `IMAGE_SERVICE_SCHEME` - protocol to use to query the image service (deprecated)
+- `IMAGE_SERVICE_HOST` - host or host:port to use to query the image service (deprecated)
+- `IMAGE_SERVICE_BASE_URL` - the base URL to use to query the image service
 - `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 - `ALLOWED_DOMAINS` - When set, determines how the service responds to requests with `Origin` headers
 - `HTTP_LISTEN_PORT` - When set, plain http listener is started on that port

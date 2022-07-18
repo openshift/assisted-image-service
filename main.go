@@ -37,6 +37,7 @@ var Options struct {
 	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 	ImageServiceScheme    string `envconfig:"IMAGE_SERVICE_SCHEME"`
 	ImageServiceHost      string `envconfig:"IMAGE_SERVICE_HOST"`
+	ImageServiceBaseURL   string `envconfig:"IMAGE_SERVICE_BASE_URL"`
 }
 
 func main() {
@@ -62,6 +63,11 @@ func main() {
 		}
 	}
 
+	if Options.ImageServiceBaseURL != "" {
+		// TODO: once all deployments use IMAGE_SERVICE_BASE_URL exclusively,
+		//       remove the support for deprecated IMAGE_SERVICE_HOST.
+		Options.ImageServiceHost = Options.ImageServiceBaseURL
+	}
 	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceScheme, Options.ImageServiceHost, Options.InsecureSkipVerify, versions)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
