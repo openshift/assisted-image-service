@@ -113,6 +113,8 @@ objects:
             value: "assisted-service:8090"
           - name: IMAGE_SERVICE_HOST
             value: ${IMAGE_SERVICE_BASE_URL}
+          - name: IMAGE_SERVICE_BASE_URL
+            value: ${IMAGE_SERVICE_BASE_URL}
           - name: DATA_DIR
             value: "/data"
           ports:
