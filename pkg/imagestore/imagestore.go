@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -78,12 +77,11 @@ type ImageStore interface {
 }
 
 type rhcosStore struct {
-	versions           []map[string]string
-	isoEditor          isoeditor.Editor
-	dataDir            string
-	httpClient         *http.Client
-	imageServiceScheme string
-	imageServiceHost   string
+	versions            []map[string]string
+	isoEditor           isoeditor.Editor
+	dataDir             string
+	httpClient          *http.Client
+	imageServiceBaseURL string
 }
 
 const (
@@ -91,7 +89,7 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceScheme, imageServiceHost string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -104,12 +102,11 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceScheme, imageServic
 	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
-		versions:           versions,
-		isoEditor:          ed,
-		dataDir:            dataDir,
-		httpClient:         httpClient,
-		imageServiceScheme: imageServiceScheme,
-		imageServiceHost:   imageServiceHost,
+		versions:            versions,
+		isoEditor:           ed,
+		dataDir:             dataDir,
+		httpClient:          httpClient,
+		imageServiceBaseURL: imageServiceBaseURL,
 	}, nil
 }
 
@@ -219,7 +216,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
 
 			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
-			rootfsURL, err := buildRootfsURL(s.imageServiceScheme, s.imageServiceHost, arch, openshiftVersion)
+			rootfsURL, err := buildRootfsURL(s.imageServiceBaseURL, arch, openshiftVersion)
 			if err != nil {
 				return fmt.Errorf("failed to build rootfs URL: %v", err)
 			}
@@ -250,39 +247,16 @@ func isoFileName(imageType, openshiftVersion, version, arch string) string {
 	return fmt.Sprintf("rhcos-%s-%s-%s-%s.iso", imageType, openshiftVersion, version, arch)
 }
 
-func buildRootfsURL(scheme, host, arch, version string) (string, error) {
-	if strings.Contains(host, ":") && !strings.HasPrefix(host, "http") {
-		// url can't parse host with colon when scheme is missing
-		host = fmt.Sprintf("%s://%s", scheme, host)
-	}
-
-	base, err := url.Parse(host)
+func buildRootfsURL(baseURL, arch, version string) (string, error) {
+	base, err := url.Parse(baseURL)
 	if err != nil {
 		return "", err
 	}
 
-	// if a scheme is not passed, use the one from the url
-	if scheme == "" {
-		scheme = base.Scheme
-	}
-
-	// if the url didn't have a scheme, fail
-	if scheme == "" {
-		return "", fmt.Errorf("Missing url scheme")
-	}
-
-	urlHost := base.Host
-	urlPath := base.Path
-
-	if base.Scheme == "" {
-		// base.Host is empty when scheme is missing from host
-		urlPath = host
-	}
-
 	downloadURL := url.URL{
-		Scheme: scheme,
-		Host:   urlHost,
-		Path:   path.Join(urlPath, "/boot-artifacts/rootfs"),
+		Scheme: base.Scheme,
+		Host:   base.Host,
+		Path:   path.Join(base.Path, "/boot-artifacts/rootfs"),
 	}
 	queryValues := url.Values{}
 	queryValues.Set("arch", arch)

@@ -60,10 +60,9 @@ var (
 		},
 	}
 
-	imageDir           string
-	imageStore         imagestore.ImageStore
-	imageServiceScheme = "http"
-	imageServiceHost   = "images.example.com"
+	imageDir            string
+	imageStore          imagestore.ImageStore
+	imageServiceBaseURL = "http://images.example.com"
 )
 
 var _ = Describe("Image integration tests", func() {
@@ -198,7 +197,7 @@ var _ = BeforeSuite(func() {
 	imageDir, err = ioutil.TempDir("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, imageServiceScheme, imageServiceHost, false, versions)
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, imageServiceBaseURL, false, versions)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = imageStore.Populate(context.Background())
