@@ -91,6 +91,15 @@ var _ = Describe("ServeHTTP", func() {
 			Expect(respContent).To(Equal(content))
 		}
 
+		initIgnitionHandler := func(queryString string) {
+			assistedServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), queryString),
+					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+				),
+			)
+		}
+
 		Context("with no auth", func() {
 			var (
 				server        *httptest.Server
@@ -99,13 +108,6 @@ var _ = Describe("ServeHTTP", func() {
 			)
 
 			BeforeEach(func() {
-				assistedServer.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
-						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
-					),
-				)
-
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
@@ -136,6 +138,7 @@ var _ = Describe("ServeHTTP", func() {
 			})
 
 			It("returns a full image", func() {
+				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
 				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
 				resp, err := client.Get(server.URL + path)
@@ -144,6 +147,7 @@ var _ = Describe("ServeHTTP", func() {
 			})
 
 			It("uses the arch parameter", func() {
+				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
 				mockImage("4.8", imagestore.ImageTypeFull, "arm64")
 				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&arch=arm64", imageID)
 				resp, err := client.Get(server.URL + path)
@@ -152,6 +156,7 @@ var _ = Describe("ServeHTTP", func() {
 			})
 
 			It("returns a minimal image with an initrd", func() {
+				initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
 				initrdContent = []byte("someramdisk")
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
@@ -167,6 +172,7 @@ var _ = Describe("ServeHTTP", func() {
 			})
 
 			It("returns a minimal image with no initrd", func() {
+				initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
@@ -210,15 +216,9 @@ var _ = Describe("ServeHTTP", func() {
 			})
 
 			It("returns a valid last-modified header when provided an invalid one", func() {
+				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
 				lastModified = ""
 				header.Set("Last-Modified", "somenonsense")
-				assistedServer.SetHandler(0,
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
-						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
-					),
-				)
-
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
 				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
 				resp, err := client.Get(server.URL + path)
@@ -230,7 +230,7 @@ var _ = Describe("ServeHTTP", func() {
 		It("passes Authorization header through to assisted requests", func() {
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=full-iso&file_name=discovery.ign"),
 					ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
 					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
@@ -271,7 +271,7 @@ var _ = Describe("ServeHTTP", func() {
 			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign&api_key=mytoken"),
+					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign&api_key=mytoken"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
 			)
@@ -307,7 +307,7 @@ var _ = Describe("ServeHTTP", func() {
 			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
 					ghttp.VerifyHeader(http.Header{"Image-Token": []string{"mytoken"}}),
 					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 				),
@@ -344,7 +344,7 @@ var _ = Describe("ServeHTTP", func() {
 			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusUnauthorized, ""),
 				),
 			)
@@ -372,7 +372,7 @@ var _ = Describe("ServeHTTP", func() {
 		It("returns an auth failure if assisted auth fails when querying initrd", func() {
 			assistedServer.AppendHandlers(
 				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "file_name=discovery.ign"),
+					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=minimal-iso&file_name=discovery.ign"),
 					ghttp.RespondWith(http.StatusOK, ignitionContent),
 				),
 				ghttp.CombineHandlers(

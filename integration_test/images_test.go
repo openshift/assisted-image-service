@@ -111,9 +111,10 @@ var _ = Describe("Image integration tests", func() {
 				assistedServer = ghttp.NewServer()
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
+				queryString := fmt.Sprintf("file_name=discovery.ign&discovery_iso_type=%s", tc.imageType)
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), "file_name=discovery.ign"),
+						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/files", imageID), queryString),
 						ghttp.RespondWith(http.StatusOK, tc.expectedIgnition),
 					),
 				)
