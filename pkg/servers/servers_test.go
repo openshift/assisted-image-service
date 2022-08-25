@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,6 +27,16 @@ var httpsKeyFile, httpsCertFile *os.File
 var ready func(rw http.ResponseWriter, req *http.Request)
 var mux *http.ServeMux
 var httpClient, httpsClient *http.Client
+
+const portConnectionRetrySeconds = 30
+const portConnectionRetryInterval = 10 * time.Millisecond
+
+// Create a new instance of the server under test
+var NewServer = func(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile string) *ServerInfo {
+	server := New(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile)
+	server.FastShutdown = true
+	return server
+}
 
 var _ = BeforeSuite(func() {
 	var err error
@@ -87,9 +98,18 @@ var _ = AfterSuite(func() {
 	Expect(os.RemoveAll(tmpDir)).To(Succeed())
 })
 
+var awaitConnection = func(portNumber int) (bool, error) {
+	var err error
+	result := Eventually(func() error {
+		_, err = net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", portNumber), portConnectionRetryInterval)
+		return err
+	}, portConnectionRetrySeconds, portConnectionRetryInterval).Should(BeNil())
+	return result, err
+}
+
 var _ = Describe("HTTPListeners", func() {
 	It("starts http only server", func() {
-		listeners := New("8080", "", "", "")
+		listeners := NewServer("8080", "", "", "")
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8080"))
@@ -97,14 +117,12 @@ var _ = Describe("HTTPListeners", func() {
 		Expect(listeners.HasBothHandlers).To(BeFalse())
 
 		listeners.ListenAndServe()
-		timeout := time.Second
-		_, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "8080"), timeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(awaitConnection(8080)).To(BeTrue())
 		Expect(listeners.Shutdown()).To(BeTrue())
 	})
 
 	It("starts http only server - no certs", func() {
-		listeners := New("8081", "8443", "", "")
+		listeners := NewServer("8081", "8443", "", "")
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8081"))
@@ -112,15 +130,12 @@ var _ = Describe("HTTPListeners", func() {
 		Expect(listeners.HasBothHandlers).To(BeFalse())
 
 		listeners.ListenAndServe()
-
-		timeout := time.Second
-		_, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "8081"), timeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(awaitConnection(8081)).To(BeTrue())
 		Expect(listeners.Shutdown()).To(BeTrue())
 	})
 
 	It("starts https only server", func() {
-		listeners := New("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners := NewServer("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
 
 		Expect(listeners.HTTP).To(BeNil())
 		Expect(listeners.HTTPS).NotTo(BeNil())
@@ -128,15 +143,12 @@ var _ = Describe("HTTPListeners", func() {
 		Expect(listeners.HasBothHandlers).To(BeFalse())
 
 		listeners.ListenAndServe()
-
-		timeout := time.Second
-		_, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "8443"), timeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(awaitConnection(8443)).To(BeTrue())
 		Expect(listeners.Shutdown()).To(BeTrue())
 	})
 
 	It("starts both servers", func() {
-		listeners := New("8082", "8444", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners := NewServer("8082", "8444", httpsKeyFile.Name(), httpsCertFile.Name())
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8082"))
@@ -145,17 +157,13 @@ var _ = Describe("HTTPListeners", func() {
 		Expect(listeners.HasBothHandlers).To(BeTrue())
 
 		listeners.ListenAndServe()
-
-		timeout := time.Second
-		_, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "8082"), timeout)
-		Expect(err).NotTo(HaveOccurred())
-		_, err = net.DialTimeout("tcp", net.JoinHostPort("localhost", "8444"), timeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(awaitConnection(8082)).To(BeTrue())
+		Expect(awaitConnection(8444)).To(BeTrue())
 		Expect(listeners.Shutdown()).To(BeTrue())
 	})
 
 	It("starts http server on https port with no certs", func() {
-		listeners := New("", "8445", "", "")
+		listeners := NewServer("", "8445", "", "")
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8445"))
@@ -163,15 +171,12 @@ var _ = Describe("HTTPListeners", func() {
 		Expect(listeners.HasBothHandlers).To(BeFalse())
 
 		listeners.ListenAndServe()
-
-		timeout := time.Second
-		_, err := net.DialTimeout("tcp", net.JoinHostPort("localhost", "8445"), timeout)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(awaitConnection(8445)).To(BeTrue())
 		Expect(listeners.Shutdown()).To(BeTrue())
 	})
 
 	It("starts http server with custom handler", func() {
-		listeners := New("", "8446", "", "")
+		listeners := NewServer("", "8446", "", "")
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8446"))
@@ -180,7 +185,7 @@ var _ = Describe("HTTPListeners", func() {
 
 		listeners.HTTP.Handler = mux
 		listeners.ListenAndServe()
-
+		Expect(awaitConnection(8446)).To(BeTrue())
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8446/ready", nil)
 		Expect(err).NotTo(HaveOccurred())
 		resp, err := httpClient.Do(req)
@@ -191,7 +196,7 @@ var _ = Describe("HTTPListeners", func() {
 	})
 
 	It("starts https server with custom handler", func() {
-		listeners := New("", "8447", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners := NewServer("", "8447", httpsKeyFile.Name(), httpsCertFile.Name())
 
 		Expect(listeners.HTTP).To(BeNil())
 		Expect(listeners.HTTPS).NotTo(BeNil())
@@ -200,7 +205,7 @@ var _ = Describe("HTTPListeners", func() {
 
 		listeners.HTTPS.Handler = mux
 		listeners.ListenAndServe()
-
+		Expect(awaitConnection(8447)).To(BeTrue())
 		req, err := http.NewRequest(http.MethodGet, "https://localhost:8447/ready", nil)
 		Expect(err).NotTo(HaveOccurred())
 		resp, err := httpsClient.Do(req)
@@ -211,7 +216,7 @@ var _ = Describe("HTTPListeners", func() {
 	})
 
 	It("starts both servers with custom handler", func() {
-		listeners := New("8088", "8448", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners := NewServer("8088", "8448", httpsKeyFile.Name(), httpsCertFile.Name())
 
 		Expect(listeners.HTTP).NotTo(BeNil())
 		Expect(listeners.HTTP.Addr).To(Equal(":8088"))
@@ -222,13 +227,13 @@ var _ = Describe("HTTPListeners", func() {
 		listeners.HTTP.Handler = mux
 		listeners.HTTPS.Handler = mux
 		listeners.ListenAndServe()
-
+		Expect(awaitConnection(8088)).To(BeTrue())
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8088/ready", nil)
 		Expect(err).NotTo(HaveOccurred())
 		resp, err := httpClient.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusOK))
-
+		Expect(awaitConnection(8448)).To(BeTrue())
 		req, err = http.NewRequest(http.MethodGet, "https://localhost:8448/ready", nil)
 		Expect(err).NotTo(HaveOccurred())
 		resp, err = httpsClient.Do(req)

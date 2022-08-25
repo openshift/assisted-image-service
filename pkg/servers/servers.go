@@ -14,6 +14,7 @@ type ServerInfo struct {
 	HTTPSKeyFile    string
 	HTTPSCertFile   string
 	HasBothHandlers bool
+	FastShutdown    bool
 }
 
 func New(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile string) *ServerInfo {
@@ -58,6 +59,7 @@ func (s *ServerInfo) ListenAndServe() {
 	if s.HTTP != nil {
 		go s.httpListen()
 	}
+
 	if s.HTTPS != nil {
 		go s.httpsListen()
 	}
@@ -65,10 +67,18 @@ func (s *ServerInfo) ListenAndServe() {
 
 func (s *ServerInfo) Shutdown() bool {
 	if s.HTTPS != nil {
-		shutdown("HTTPS", s.HTTPS)
+		if s.FastShutdown {
+			s.HTTPS.Close()
+		} else {
+			shutdown("HTTPS", s.HTTPS)
+		}
 	}
 	if s.HTTP != nil {
-		shutdown("HTTP", s.HTTP)
+		if s.FastShutdown {
+			s.HTTP.Close()
+		} else {
+			shutdown("HTTP", s.HTTP)
+		}
 	}
 	return true
 }
