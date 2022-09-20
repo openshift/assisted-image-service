@@ -48,7 +48,7 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignition, lastModified, code, err := h.client.ignitionContent(r, imageID)
+	ignition, lastModified, code, err := h.client.ignitionContent(r, imageID, "")
 	if err != nil {
 		httpErrorf(w, code, "Error retrieving ignition content: %v", err)
 		return
