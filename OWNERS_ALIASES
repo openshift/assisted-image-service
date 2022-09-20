@@ -5,42 +5,27 @@ aliases:
     - eranco74
     - filanov
     - gamli75
-  code-reviewers:
+    - romfreiman
     - avishayt
-    - empovit
     - eranco74
     - filanov
     - gamli75
     - ori-amizur
     - tsorya
-    - yevgeny-shnaidman
     - nmagnezi
     - carbonin
-    - rollandf
     - danielerez
-    - ybettan
     - slaviered
-    - rwsu
     - omertuc
     - eliorerz
-    - michaellevy101
     - osherdp
     - flaper87
     - mkowalski
-    - djzager
+  emeritus_approvers:
+    - empovit
+    - yevgeny-shnaidman
+    - rwsu
     - lranjbar
     - pawanpinjarkar
     - sagidayan
-  ci-approvers:
-    - lranjbar
-    - osherdp
-    - eliorerz
-  reviewers-only:
-    - jakub-dzon
-    - pkliczewski
-    - masayag
-    - jordigilh
-    - machacekondra
-    - rewantsoni
-    - nbalacha
-    - priyanka19-98
+    - ybettan
