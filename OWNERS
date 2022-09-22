@@ -3,8 +3,8 @@
 filters:
   .*:
     approvers:
-      - code-reviewers
-      - romfreiman
+      - approvers
+    emeritus_approvers:
+      - emeritus_approvers
     reviewers:
-      - code-reviewers
-      - reviewers-only
+      - approvers
