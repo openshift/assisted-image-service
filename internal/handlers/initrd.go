@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"time"
@@ -66,6 +67,21 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer initrdReader.Close()
+
+	ramdisk, statusCode, err := h.client.ramdiskContent(r, imageID)
+	if err != nil {
+		log.Errorf("Error retrieving ramdisk content: %v\n", err)
+		w.WriteHeader(statusCode)
+		return
+	}
+	// the content will be nil if no static networking is configured
+	if ramdisk != nil {
+		initrdReader, err = overlay.NewAppendReader(initrdReader, bytes.NewReader(ramdisk))
+		if err != nil {
+			httpErrorf(w, http.StatusInternalServerError, "Failed to create append reader for initrd: %v", err)
+			return
+		}
+	}
 
 	fileName := fmt.Sprintf("%s-initrd.img", imageID)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))

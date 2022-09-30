@@ -17,12 +17,13 @@ import (
 
 var _ = Describe("ServeHTTP", func() {
 	var (
-		ctrl            *gomock.Controller
-		mockImageStore  *imagestore.MockImageStore
-		imageFilename   string
-		imageID         = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
-		assistedServer  *ghttp.Server
-		ignitionContent = []byte("someignitioncontent")
+		ctrl                 *gomock.Controller
+		mockImageStore       *imagestore.MockImageStore
+		imageFilename        string
+		imageID              = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+		assistedServer       *ghttp.Server
+		ignitionContent      = []byte("someignitioncontent")
+		minimalInitrdContent = []byte("someinitrdcontent")
 		// must match content in createTestISO
 		initrdContent        = []byte("this is initrd")
 		ignitionArchiveBytes = []byte{
@@ -91,8 +92,31 @@ var _ = Describe("ServeHTTP", func() {
 		Expect(respContent).To(Equal(content))
 	}
 
-	It("returns the correct content", func() {
+	withNoMinimalInitrd := func() {
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusNoContent, []byte{}),
+			),
+		)
+	}
+
+	It("returns the correct content with minimal initrd", func() {
 		mockImage("4.9", "x86_64")
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
+			),
+		)
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		expectSuccessfulResponse(resp, append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...))
+	})
+
+	It("returns the correct content without minimal initrd", func() {
+		mockImage("4.9", "x86_64")
+		withNoMinimalInitrd()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(initrdContent, ignitionArchiveBytes...))
@@ -100,6 +124,7 @@ var _ = Describe("ServeHTTP", func() {
 
 	It("uses the default arch", func() {
 		mockImage("4.9", "x86_64")
+		withNoMinimalInitrd()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(initrdContent, ignitionArchiveBytes...))
@@ -124,6 +149,19 @@ var _ = Describe("ServeHTTP", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 	})
 
+	It("returns the response code from assisted-service when querying the minimal initrd fails", func() {
+		mockImage("4.9", "x86_64")
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusServiceUnavailable, "unavailable"),
+			),
+		)
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+	})
+
 	It("returns a valid last-modified header when provided an invalid one", func() {
 		lastModified = ""
 		header.Set("Last-Modified", "somenonsense")
@@ -135,6 +173,7 @@ var _ = Describe("ServeHTTP", func() {
 		)
 
 		mockImage("4.9", "x86_64")
+		withNoMinimalInitrd()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(initrdContent, ignitionArchiveBytes...))
