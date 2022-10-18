@@ -61,7 +61,15 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	isoReader, err := h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk)
+	var kargs []byte
+	kargs, statusCode, err = h.client.discoveryKernelArguments(r, imageID)
+	if err != nil {
+		log.Errorf("Error retrieving kernel arguments content: %v\n", err)
+		w.WriteHeader(statusCode)
+		return
+	}
+
+	isoReader, err := h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk, kargs)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)

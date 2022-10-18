@@ -18,6 +18,7 @@ func TestIsoEditor(t *testing.T) {
 const testGrubConfig = `
 menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {
 	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
+###################### COREOS_KARG_EMBED_AREA
 	initrd /images/pxeboot/initrd.img /images/ignition.img
 }
 `
@@ -28,6 +29,7 @@ label linux
   menu default
   kernel /images/pxeboot/vmlinuz
   append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
+###################### COREOS_KARG_EMBED_AREA
 `
 
 const ignitionPaddingLength = 256 * 1024 // 256KB

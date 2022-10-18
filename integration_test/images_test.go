@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -74,17 +76,41 @@ var _ = Describe("Image integration tests", func() {
 		imageClient    *http.Client
 	)
 
+	buildInfraenvResponse := func(args ...string) []byte {
+		if len(args) == 0 {
+			return []byte("{}")
+		}
+		var infraEnv struct {
+			// JSON formatted string array representing the discovery image kernel arguments.
+			DiscoveryKernelArguments *string `json:"discovery_kernel_arguments,omitempty"`
+		}
+		kargs, err := isoeditor.KargsToStr(args)
+		Expect(err).ToNot(HaveOccurred())
+		infraEnv.DiscoveryKernelArguments = &kargs
+		b, err := json.Marshal(&infraEnv)
+		Expect(err).ToNot(HaveOccurred())
+		return b
+	}
+
 	testcases := []struct {
-		name             string
-		imageType        string
-		expectedIgnition []byte
-		expectedRamdisk  []byte
+		name               string
+		imageType          string
+		expectedIgnition   []byte
+		expectedRamdisk    []byte
+		expectedExtraKargs []string
 	}{
 		{
 			name:             "full-iso",
 			imageType:        imagestore.ImageTypeFull,
 			expectedIgnition: []byte("someignitioncontent"),
 			expectedRamdisk:  nil,
+		},
+		{
+			name:               "full-iso-with-kargs",
+			imageType:          imagestore.ImageTypeFull,
+			expectedIgnition:   []byte("someignitioncontent"),
+			expectedRamdisk:    nil,
+			expectedExtraKargs: []string{"p1", "p1", `key=value`},
 		},
 		{
 			name:             "minimal-iso-with-initrd",
@@ -97,6 +123,13 @@ var _ = Describe("Image integration tests", func() {
 			imageType:        imagestore.ImageTypeMinimal,
 			expectedIgnition: []byte("someignitioncontent"),
 			expectedRamdisk:  []byte(""),
+		},
+		{
+			name:               "minimal-iso-without-initrd-with-kargs",
+			imageType:          imagestore.ImageTypeMinimal,
+			expectedIgnition:   []byte("someignitioncontent"),
+			expectedRamdisk:    []byte(""),
+			expectedExtraKargs: []string{"p5", "p6", `key=value`},
 		},
 	}
 
@@ -126,6 +159,12 @@ var _ = Describe("Image integration tests", func() {
 						),
 					)
 				}
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s", imageID)),
+						ghttp.RespondWith(http.StatusOK, buildInfraenvResponse(tc.expectedExtraKargs...)),
+					),
+				)
 
 				asc, err := handlers.NewAssistedServiceClient(u.Scheme, u.Host, "")
 				Expect(err).NotTo(HaveOccurred())
@@ -144,7 +183,7 @@ var _ = Describe("Image integration tests", func() {
 			for i := range versions {
 				version := versions[i]
 
-				It("returns a properly generated "+tc.name+" iso image", func() {
+				It("returns a properly generated "+tc.name+" iso image "+version["version"], func() {
 					By("getting an iso")
 					path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], tc.imageType, version["cpu_architecture"])
 					resp, err := imageClient.Get(imageServer.URL + path)
@@ -185,6 +224,18 @@ var _ = Describe("Image integration tests", func() {
 						content, err := ioutil.ReadAll(f)
 						Expect(err).NotTo(HaveOccurred())
 						Expect(bytes.TrimRight(content, "\x00")).To(Equal(tc.expectedRamdisk))
+					}
+					if len(tc.expectedExtraKargs) > 0 {
+						By("verifying kernel arguments content")
+						files, err := isoeditor.KargsFiles(isoFilename)
+						Expect(err).ToNot(HaveOccurred())
+						for _, fname := range files {
+							f, err := fs.OpenFile(fname, os.O_RDONLY)
+							Expect(err).ToNot(HaveOccurred())
+							b, err := ioutil.ReadAll(f)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(string(b)).To(MatchRegexp(" " + strings.Join(tc.expectedExtraKargs, " ") + "\n#+ COREOS_KARG_EMBED_AREA"))
+						}
 					}
 				})
 			}
