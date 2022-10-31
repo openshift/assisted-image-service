@@ -53,7 +53,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 	}
 
 	It("embeds the ignition with no ramdisk content", func() {
-		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil)
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -68,7 +68,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 
 	It("embeds the ignition and ramdisk content", func() {
 		initrdContent := []byte("someramdiskcontent")
-		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, initrdContent)
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, initrdContent, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -80,5 +80,24 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 
 		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
 		Expect(isoFileContent(f.Name(), ramDiskImagePath)).To(Equal(initrdContent))
+	})
+	It("embeds the ignition and kargs content", func() {
+		kargs := []byte(" p1 p2 p3 p4\n")
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, kargs)
+		Expect(err).NotTo(HaveOccurred())
+
+		f, err := os.CreateTemp(filesDir, "streamed*.iso")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(f, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Sync()).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+
+		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		grubFileContent := string(isoFileContent(f.Name(), defaultGrubFilePath))
+		isolinuxContent := string(isoFileContent(f.Name(), defaultIsolinuxFilePath))
+		for _, content := range []string{grubFileContent, isolinuxContent} {
+			Expect(content).To(MatchRegexp(string(kargs) + "#+ COREOS_KARG_EMBED_AREA"))
+		}
 	})
 })

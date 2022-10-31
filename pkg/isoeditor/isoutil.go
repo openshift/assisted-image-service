@@ -242,6 +242,7 @@ func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
 		return 0, 0, errors.Wrapf(err, "Failed to open file %s", filePath)
 	}
 
+	defer fsFile.Close()
 	isoFile := fsFile.(*iso9660.File)
 	defaultSectorSize := uint32(2 * 1024)
 	return int64(isoFile.Location() * defaultSectorSize), isoFile.Size(), nil
@@ -264,4 +265,18 @@ func GetFileFromISO(isoPath, filePath string) (filesystem.File, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// Reads a whole specific file from the ISO image
+func ReadFileFromISO(isoPath, filePath string) ([]byte, error) {
+	f, err := GetFileFromISO(isoPath, filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	ret, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
