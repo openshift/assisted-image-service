@@ -82,11 +82,11 @@ var _ = Describe("Image integration tests", func() {
 		}
 		var infraEnv struct {
 			// JSON formatted string array representing the discovery image kernel arguments.
-			DiscoveryKernelArguments *string `json:"discovery_kernel_arguments,omitempty"`
+			KernelArguments *string `json:"kernel_arguments,omitempty"`
 		}
 		kargs, err := isoeditor.KargsToStr(args)
 		Expect(err).ToNot(HaveOccurred())
-		infraEnv.DiscoveryKernelArguments = &kargs
+		infraEnv.KernelArguments = &kargs
 		b, err := json.Marshal(&infraEnv)
 		Expect(err).ToNot(HaveOccurred())
 		return b

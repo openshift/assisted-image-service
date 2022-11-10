@@ -163,13 +163,13 @@ func (c *AssistedServiceClient) discoveryKernelArguments(imageServiceRequest *ht
 	d := json.NewDecoder(resp.Body)
 	var infraEnv struct {
 		// JSON formatted string array representing the discovery image kernel arguments.
-		DiscoveryKernelArguments *string `json:"discovery_kernel_arguments,omitempty"`
+		KernelArguments *string `json:"kernel_arguments,omitempty"`
 	}
 	if err = d.Decode(&infraEnv); err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to decode infra-env input: %v", err)
 	}
-	if infraEnv.DiscoveryKernelArguments != nil {
-		kargs, err := isoeditor.StrToKargs(*infraEnv.DiscoveryKernelArguments)
+	if infraEnv.KernelArguments != nil {
+		kargs, err := isoeditor.StrToKargs(*infraEnv.KernelArguments)
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
