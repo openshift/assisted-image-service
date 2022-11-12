@@ -60,10 +60,13 @@ var _ = Describe("ServeHTTP", func() {
 		asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
 		Expect(err).NotTo(HaveOccurred())
 
-		server = httptest.NewServer(&initrdHandler{
-			ImageStore: mockImageStore,
-			client:     asc,
-		})
+		handler := &ImageHandler{
+			initrd: &initrdHandler{
+				ImageStore: mockImageStore,
+				client:     asc,
+			},
+		}
+		server = httptest.NewServer(handler.router(1))
 
 		client = server.Client()
 	})

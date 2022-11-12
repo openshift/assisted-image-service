@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
-	log "github.com/sirupsen/logrus"
 )
 
 type initrdHandler struct {
@@ -20,11 +22,7 @@ type initrdHandler struct {
 var _ http.Handler = &initrdHandler{}
 
 func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	imageID, err := parseImageID(r.URL.Path)
-	if err != nil {
-		httpErrorf(w, http.StatusNotFound, "failed to parse image ID: %v\n", err)
-		return
-	}
+	imageID := chi.URLParam(r, "image_id")
 
 	version := r.URL.Query().Get("version")
 	if version == "" {
