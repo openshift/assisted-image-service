@@ -111,9 +111,9 @@ var _ = Describe("ServeHTTP", func() {
 				Expect(err).ToNot(HaveOccurred())
 				var infraEnv struct {
 					// JSON formatted string array representing the discovery image kernel arguments.
-					DiscoveryKernelArguments *string `json:"discovery_kernel_arguments,omitempty"`
+					KernelArguments *string `json:"kernel_arguments,omitempty"`
 				}
-				infraEnv.DiscoveryKernelArguments = &discoveryKernelArguments
+				infraEnv.KernelArguments = &discoveryKernelArguments
 				b, err := json.Marshal(&infraEnv)
 				Expect(err).ToNot(HaveOccurred())
 				response = string(b)
