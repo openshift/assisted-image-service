@@ -8,10 +8,6 @@ RUN CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service 
 
 FROM quay.io/centos/centos:stream8
 
-# Force an update to fix CVE-2022-0778
-# This can be removed when the base image is updated
-RUN dnf update -y openssl-libs
-
 ARG DATA_DIR=/data
 RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
