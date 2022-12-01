@@ -17,7 +17,7 @@ import (
 
 // Extract unpacks the iso contents into the working directory
 func Extract(isoPath string, workDir string) error {
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func Create(outPath string, workDir string, volumeLabel string) error {
 	// we were writing to a particular partition on a device, but we are
 	// not so the minimum iso size will work for us here
 	minISOSize := 38 * 1024
-	d, err := diskfs.Create(outPath, int64(minISOSize), diskfs.Raw)
+	d, err := diskfs.Create(outPath, int64(minISOSize), diskfs.Raw, diskfs.SectorSizeDefault)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func VolumeIdentifier(isoPath string) (string, error) {
 }
 
 func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -250,7 +250,7 @@ func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
 
 // Gets a readWrite seeker of a specific file from the ISO image
 func GetFileFromISO(isoPath, filePath string) (filesystem.File, error) {
-	d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+	d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
 	if err != nil {
 		return nil, err
 	}
