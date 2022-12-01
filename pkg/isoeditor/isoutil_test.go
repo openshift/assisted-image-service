@@ -56,7 +56,7 @@ var _ = Context("with test files", func() {
 
 			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
 
-			d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+			d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
 			Expect(err).ToNot(HaveOccurred())
 			fs, err := d.GetFilesystem(0)
 			Expect(err).ToNot(HaveOccurred())

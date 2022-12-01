@@ -37,7 +37,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 	})
 
 	isoFileContent := func(isoPath, filePath string) []byte {
-		d, err := diskfs.OpenWithMode(isoPath, diskfs.ReadOnly)
+		d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
 		Expect(err).NotTo(HaveOccurred())
 
 		fs, err := d.GetFilesystem(0)

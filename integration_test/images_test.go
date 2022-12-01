@@ -197,7 +197,7 @@ var _ = Describe("Image integration tests", func() {
 					isoFilename = isoFile.Name()
 
 					By("opening the iso")
-					d, err := diskfs.OpenWithMode(isoFilename, diskfs.ReadOnly)
+					d, err := diskfs.Open(isoFilename, diskfs.WithOpenMode(diskfs.ReadOnly))
 					Expect(err).NotTo(HaveOccurred())
 					fs, err := d.GetFilesystem(0)
 					Expect(err).NotTo(HaveOccurred())
