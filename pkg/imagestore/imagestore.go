@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -164,6 +165,19 @@ func (s *rhcosStore) downloadURLToFile(url string, path string) error {
 	return nil
 }
 
+func validateISOID(path string) error {
+	volumeID, err := isoeditor.VolumeIdentifier(path)
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasPrefix(volumeID, "rhcos-") && !strings.HasPrefix(volumeID, "fedora-coreos-") {
+		return fmt.Errorf("ISO volume identifier (%s) is invalid", volumeID)
+	}
+
+	return nil
+}
+
 func (s *rhcosStore) Populate(ctx context.Context) error {
 	if err := s.cleanDataDir(); err != nil {
 		return err
@@ -187,8 +201,15 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				if err != nil {
 					return fmt.Errorf("failed to download %s: %v", url, err)
 				}
-
 				log.Infof("Finished downloading for %s-%s (%s)", openshiftVersion, arch, imageVersion)
+				if err := validateISOID(fullPath); err != nil {
+					message := fmt.Sprintf("failed to validate %s: %v", fullPath, err)
+					if err = os.Remove(fullPath); err != nil {
+						log.WithError(err).Errorf("failed to remove invalid ISO %s", fullPath)
+					}
+					log.Error(message)
+					return fmt.Errorf(message)
+				}
 			}
 
 			return nil
