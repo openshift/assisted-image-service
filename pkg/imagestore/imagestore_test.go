@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -58,9 +59,10 @@ var _ = Context("with a data directory configured", func() {
 
 		Describe("Populate", func() {
 			var (
-				ctrl       *gomock.Controller
-				mockEditor *isoeditor.MockEditor
-				version    = map[string]string{
+				ctrl          *gomock.Controller
+				mockEditor    *isoeditor.MockEditor
+				validVolumeID = "rhcos-411.86.202210041459-0"
+				version       = map[string]string{
 					"openshift_version": "4.8",
 					"cpu_architecture":  "x86_64",
 					"version":           "48.84.202109241901-0",
@@ -77,11 +79,21 @@ var _ = Context("with a data directory configured", func() {
 				mockEditor = isoeditor.NewMockEditor(ctrl)
 			})
 
+			isoInfo := func(id string) ([]byte, http.Header) {
+				content := make([]byte, 32840)
+				copy(content[32808:], id)
+				header := http.Header{}
+				header.Add("Content-Length", strconv.Itoa(len(content)))
+
+				return content, header
+			}
+
 			It("downloads an image correctly", func() {
+				isoContent, isoHeader := isoInfo(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
-						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
@@ -94,7 +106,7 @@ var _ = Context("with a data directory configured", func() {
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(string(content)).To(Equal("someisocontenthere"))
+				Expect(content).To(Equal(isoContent))
 			})
 
 			It("fails when the download fails", func() {
@@ -109,6 +121,24 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
+			})
+
+			It("fails and removes the file when the downloaded iso has an invalid volume ID", func() {
+				isoContent, isoHeader := isoInfo("Fedora-S-dvd-x86_64-37")
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(is.Populate(ctx)).NotTo(Succeed())
+
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 
 			It("fails when minimal iso creation fails", func() {
@@ -162,10 +192,11 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("downloads image with x.y.z openshift_version correctly", func() {
+				isoContent, isoHeader := isoInfo(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/somepatchversion.iso"),
-						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
 				versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
@@ -178,17 +209,18 @@ var _ = Context("with a data directory configured", func() {
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8.1-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(string(content)).To(Equal("someisocontenthere"))
+				Expect(content).To(Equal(isoContent))
 			})
 
 			It("cleans up files that are not configured isos", func() {
 				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
 				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
 
+				isoContent, isoHeader := isoInfo(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
-						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
@@ -231,10 +263,11 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("downloads fails when imageServiceBaseURL is invalid", func() {
+				isoContent, isoHeader := isoInfo(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
-						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
