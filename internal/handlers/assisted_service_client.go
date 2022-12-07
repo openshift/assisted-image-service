@@ -23,6 +23,9 @@ type AssistedServiceClient struct {
 const fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
 
 func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCertFile string) (*AssistedServiceClient, error) {
+	if len(assistedServiceHost) == 0 {
+		return nil, fmt.Errorf("ASSISTED_SERVICE_HOST is not set")
+	}
 	client := &http.Client{}
 	if caCertFile != "" {
 		caCert, err := ioutil.ReadFile(caCertFile)
@@ -55,9 +58,6 @@ func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCert
 // The returned code should only be used if an error is also returned
 func (c *AssistedServiceClient) ramdiskContent(imageServiceRequest *http.Request, imageID string) ([]byte, int, error) {
 	var ramdiskBytes []byte
-	if c.assistedServiceHost == "" {
-		return nil, 0, nil
-	}
 
 	u := url.URL{
 		Scheme: c.assistedServiceScheme,
@@ -94,9 +94,6 @@ func (c *AssistedServiceClient) ramdiskContent(imageServiceRequest *http.Request
 // The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
 // The returned code should only be used if an error is also returned
 func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Request, imageID string, imageType string) (*isoeditor.IgnitionContent, string, int, error) {
-	if c.assistedServiceHost == "" {
-		return nil, "", 0, nil
-	}
 
 	u := url.URL{
 		Scheme: c.assistedServiceScheme,
@@ -137,9 +134,6 @@ const infraEnvPathFormat = "/api/assisted-install/v2/infra-envs/%s"
 // The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
 // The returned code should only be used if an error is also returned
 func (c *AssistedServiceClient) discoveryKernelArguments(imageServiceRequest *http.Request, infraEnvID string) ([]byte, int, error) {
-	if c.assistedServiceHost == "" {
-		return nil, 0, nil
-	}
 
 	u := url.URL{
 		Scheme: c.assistedServiceScheme,
