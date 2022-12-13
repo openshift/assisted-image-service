@@ -212,6 +212,26 @@ var _ = Context("with a data directory configured", func() {
 				Expect(content).To(Equal(isoContent))
 			})
 
+			It("populates Fedora/Centos images correctly", func() {
+				validVolumeIDs := []string{"fedora-coreos-35.20220101.0.3", "scos-413.9.20231000101-0"}
+				for _, testValidVolumeID := range validVolumeIDs {
+					isoContent, isoHeader := isoInfo(testValidVolumeID)
+					ts.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", "/somepatchversion.iso"),
+							ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
+						),
+					)
+					versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch})
+					Expect(err).NotTo(HaveOccurred())
+
+					rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
+					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any()).Return(nil)
+					Expect(is.Populate(ctx)).To(Succeed())
+				}
+			})
+
 			It("cleans up files that are not configured isos", func() {
 				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
 				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
