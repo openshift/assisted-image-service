@@ -171,7 +171,7 @@ func validateISOID(path string) error {
 		return err
 	}
 
-	if !strings.HasPrefix(volumeID, "rhcos-") && !strings.HasPrefix(volumeID, "fedora-coreos-") {
+	if !strings.HasPrefix(volumeID, "rhcos-") && !strings.HasPrefix(volumeID, "fedora-coreos-") && !strings.HasPrefix(volumeID, "scos-") {
 		return fmt.Errorf("ISO volume identifier (%s) is invalid", volumeID)
 	}
 
