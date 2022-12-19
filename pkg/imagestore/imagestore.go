@@ -226,6 +226,11 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		imageVersion := imageInfo["version"]
 		arch := imageInfo["cpu_architecture"]
 
+		// Don't attempt to create a minimal ISO for s390x because there's no easy way to edit the kernel parameters
+		// This means that the rootfs URL can't be added which makes it impossible for us to create a minimal ISO
+		if arch == "s390x" {
+			continue
+		}
 		minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, openshiftVersion, imageVersion, arch))
 		if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
 			log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
