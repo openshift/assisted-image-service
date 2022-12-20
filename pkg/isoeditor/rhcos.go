@@ -17,7 +17,7 @@ const (
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
-	CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error
+	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath string) error
 }
 
 type rhcosEditor struct {
@@ -29,7 +29,7 @@ func NewEditor(dataDir string) Editor {
 }
 
 // CreateMinimalISOTemplate Creates the template minimal iso by removing the rootfs and adding the url
-func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalISOPath string) error {
+func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath string) error {
 	extractDir, err := os.MkdirTemp(e.workDir, "isoutil")
 	if err != nil {
 		return err
@@ -52,9 +52,12 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalIS
 		log.WithError(err).Warnf("Failed to edit grub config")
 		return err
 	}
-	if err = fixIsolinuxConfig(rootFSURL, extractDir); err != nil {
-		log.WithError(err).Warnf("Failed to edit isolinux config")
-		return err
+	// ignore isolinux.cfg for ppc64le because it doesn't exist
+	if arch != "ppc64le" {
+		if err = fixIsolinuxConfig(rootFSURL, extractDir); err != nil {
+			log.WithError(err).Warnf("Failed to edit isolinux config")
+			return err
+		}
 	}
 
 	volumeID, err := VolumeIdentifier(fullISOPath)
@@ -92,7 +95,7 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixGrubConfig(rootFSURL, extractDir string) error {
-	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg"}
+	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
 		path := filepath.Join(extractDir, pathSection)

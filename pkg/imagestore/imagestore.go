@@ -241,7 +241,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				return fmt.Errorf("failed to build rootfs URL: %v", err)
 			}
 
-			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, minimalPath)
+			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, arch, minimalPath)
 			if err != nil {
 				return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
 			}

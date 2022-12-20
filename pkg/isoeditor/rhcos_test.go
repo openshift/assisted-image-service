@@ -58,13 +58,13 @@ var _ = Context("with test files", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir)
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir)
-			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -73,13 +73,13 @@ var _ = Context("with test files", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir)
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir)
-			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
