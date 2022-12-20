@@ -48,8 +48,12 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, minimalIS
 		return err
 	}
 
-	if err = fixTemplateConfigs(rootFSURL, extractDir); err != nil {
-		log.WithError(err).Warnf("Failed to edit template configs")
+	if err = fixGrubConfig(rootFSURL, extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to edit grub config")
+		return err
+	}
+	if err = fixIsolinuxConfig(rootFSURL, extractDir); err != nil {
+		log.WithError(err).Warnf("Failed to edit isolinux config")
 		return err
 	}
 
@@ -87,7 +91,7 @@ func embedInitrdPlaceholders(extractDir string) error {
 	return nil
 }
 
-func fixTemplateConfigs(rootFSURL, extractDir string) error {
+func fixGrubConfig(rootFSURL, extractDir string) error {
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
@@ -106,16 +110,9 @@ func fixTemplateConfigs(rootFSURL, extractDir string) error {
 	if err := editFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
 		return err
 	}
-	replacement = fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
-		return err
-	}
 
 	// Remove the coreos.liveiso parameter
 	if err := editFile(foundGrubPath, ` coreos.liveiso=\S+`, ""); err != nil {
-		return err
-	}
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
 		return err
 	}
 
@@ -123,6 +120,20 @@ func fixTemplateConfigs(rootFSURL, extractDir string) error {
 	if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func fixIsolinuxConfig(rootFSURL, extractDir string) error {
+	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
+		return err
+	}
+
+	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+		return err
+	}
+
 	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
 		return err
 	}

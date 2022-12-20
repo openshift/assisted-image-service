@@ -83,23 +83,25 @@ var _ = Context("with test files", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+	It("fixGrubConfig alters the kernel parameters correctly", func() {
+		err := fixGrubConfig(testRootFSURL, filesDir)
+		Expect(err).ToNot(HaveOccurred())
 
-	Describe("fixTemplateConfigs", func() {
-		It("alters the kernel parameters correctly", func() {
-			err := fixTemplateConfigs(testRootFSURL, filesDir)
-			Expect(err).ToNot(HaveOccurred())
+		newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
+		grubCfg := fmt.Sprintf(newLine, testRootFSURL)
+		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
 
-			newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
-			grubCfg := fmt.Sprintf(newLine, testRootFSURL)
-			validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+		newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
+		grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
+		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
 
-			newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
-			grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
-			validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+	})
+	It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
+		err := fixIsolinuxConfig(testRootFSURL, filesDir)
+		Expect(err).ToNot(HaveOccurred())
 
-			newLine = "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
-			isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
-			validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
-		})
+		newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+		isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
+		validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
 	})
 })
