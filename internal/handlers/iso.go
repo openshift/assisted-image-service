@@ -69,6 +69,11 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if kargs != nil && params.arch == "s390x" {
+		httpErrorf(w, http.StatusBadRequest, "kargs cannot be modified in s390x architecture ISOs")
+		return
+	}
+
 	isoReader, err := h.GenerateImageStream(h.ImageStore.PathForParams(params.imageType, params.version, params.arch), ignition, ramdisk, kargs)
 	if err != nil {
 		log.Errorf("Error creating image stream: %v\n", err)
