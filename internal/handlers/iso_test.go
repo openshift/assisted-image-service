@@ -275,6 +275,16 @@ var _ = Describe("ServeHTTP", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
 			})
+
+			It("fails when kargs are supplied for an s390x image", func() {
+				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+				mockImage("4.11", imagestore.ImageTypeFull, "s390x")
+				path := fmt.Sprintf("/images/%s?version=4.11&type=full-iso&arch=s390x", imageID)
+				setInfraenvKargsHandlerSuccess("arg")
+				resp, err := client.Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+			})
 		})
 
 		It("passes Authorization header through to assisted requests", func() {

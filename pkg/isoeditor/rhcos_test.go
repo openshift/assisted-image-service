@@ -58,13 +58,13 @@ var _ = Context("with test files", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir)
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir)
-			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -73,33 +73,35 @@ var _ = Context("with test files", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir)
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir)
-			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, minimalISOPath)
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
+	It("fixGrubConfig alters the kernel parameters correctly", func() {
+		err := fixGrubConfig(testRootFSURL, filesDir)
+		Expect(err).ToNot(HaveOccurred())
 
-	Describe("fixTemplateConfigs", func() {
-		It("alters the kernel parameters correctly", func() {
-			err := fixTemplateConfigs(testRootFSURL, filesDir)
-			Expect(err).ToNot(HaveOccurred())
+		newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
+		grubCfg := fmt.Sprintf(newLine, testRootFSURL)
+		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
 
-			newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
-			grubCfg := fmt.Sprintf(newLine, testRootFSURL)
-			validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+		newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
+		grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
+		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
 
-			newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
-			grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
-			validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+	})
+	It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
+		err := fixIsolinuxConfig(testRootFSURL, filesDir)
+		Expect(err).ToNot(HaveOccurred())
 
-			newLine = "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
-			isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
-			validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
-		})
+		newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+		isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
+		validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
 	})
 })

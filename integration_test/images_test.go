@@ -60,6 +60,18 @@ var (
 			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
 			"version":           "arm-latest",
 		},
+		{
+			"openshift_version": "4.11",
+			"cpu_architecture":  "s390x",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-s390x-live.s390x.iso",
+			"version":           "s390x-latest",
+		},
+		{
+			"openshift_version": "4.11",
+			"cpu_architecture":  "ppc64le",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-ppc64le-live.ppc64le.iso",
+			"version":           "ppc64le-latest",
+		},
 	}
 
 	imageDir            string
@@ -184,6 +196,15 @@ var _ = Describe("Image integration tests", func() {
 				version := versions[i]
 
 				It("returns a properly generated "+tc.name+" iso image "+version["version"], func() {
+					if version["cpu_architecture"] == "s390x" {
+						if tc.imageType == imagestore.ImageTypeMinimal {
+							Skip("minimal ISO is not supported for s390x architecture")
+						}
+						if tc.expectedExtraKargs != nil {
+							Skip("Karg editing is not supported for s390x architecture")
+						}
+					}
+
 					By("getting an iso")
 					path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], tc.imageType, version["cpu_architecture"])
 					resp, err := imageClient.Get(imageServer.URL + path)
