@@ -26,6 +26,22 @@ var _ = Context("kargs tests", func() {
   "size": 1137
 }
 `
+		kargsCentOSConfileFile = `
+{
+  "default": "mitigations=auto,nosmt coreos.liveiso=scos-413.9.20230103.0 ignition.firstboot ignition.platform.id=metal",
+  "files": [
+    {
+      "offset": 970,
+      "path": "EFI/centos/grub.cfg"
+    },
+    {
+      "offset": 1870,
+      "path": "isolinux/isolinux.cfg"
+    }
+  ],
+  "size": 1137
+}
+`
 		grubFileWithEmbedArea = `
 function load_video {
   insmod efi_gop
@@ -108,6 +124,11 @@ menuentry 'Fedora CoreOS (Live)' --class fedora --class gnu-linux --class gnu --
 			files, err := kargsFiles("isoPath", mockFileReaderSuccess(kargsConfileFile))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(files).To(Equal([]string{"EFI/fedora/grub.cfg", "isolinux/isolinux.cfg"}))
+		})
+		It("works with centos", func() {
+			files, err := kargsFiles("isoPath", mockFileReaderSuccess(kargsCentOSConfileFile))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(files).To(Equal([]string{"EFI/centos/grub.cfg", "isolinux/isolinux.cfg"}))
 		})
 	})
 	Describe("kargsEmbedAreaBoundariesFinder", func() {

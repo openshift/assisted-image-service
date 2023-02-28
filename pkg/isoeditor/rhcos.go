@@ -95,7 +95,7 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixGrubConfig(rootFSURL, extractDir string) error {
-	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg"}
+	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
 		path := filepath.Join(extractDir, pathSection)

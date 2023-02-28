@@ -72,6 +72,12 @@ var (
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-ppc64le-live.ppc64le.iso",
 			"version":           "ppc64le-latest",
 		},
+		{
+			"openshift_version": "scos-prerelease",
+			"cpu_architecture":  "x86_64",
+			"url":               "https://okd-scos.s3.amazonaws.com/okd-scos/builds/413.9.202302280609-0/x86_64/scos-413.9.202302280609-0-live.x86_64.iso",
+			"version":           "x86_64-latest",
+		},
 	}
 
 	imageDir            string
