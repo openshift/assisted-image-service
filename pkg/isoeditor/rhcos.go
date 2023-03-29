@@ -88,7 +88,7 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixTemplateConfigs(rootFSURL, extractDir string) error {
-	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg"}
+	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
 		path := filepath.Join(extractDir, pathSection)
