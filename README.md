@@ -22,17 +22,18 @@ skipper make test
 
 ## Configuration
 
-- `DATA_DIR` - Path at which to store downloaded RHCOS images.
-- `RHCOS_VERSIONS`/`OS_IMAGES` - JSON string indicating the supported versions and their required urls. `OS_IMAGES` takes precedence.
-- `LISTEN_PORT` - Image Service listen port
-- `HTTPS_KEY_FILE` - tls key file path
-- `HTTPS_CERT_FILE` - tls cert file path
-- `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
-- `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
-- `IMAGE_SERVICE_BASE_URL` - the base URL to use to query the image service
-- `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 - `ALLOWED_DOMAINS` - When set, determines how the service responds to requests with `Origin` headers
+- `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
+- `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
+- `DATA_DIR` - Path at which to store downloaded RHCOS images.
+- `HTTPS_CERT_FILE` - tls cert file path
+- `HTTPS_KEY_FILE` - tls key file path
 - `HTTP_LISTEN_PORT` - When set, plain http listener is started on that port
+- `IMAGE_SERVICE_BASE_URL` - the base URL to use to query the image service
+- `LISTEN_PORT` - Image Service listen port
+- `LOG_LEVEL` - log level, such as "info" or "debug"; see logrus docs for a complete list
+- `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
+- `RHCOS_VERSIONS`/`OS_IMAGES` - JSON string indicating the supported versions and their required urls. `OS_IMAGES` takes precedence.
 
 Example `OS_IMAGES`:
 ```json

@@ -36,6 +36,7 @@ var Options struct {
 	AllowedDomains        string `envconfig:"ALLOWED_DOMAINS"`
 	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 	ImageServiceBaseURL   string `envconfig:"IMAGE_SERVICE_BASE_URL"`
+	LogLevel              string `envconfig:"LOGLEVEL" default:"info"`
 }
 
 func main() {
@@ -45,6 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
 	}
+	logLevel, err := log.ParseLevel(Options.LogLevel)
+	if err != nil {
+		log.Fatalf("unknown log level: %s", Options.LogLevel)
+	}
+	log.SetLevel(logLevel)
 
 	versionsJSON := Options.OSImages
 	if versionsJSON == "" {

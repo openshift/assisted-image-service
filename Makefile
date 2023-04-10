@@ -2,6 +2,7 @@ IMAGE := $(or ${IMAGE}, quay.io/edge-infrastructure/assisted-image-service:lates
 PWD = $(shell pwd)
 LISTEN_PORT := $(or ${LISTEN_PORT}, 8080)
 IMAGE_SERVICE_BASE_URL := $(or ${IMAGE_SERVICE_BASE_URL}, http://localhost:8080)
+LOG_LEVEL := $(or ${LOG_LEVEL}, info)
 
 CI ?= false
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -51,6 +52,7 @@ run: certs
 		-e RHCOS_VERSIONS='${RHCOS_VERSIONS}' \
 		-e OS_IMAGES='${OS_IMAGES}' \
 		-e HTTP_LISTEN_PORT='${HTTP_LISTEN_PORT}' \
+		-e LOGLEVEL='${LOG_LEVEL}' \
 		$(IMAGE)
 
 .PHONY: certs
