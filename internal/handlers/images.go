@@ -2,61 +2,78 @@ package handlers
 
 import (
 	"net/http"
-	"regexp"
+
+	"github.com/go-chi/chi/v5"
+	metricsmiddleware "github.com/slok/go-http-metrics/middleware"
+	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	log "github.com/sirupsen/logrus"
-	"github.com/slok/go-http-metrics/middleware"
-	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
-	"golang.org/x/sync/semaphore"
 )
 
 const defaultArch = "x86_64"
 
 type ImageHandler struct {
-	iso    http.Handler
-	initrd http.Handler
-	sem    *semaphore.Weighted
+	long     http.Handler
+	byAPIKey http.Handler
+	byID     http.Handler
+	byToken  http.Handler
+	initrd   http.Handler
 }
 
-var _ http.Handler = &ImageHandler{}
+func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw metricsmiddleware.Middleware) http.Handler {
+	h := ImageHandler{
+		long: stdmiddleware.Handler("/images/:imageID", mdw,
+			&isoHandler{
+				ImageStore:          is,
+				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
+				client:              assistedServiceClient,
+				urlParser:           parseLongURL,
+			},
+		),
+		byAPIKey: stdmiddleware.Handler("/byapikey/:token", mdw,
+			&isoHandler{
+				ImageStore:          is,
+				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
+				client:              assistedServiceClient,
+				urlParser:           parseShortURL,
+			},
+		),
+		byID: stdmiddleware.Handler("/byid/:token", mdw,
+			&isoHandler{
+				ImageStore:          is,
+				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
+				client:              assistedServiceClient,
+				urlParser:           parseShortURL,
+			},
+		),
+		byToken: stdmiddleware.Handler("/bytoken/:token", mdw,
+			&isoHandler{
+				ImageStore:          is,
+				GenerateImageStream: isoeditor.NewRHCOSStreamReader,
+				client:              assistedServiceClient,
+				urlParser:           parseShortURL,
+			},
+		),
+		initrd: stdmiddleware.Handler("/images/:imageID/pxe-initrd", mdw,
+			&initrdHandler{
+				ImageStore: is,
+				client:     assistedServiceClient,
+			},
+		),
+	}
 
-func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw middleware.Middleware) http.Handler {
-	isos := &isoHandler{
-		ImageStore:          is,
-		GenerateImageStream: isoeditor.NewRHCOSStreamReader,
-		client:              assistedServiceClient,
-	}
-	initrds := &initrdHandler{
-		ImageStore: is,
-		client:     assistedServiceClient,
-	}
-
-	return &ImageHandler{
-		iso:    stdmiddleware.Handler("/images/:imageID", mdw, isos),
-		initrd: stdmiddleware.Handler("/images/:imageID/pxe-initrd", mdw, initrds),
-		sem:    semaphore.NewWeighted(maxRequests),
-	}
+	return h.router(maxRequests)
 }
 
-func (h *ImageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := h.sem.Acquire(r.Context(), 1); err != nil {
-		log.Errorf("Failed to acquire semaphore: %v", err)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
-	defer h.sem.Release(1)
+func (h *ImageHandler) router(maxRequests int64) *chi.Mux {
+	router := chi.NewRouter()
+	router.Use(WithRequestLimit(maxRequests))
+	router.Handle("/images/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/pxe-initrd", h.initrd)
+	router.Handle("/images/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}", h.long)
+	router.Handle("/byid/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/{version}/{arch}/{filename}", h.byID)
+	router.Handle("/byapikey/{api_key}/{version}/{arch}/{filename}", h.byAPIKey)
+	router.Handle("/bytoken/{token}/{version}/{arch}/{filename}", h.byToken)
 
-	matched, err := regexp.MatchString(`/images/.*/pxe-initrd`, r.URL.Path)
-	if err != nil {
-		log.Errorf("Failed to test path match to initrd: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if matched {
-		h.initrd.ServeHTTP(w, r)
-	} else {
-		h.iso.ServeHTTP(w, r)
-	}
+	return router
 }

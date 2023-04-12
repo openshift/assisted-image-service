@@ -61,6 +61,45 @@ Example `OS_IMAGES`:
 
 ## API
 
+None of these APIs should be considered stable for end-users of assisted
+installer. Users should never construct URLs that match these APIs; instead
+users should obtain an ISO URL from an InfraEnv resource, as provided by
+assisted installer. These APIs represent a contract between
+assisted-image-service and assisted installer only.
+
+### `GET /byid/{image_id}/{version}/{arch}/{filename}`
+
+Downloads the RHCOS image for the specified image ID.
+
+URL segments:
+- `image_id`: ID for the image, usually the InfraEnv ID
+- `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
+- `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
+- `filename`: `full.iso` to download the ISO including the rootfs, `minimal.iso` to download the ISO without the rootfs
+
+### `GET /bytoken/{token}/{version}/{arch}/{filename}`
+
+Downloads the RHCOS image for the specified image ID.
+
+URL segments:
+- `token`: JWT whose payload containes either a `sub` field or `infra_env_id` field
+- `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
+- `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
+- `filename`: `full.iso` to download the ISO including the rootfs, `minimal.iso` to download the ISO without the rootfs
+
+### `GET /byapikey/{api_key}/{version}/{arch}/{filename}`
+
+Downloads the RHCOS image for the specified image ID.
+
+URL segments:
+- `api_key`: JWT whose payload containes either a `sub` field or `infra_env_id` field
+- `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
+- `arch`: the base image cpu architecture (must match an entry in `RHCOS_VERSIONS`)
+- `filename`: `full.iso` to download the ISO including the rootfs, `minimal.iso` to download the ISO without the rootfs
+
+
+## Deprecated API
+
 ### `GET /images/{image_id}`
 
 Downloads the RHCOS image for the specified image ID.

@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/golang/mock/gomock"
@@ -30,6 +29,13 @@ var _ = Describe("ServeHTTP", func() {
 		ignitionContent   = "someignitioncontent"
 		lastModified      string
 		header            = http.Header{}
+
+		// generated at https://jwt.io/ with payload:
+		//
+		//	{
+		//		"infra_env_id": "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+		//	}
+		tokenInfraEnv = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpbmZyYV9lbnZfaWQiOiJiZjI1MjkyYS1kZGRkLTQ5ZGMtYWI5Yy0zZmI0YzFmMDcwNzEifQ.VbI4JtIVcxy2S7n2tYFgtFPD9St15RrzQnpJuE0CuAI" //#nosec
 	)
 
 	Context("with image files", func() {
@@ -135,393 +141,831 @@ var _ = Describe("ServeHTTP", func() {
 			)
 		}
 
-		Context("with no auth", func() {
-			var (
-				server        *httptest.Server
-				client        *http.Client
-				initrdContent []byte
-			)
+		Describe("Short URLs", func() {
 
-			BeforeEach(func() {
+			Context("with no auth", func() {
+				var (
+					server        *httptest.Server
+					client        *http.Client
+					initrdContent []byte
+				)
+
+				BeforeEach(func() {
+					u, err := url.Parse(assistedServer.URL())
+					Expect(err).NotTo(HaveOccurred())
+
+					initrdContent = nil
+					mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+						defer GinkgoRecover()
+						Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+						if isoPath == minImageFilename {
+							Expect(ramdiskBytes).To(Equal(initrdContent))
+						}
+						return os.Open(isoPath)
+					}
+
+					asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+					Expect(err).NotTo(HaveOccurred())
+
+					handler := &ImageHandler{
+						long: &isoHandler{
+							ImageStore:          mockImageStore,
+							GenerateImageStream: mockImageStream,
+							client:              asc,
+							urlParser:           parseLongURL,
+						},
+						byID: &isoHandler{
+							ImageStore:          mockImageStore,
+							GenerateImageStream: mockImageStream,
+							client:              asc,
+							urlParser:           parseShortURL,
+						},
+					}
+					server = httptest.NewServer(handler.router(1))
+					client = server.Client()
+				})
+
+				AfterEach(func() {
+					server.Close()
+				})
+
+				It("returns a full image", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("uses the arch parameter", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, "arm64")
+					path := fmt.Sprintf("/byid/%s/4.8/arm64/full.iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("returns a minimal image with an initrd", func() {
+					initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
+					initrdContent = []byte("someramdisk")
+					assistedServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+							ghttp.RespondWith(http.StatusOK, initrdContent),
+						),
+					)
+					setInfraenvKargsHandlerSuccess()
+					mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/minimal.iso", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("minimalisocontent"))
+				})
+
+				It("returns a minimal image with no initrd", func() {
+					initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
+					assistedServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+							ghttp.RespondWith(http.StatusNoContent, initrdContent),
+						),
+					)
+					mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/minimal.iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("minimalisocontent"))
+				})
+
+				It("fails for a non-existant version", func() {
+					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					path := fmt.Sprintf("/byid/%s/4.7/x86_64/full.iso", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				})
+
+				It("fails when no type is supplied", func() {
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				})
+
+				It("fails when no image id is supplied", func() {
+					resp, err := client.Get(server.URL + "/byid/")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				})
+
+				It("returns a valid last-modified header when provided an invalid one", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					lastModified = ""
+					header.Set("Last-Modified", "somenonsense")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("fail kargs infra env query", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+					setInfraenvKargsHandlerFailure()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+				})
+
+				It("fails when kargs are supplied for an s390x image", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.11", imagestore.ImageTypeFull, "s390x")
+					path := fmt.Sprintf("/byid/%s/4.11/s390x/full.iso", imageID)
+					setInfraenvKargsHandlerSuccess("arg")
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+				})
+			})
+
+			It("passes Authorization header through to assisted requests", func() {
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+				setInfraenvKargsHandlerSuccess()
+
 				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
 
-				initrdContent = nil
 				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
 					defer GinkgoRecover()
 					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
-					if isoPath == minImageFilename {
-						Expect(ramdiskBytes).To(Equal(initrdContent))
-					}
 					return os.Open(isoPath)
 				}
 
 				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
 				Expect(err).NotTo(HaveOccurred())
 
-				handler := &isoHandler{
-					ImageStore:          mockImageStore,
-					GenerateImageStream: mockImageStream,
-					client:              asc,
+				handler := &ImageHandler{
+					byID: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseShortURL,
+					},
 				}
-				server = httptest.NewServer(handler)
-				client = server.Client()
-			})
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
 
-			AfterEach(func() {
-				server.Close()
-			})
-
-			It("returns a full image", func() {
-				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-				setInfraenvKargsHandlerSuccess()
-				resp, err := client.Get(server.URL + path)
+				path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+				req, err := http.NewRequest(http.MethodGet, server.URL+path, nil)
+				Expect(err).NotTo(HaveOccurred())
+				req.Header.Set("Authorization", "Bearer mytoken")
+
+				resp, err := server.Client().Do(req)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("someisocontent"))
 			})
 
-			It("uses the arch parameter", func() {
-				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
-				mockImage("4.8", imagestore.ImageTypeFull, "arm64")
-				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&arch=arm64", imageID)
-				setInfraenvKargsHandlerSuccess()
-				resp, err := client.Get(server.URL + path)
-				Expect(err).NotTo(HaveOccurred())
-				expectSuccessfulResponse(resp, []byte("someisocontent"))
-			})
-
-			It("returns a minimal image with an initrd", func() {
-				initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
-				initrdContent = []byte("someramdisk")
+			It("passes api_key query param through to assisted requests", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
 				assistedServer.AppendHandlers(
 					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
-						ghttp.RespondWith(http.StatusOK, initrdContent),
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign&api_key=mytoken"),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+
+				setInfraenvKargsHandlerSuccess()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byID: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso?api_key=mytoken", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
+
+			It("passes api_key url path segment through to assisted requests", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, fmt.Sprintf("discovery_iso_type=full-iso&file_name=discovery.ign&api_key=%s", tokenInfraEnv)),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+
+				setInfraenvKargsHandlerSuccess()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byAPIKey: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/byapikey/%s/4.8/x86_64/full.iso", tokenInfraEnv)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
+
+			It("passes non empty kargs", func() {
+				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+				kernelArguments := []string{
+					"p1",
+					"p2",
+					"p3",
+				}
+				setInfraenvKargsHandlerSuccess(kernelArguments...)
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(kargs).To(Equal([]byte(" " + strings.Join(kernelArguments, " ") + "\n")))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byID: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			})
+
+			It("passes image_token param through to assisted requests header", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				// generated at https://jwt.io/ with payload:
+				// {
+				// 	"infra_env_id": "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+				// }
+				token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpbmZyYV9lbnZfaWQiOiJiZjI1MjkyYS1kZGRkLTQ5ZGMtYWI5Yy0zZmI0YzFmMDcwNzEifQ.VbI4JtIVcxy2S7n2tYFgtFPD9St15RrzQnpJuE0CuAI" //#nosec
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.VerifyHeader(http.Header{"Image-Token": []string{token}}),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+
+				setInfraenvKargsHandlerSuccess()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byToken: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/bytoken/%s/4.8/x86_64/full.iso", token)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
+
+			It("returns an auth failure if assisted auth fails when querying ignition", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusUnauthorized, ""),
+					),
+				)
+
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byID: &isoHandler{
+						ImageStore: mockImageStore,
+						client:     asc,
+						urlParser:  parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/byid/%s/4.8/x86_64/full.iso", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+			})
+
+			It("returns an auth failure if assisted auth fails when querying initrd", func() {
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=minimal-iso&file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusOK, ignitionContent),
+					),
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
+						),
+						ghttp.RespondWith(http.StatusUnauthorized, ""),
+					),
+				)
+
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					byID: &isoHandler{
+						ImageStore: mockImageStore,
+						client:     asc,
+						urlParser:  parseShortURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+				path := fmt.Sprintf("/byid/%s/4.8/x86_64/minimal.iso", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+			})
+		})
+
+		Describe("Long URLs", func() {
+
+			Context("with no auth", func() {
+				var (
+					server        *httptest.Server
+					client        *http.Client
+					initrdContent []byte
+				)
+
+				BeforeEach(func() {
+					u, err := url.Parse(assistedServer.URL())
+					Expect(err).NotTo(HaveOccurred())
+
+					initrdContent = nil
+					mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+						defer GinkgoRecover()
+						Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+						if isoPath == minImageFilename {
+							Expect(ramdiskBytes).To(Equal(initrdContent))
+						}
+						return os.Open(isoPath)
+					}
+
+					asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+					Expect(err).NotTo(HaveOccurred())
+
+					handler := &ImageHandler{
+						long: &isoHandler{
+							ImageStore:          mockImageStore,
+							GenerateImageStream: mockImageStream,
+							client:              asc,
+							urlParser:           parseLongURL,
+						},
+					}
+					server = httptest.NewServer(handler.router(1))
+					client = server.Client()
+				})
+
+				AfterEach(func() {
+					server.Close()
+				})
+
+				It("returns a full image", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("uses the arch parameter", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, "arm64")
+					path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&arch=arm64", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("returns a minimal image with an initrd", func() {
+					initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
+					initrdContent = []byte("someramdisk")
+					assistedServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+							ghttp.RespondWith(http.StatusOK, initrdContent),
+						),
+					)
+					setInfraenvKargsHandlerSuccess()
+					mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+					path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("minimalisocontent"))
+				})
+
+				It("returns a minimal image with no initrd", func() {
+					initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
+					assistedServer.AppendHandlers(
+						ghttp.CombineHandlers(
+							ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+							ghttp.RespondWith(http.StatusNoContent, initrdContent),
+						),
+					)
+					mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+					path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("minimalisocontent"))
+				})
+
+				It("fails for a non-existant version", func() {
+					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					path := fmt.Sprintf("/images/%s?version=4.7&type=full-iso", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				})
+
+				It("fails when no version is supplied", func() {
+					path := fmt.Sprintf("/images/%s?type=full-iso", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+				})
+
+				It("fails when no type is supplied", func() {
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					path := fmt.Sprintf("/images/%s?version=4.8", imageID)
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+				})
+
+				It("fails when no image id is supplied", func() {
+					resp, err := client.Get(server.URL + "/images/")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+				})
+
+				It("returns a valid last-modified header when provided an invalid one", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					lastModified = ""
+					header.Set("Last-Modified", "somenonsense")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					expectSuccessfulResponse(resp, []byte("someisocontent"))
+				})
+
+				It("fail kargs infra env query", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+					path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+					setInfraenvKargsHandlerFailure()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+				})
+
+				It("fails when kargs are supplied for an s390x image", func() {
+					initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+					mockImage("4.11", imagestore.ImageTypeFull, "s390x")
+					path := fmt.Sprintf("/images/%s?version=4.11&type=full-iso&arch=s390x", imageID)
+					setInfraenvKargsHandlerSuccess("arg")
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+				})
+			})
+
+			It("passes Authorization header through to assisted requests", func() {
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 					),
 				)
 				setInfraenvKargsHandlerSuccess()
-				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
-				resp, err := client.Get(server.URL + path)
-				Expect(err).NotTo(HaveOccurred())
-				expectSuccessfulResponse(resp, []byte("minimalisocontent"))
-			})
 
-			It("returns a minimal image with no initrd", func() {
-				initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
-				assistedServer.AppendHandlers(
-					ghttp.CombineHandlers(
-						ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
-						ghttp.RespondWith(http.StatusNoContent, initrdContent),
-					),
-				)
-				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
-				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
-				setInfraenvKargsHandlerSuccess()
-				resp, err := client.Get(server.URL + path)
+				u, err := url.Parse(assistedServer.URL())
 				Expect(err).NotTo(HaveOccurred())
-				expectSuccessfulResponse(resp, []byte("minimalisocontent"))
-			})
 
-			It("fails for a non-existant version", func() {
-				mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
-				path := fmt.Sprintf("/images/%s?version=4.7&type=full-iso", imageID)
-				resp, err := client.Get(server.URL + path)
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
 				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			})
 
-			It("fails when no version is supplied", func() {
-				path := fmt.Sprintf("/images/%s?type=full-iso", imageID)
-				resp, err := client.Get(server.URL + path)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			})
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
 
-			It("fails when no type is supplied", func() {
-				mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
-				path := fmt.Sprintf("/images/%s?version=4.8", imageID)
-				resp, err := client.Get(server.URL + path)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			})
-
-			It("fails when no image id is supplied", func() {
-				resp, err := client.Get(server.URL + "/images/")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
-			})
-
-			It("returns a valid last-modified header when provided an invalid one", func() {
-				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
-				lastModified = ""
-				header.Set("Last-Modified", "somenonsense")
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
 				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-				setInfraenvKargsHandlerSuccess()
-				resp, err := client.Get(server.URL + path)
+				req, err := http.NewRequest(http.MethodGet, server.URL+path, nil)
+				Expect(err).NotTo(HaveOccurred())
+				req.Header.Set("Authorization", "Bearer mytoken")
+
+				resp, err := server.Client().Do(req)
 				Expect(err).NotTo(HaveOccurred())
 				expectSuccessfulResponse(resp, []byte("someisocontent"))
 			})
 
-			It("fail kargs infra env query", func() {
+			It("passes api_key param through to assisted requests", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign&api_key=mytoken"),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
+					),
+				)
+
+				setInfraenvKargsHandlerSuccess()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
+
+			It("passes non empty kargs", func() {
 				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
+				kernelArguments := []string{
+					"p1",
+					"p2",
+					"p3",
+				}
+				setInfraenvKargsHandlerSuccess(kernelArguments...)
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(kargs).To(Equal([]byte(" " + strings.Join(kernelArguments, " ") + "\n")))
+					return os.Open(isoPath)
+				}
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
 				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
 				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-				setInfraenvKargsHandlerFailure()
-				resp, err := client.Get(server.URL + path)
+				resp, err := server.Client().Get(server.URL + path)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusInternalServerError))
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
 			})
 
-			It("fails when kargs are supplied for an s390x image", func() {
-				initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
-				mockImage("4.11", imagestore.ImageTypeFull, "s390x")
-				path := fmt.Sprintf("/images/%s?version=4.11&type=full-iso&arch=s390x", imageID)
-				setInfraenvKargsHandlerSuccess("arg")
-				resp, err := client.Get(server.URL + path)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
-			})
-		})
-
-		It("passes Authorization header through to assisted requests", func() {
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=full-iso&file_name=discovery.ign"),
-					ghttp.VerifyHeader(http.Header{"Authorization": []string{"Bearer mytoken"}}),
-					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
-				),
-			)
-			setInfraenvKargsHandlerSuccess()
-
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
-
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
-				defer GinkgoRecover()
-				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
-				return os.Open(isoPath)
-			}
-
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			handler := &isoHandler{
-				ImageStore:          mockImageStore,
-				GenerateImageStream: mockImageStream,
-				client:              asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
-
-			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-			req, err := http.NewRequest(http.MethodGet, server.URL+path, nil)
-			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("Authorization", "Bearer mytoken")
-
-			resp, err := server.Client().Do(req)
-			Expect(err).NotTo(HaveOccurred())
-			expectSuccessfulResponse(resp, []byte("someisocontent"))
-		})
-
-		It("passes api_key param through to assisted requests", func() {
-			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign&api_key=mytoken"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
-				),
-			)
-
-			setInfraenvKargsHandlerSuccess()
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
-
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
-				defer GinkgoRecover()
-				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
-				return os.Open(isoPath)
-			}
-
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			handler := &isoHandler{
-				ImageStore:          mockImageStore,
-				GenerateImageStream: mockImageStream,
-				client:              asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
-
-			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&api_key=mytoken", imageID)
-			resp, err := server.Client().Get(server.URL + path)
-			Expect(err).NotTo(HaveOccurred())
-			expectSuccessfulResponse(resp, []byte("someisocontent"))
-		})
-
-		It("passes non empty kargs", func() {
-			initIgnitionHandler("discovery_iso_type=full-iso&file_name=discovery.ign")
-			kernelArguments := []string{
-				"p1",
-				"p2",
-				"p3",
-			}
-			setInfraenvKargsHandlerSuccess(kernelArguments...)
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
-
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
-				defer GinkgoRecover()
-				Expect(kargs).To(Equal([]byte(" " + strings.Join(kernelArguments, " ") + "\n")))
-				return os.Open(isoPath)
-			}
-
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			handler := &isoHandler{
-				ImageStore:          mockImageStore,
-				GenerateImageStream: mockImageStream,
-				client:              asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
-
-			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-			resp, err := server.Client().Get(server.URL + path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
-		})
-
-		It("passes image_token param through to assisted requests header", func() {
-			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
-					ghttp.VerifyHeader(http.Header{"Image-Token": []string{"mytoken"}}),
-					ghttp.RespondWith(http.StatusOK, ignitionContent, header),
-				),
-			)
-
-			setInfraenvKargsHandlerSuccess()
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
-
-			mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
-				defer GinkgoRecover()
-				Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
-				return os.Open(isoPath)
-			}
-
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			handler := &isoHandler{
-				ImageStore:          mockImageStore,
-				GenerateImageStream: mockImageStream,
-				client:              asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
-
-			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&image_token=mytoken", imageID)
-			resp, err := server.Client().Get(server.URL + path)
-			Expect(err).NotTo(HaveOccurred())
-			expectSuccessfulResponse(resp, []byte("someisocontent"))
-		})
-
-		It("returns an auth failure if assisted auth fails when querying ignition", func() {
-			assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
-					ghttp.RespondWith(http.StatusUnauthorized, ""),
-				),
-			)
-
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
-
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			handler := &isoHandler{
-				ImageStore: mockImageStore,
-				client:     asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
-
-			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
-			resp, err := server.Client().Get(server.URL + path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
-		})
-
-		It("returns an auth failure if assisted auth fails when querying initrd", func() {
-			assistedServer.AppendHandlers(
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=minimal-iso&file_name=discovery.ign"),
-					ghttp.RespondWith(http.StatusOK, ignitionContent),
-				),
-				ghttp.CombineHandlers(
-					ghttp.VerifyRequest(
-						"GET",
-						fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
+			It("passes image_token param through to assisted requests header", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.VerifyHeader(http.Header{"Image-Token": []string{"mytoken"}}),
+						ghttp.RespondWith(http.StatusOK, ignitionContent, header),
 					),
-					ghttp.RespondWith(http.StatusUnauthorized, ""),
-				),
-			)
+				)
 
-			u, err := url.Parse(assistedServer.URL())
-			Expect(err).NotTo(HaveOccurred())
+				setInfraenvKargsHandlerSuccess()
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
 
-			asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
-			Expect(err).NotTo(HaveOccurred())
+				mockImageStream := func(isoPath string, ignition *isoeditor.IgnitionContent, ramdiskBytes, kargs []byte) (isoeditor.ImageReader, error) {
+					defer GinkgoRecover()
+					Expect(ignition.Config).To(Equal([]byte(ignitionContent)))
+					return os.Open(isoPath)
+				}
 
-			handler := &isoHandler{
-				ImageStore: mockImageStore,
-				client:     asc,
-			}
-			server := httptest.NewServer(handler)
-			defer server.Close()
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
 
-			mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
-			path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
-			resp, err := server.Client().Get(server.URL + path)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore:          mockImageStore,
+						GenerateImageStream: mockImageStream,
+						client:              asc,
+						urlParser:           parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso&image_token=mytoken", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				expectSuccessfulResponse(resp, []byte("someisocontent"))
+			})
+
+			It("returns an auth failure if assisted auth fails when querying ignition", func() {
+				assistedPath := fmt.Sprintf(fileRouteFormat, imageID)
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", assistedPath, "discovery_iso_type=full-iso&file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusUnauthorized, ""),
+					),
+				)
+
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore: mockImageStore,
+						client:     asc,
+						urlParser:  parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=full-iso", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+			})
+
+			It("returns an auth failure if assisted auth fails when querying initrd", func() {
+				assistedServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", fmt.Sprintf(fileRouteFormat, imageID), "discovery_iso_type=minimal-iso&file_name=discovery.ign"),
+						ghttp.RespondWith(http.StatusOK, ignitionContent),
+					),
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID),
+						),
+						ghttp.RespondWith(http.StatusUnauthorized, ""),
+					),
+				)
+
+				u, err := url.Parse(assistedServer.URL())
+				Expect(err).NotTo(HaveOccurred())
+
+				asc, err := NewAssistedServiceClient(u.Scheme, u.Host, "")
+				Expect(err).NotTo(HaveOccurred())
+
+				handler := &ImageHandler{
+					long: &isoHandler{
+						ImageStore: mockImageStore,
+						client:     asc,
+						urlParser:  parseLongURL,
+					},
+				}
+				server := httptest.NewServer(handler.router(1))
+				defer server.Close()
+
+				mockImage("4.8", imagestore.ImageTypeMinimal, defaultArch)
+				path := fmt.Sprintf("/images/%s?version=4.8&type=minimal-iso", imageID)
+				resp, err := server.Client().Get(server.URL + path)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+			})
 		})
-	})
-})
-
-var _ = Describe("parseImageID", func() {
-	var imageID = "87bfb5e4-884b-4c00-a38a-f90f8b71effe"
-	It("returns the correct ID", func() {
-		path := filepath.Join("/images", imageID)
-		id, err := parseImageID(path)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(id).To(Equal(imageID))
-	})
-
-	It("fails with the wrong path", func() {
-		path := filepath.Join("/wat/images", imageID)
-		_, err := parseImageID(path)
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("fails with no id", func() {
-		_, err := parseImageID("/images/")
-		Expect(err).To(HaveOccurred())
 	})
 })
 

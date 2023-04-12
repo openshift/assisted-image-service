@@ -112,6 +112,7 @@ var _ = Describe("Image integration tests", func() {
 
 	testcases := []struct {
 		name               string
+		fileName           string
 		imageType          string
 		expectedIgnition   []byte
 		expectedRamdisk    []byte
@@ -120,12 +121,14 @@ var _ = Describe("Image integration tests", func() {
 		{
 			name:             "full-iso",
 			imageType:        imagestore.ImageTypeFull,
+			fileName:         "full.iso",
 			expectedIgnition: []byte("someignitioncontent"),
 			expectedRamdisk:  nil,
 		},
 		{
 			name:               "full-iso-with-kargs",
 			imageType:          imagestore.ImageTypeFull,
+			fileName:           "full.iso",
 			expectedIgnition:   []byte("someignitioncontent"),
 			expectedRamdisk:    nil,
 			expectedExtraKargs: []string{"p1", "p1", `key=value`},
@@ -133,18 +136,21 @@ var _ = Describe("Image integration tests", func() {
 		{
 			name:             "minimal-iso-with-initrd",
 			imageType:        imagestore.ImageTypeMinimal,
+			fileName:         "minimal.iso",
 			expectedIgnition: []byte("someignitioncontent"),
 			expectedRamdisk:  []byte("someramdiskcontent"),
 		},
 		{
 			name:             "minimal-iso-without-initrd",
 			imageType:        imagestore.ImageTypeMinimal,
+			fileName:         "minimal.iso",
 			expectedIgnition: []byte("someignitioncontent"),
 			expectedRamdisk:  []byte(""),
 		},
 		{
 			name:               "minimal-iso-without-initrd-with-kargs",
 			imageType:          imagestore.ImageTypeMinimal,
+			fileName:           "minimal.iso",
 			expectedIgnition:   []byte("someignitioncontent"),
 			expectedRamdisk:    []byte(""),
 			expectedExtraKargs: []string{"p5", "p6", `key=value`},
@@ -212,7 +218,7 @@ var _ = Describe("Image integration tests", func() {
 					}
 
 					By("getting an iso")
-					path := fmt.Sprintf("/images/%s?version=%s&type=%s&arch=%s", imageID, version["openshift_version"], tc.imageType, version["cpu_architecture"])
+					path := fmt.Sprintf("/byid/%s/%s/%s/%s", imageID, version["openshift_version"], version["cpu_architecture"], tc.fileName)
 					resp, err := imageClient.Get(imageServer.URL + path)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(resp.StatusCode).To(Equal(http.StatusOK))

@@ -128,6 +128,9 @@ func main() {
 		imageHandler = handlers.WithInitrdViaHTTP(imageHandler)
 	}
 	http.Handle("/images/", imageHandler)
+	http.Handle("/byapikey/", imageHandler)
+	http.Handle("/byid/", imageHandler)
+	http.Handle("/bytoken/", imageHandler)
 
 	serverInfo.ListenAndServe()
 	<-stop

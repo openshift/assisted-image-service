@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
 	github.com/diskfs/go-diskfs v1.2.1-0.20221201153419-70aa09455238
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/golang/mock v1.6.0
 	github.com/google/renameio v0.1.0
 	github.com/google/uuid v1.1.1

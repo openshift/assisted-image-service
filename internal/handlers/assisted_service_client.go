@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
 
@@ -175,14 +177,23 @@ func (c *AssistedServiceClient) discoveryKernelArguments(imageServiceRequest *ht
 func setRequestAuth(imageRequest, assistedRequest *http.Request) {
 	queryValues := imageRequest.URL.Query()
 	authHeader := imageRequest.Header.Get("Authorization")
+	api_key := chi.URLParam(imageRequest, "api_key")
+	token := chi.URLParam(imageRequest, "token")
 
-	if queryValues.Get("api_key") != "" {
+	switch {
+	case api_key != "":
+		params := assistedRequest.URL.Query()
+		params.Set("api_key", api_key)
+		assistedRequest.URL.RawQuery = params.Encode()
+	case queryValues.Get("api_key") != "":
 		params := assistedRequest.URL.Query()
 		params.Set("api_key", queryValues.Get("api_key"))
 		assistedRequest.URL.RawQuery = params.Encode()
-	} else if queryValues.Get("image_token") != "" {
+	case token != "":
+		assistedRequest.Header.Set("Image-Token", token)
+	case queryValues.Get("image_token") != "":
 		assistedRequest.Header.Set("Image-Token", queryValues.Get("image_token"))
-	} else if authHeader != "" {
+	case authHeader != "":
 		assistedRequest.Header.Set("Authorization", authHeader)
 	}
 }
