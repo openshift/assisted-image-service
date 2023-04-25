@@ -21,7 +21,7 @@ var _ http.Handler = &BootArtifactsHandler{}
 
 var bootpathRegexp = regexp.MustCompile(`^/boot-artifacts/(.+)`)
 
-func parseArtifact(path string) (string, error) {
+func parseArtifact(path, arch string) (string, error) {
 	match := bootpathRegexp.FindStringSubmatch(path)
 	if len(match) < 1 {
 		return "", fmt.Errorf("malformed download path: %s", path)
@@ -32,7 +32,11 @@ func parseArtifact(path string) (string, error) {
 	case "rootfs":
 		artifact = "rootfs.img"
 	case "kernel":
-		artifact = "vmlinuz"
+		if arch == "s390x" {
+			artifact = "kernel.img"
+		} else {
+			artifact = "vmlinuz"
+		}
 	default:
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
@@ -47,14 +51,15 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	artifact, err := parseArtifact(r.URL.Path)
-	if err != nil {
-		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
-		return
-	}
 	version, arch, err := b.parseQueryParams(r.URL.Query())
 	if err != nil {
 		httpErrorf(w, http.StatusBadRequest, "Failed to parse query parameters: %v", err)
+		return
+	}
+
+	artifact, err := parseArtifact(r.URL.Path, arch)
+	if err != nil {
+		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
 		return
 	}
 
