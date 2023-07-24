@@ -11,6 +11,8 @@ updates:
     labels:
       - "go"
       - "dependabot"
+      - "approved"
+      - "lgtm"
     commit-message:
       prefix: "NO-ISSUE"
     groups:
