@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,7 +24,8 @@ func New(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile string) *ServerInfo {
 		// Run HTTPS listener when port, key and cert are specified
 		// This is default in operator deployments
 		servers.HTTPS = &http.Server{
-			Addr: fmt.Sprintf(":%s", httpsPort),
+			Addr:              fmt.Sprintf(":%s", httpsPort),
+			ReadHeaderTimeout: 3 * time.Second,
 		}
 		servers.HTTPSCertFile = HTTPSCertFile
 		servers.HTTPSKeyFile = HTTPSKeyFile
@@ -31,13 +33,15 @@ func New(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile string) *ServerInfo {
 		// Run HTTP listener on HTTPS port if httpPort is not set
 		// This is default in podman deployment
 		servers.HTTP = &http.Server{
-			Addr: fmt.Sprintf(":%s", httpsPort),
+			Addr:              fmt.Sprintf(":%s", httpsPort),
+			ReadHeaderTimeout: 3 * time.Second,
 		}
 	}
 	if httpPort != "" {
 		// Run HTTP listener if httpPort is set
 		servers.HTTP = &http.Server{
-			Addr: fmt.Sprintf(":%s", httpPort),
+			Addr:              fmt.Sprintf(":%s", httpPort),
+			ReadHeaderTimeout: 3 * time.Second,
 		}
 	}
 	servers.HasBothHandlers = servers.HTTP != nil && servers.HTTPS != nil
