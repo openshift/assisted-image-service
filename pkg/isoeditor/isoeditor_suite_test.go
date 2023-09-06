@@ -32,6 +32,12 @@ label linux
 ###################### COREOS_KARG_EMBED_AREA
 `
 
+const testIgnitionInfo = `
+{
+  "file": "images/ignition.img"
+}
+`
+
 const ignitionPaddingLength = 256 * 1024 // 256KB
 
 func createTestFiles(volumeID string) (string, string) {
@@ -45,6 +51,7 @@ func createTestFiles(volumeID string) (string, string) {
 	Expect(temp.Close()).To(Succeed())
 	Expect(os.Remove(temp.Name())).To(Succeed())
 
+	Expect(os.MkdirAll(filepath.Join(filesDir, "coreos"), 0755)).To(Succeed())
 	Expect(os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)).To(Succeed())
 	Expect(os.MkdirAll(filepath.Join(filesDir, "EFI/redhat"), 0755)).To(Succeed())
 	Expect(os.MkdirAll(filepath.Join(filesDir, "isolinux"), 0755)).To(Succeed())
@@ -57,6 +64,7 @@ func createTestFiles(volumeID string) (string, string) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(f.Truncate(64)).To(Succeed())
 
+	Expect(os.WriteFile(filepath.Join(filesDir, "coreos/igninfo.json"), []byte(testIgnitionInfo), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/assisted_installer_custom.img"), make([]byte, RamDiskPaddingLength), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/ignition.img"), make([]byte, ignitionPaddingLength), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), []byte("this is rootfs"), 0600)).To(Succeed())
