@@ -29,13 +29,13 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 		return nil, err
 	}
 
-	r, err := readerForFileContent(isoPath, ignitionImagePath, isoReader, ignitionReader)
+	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, GetISOFileInfo)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
 
 	if ramdiskContent != nil {
-		r, err = readerForFileContent(isoPath, ramDiskImagePath, r, bytes.NewReader(ramdiskContent))
+		r, err = readerForContent(isoPath, ramDiskImagePath, r, bytes.NewReader(ramdiskContent), GetISOFileInfo)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create overwrite reader for ramdisk")
 		}
@@ -78,8 +78,4 @@ func readerForContent(isoPath, filePath string, base io.ReadSeeker, contentReade
 	}
 
 	return r, nil
-}
-
-func readerForFileContent(isoPath string, filePath string, base io.ReadSeeker, contentReader *bytes.Reader) (overlay.OverlayReader, error) {
-	return readerForContent(isoPath, filePath, base, contentReader, GetISOFileInfo)
 }
