@@ -31,22 +31,52 @@ import (
 var (
 	versions = []map[string]string{
 		{
-			"openshift_version": "pre-release",
+			"openshift_version": "pre-release-arm",
 			"cpu_architecture":  "arm64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live.aarch64.iso",
+			"version":           "arm-pre",
+		},
+		{
+			"openshift_version": "pre-release-x86",
+			"cpu_architecture":  "x86_64",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/latest/rhcos-live.x86_64.iso",
+			"version":           "x86_64-pre",
+		},
+		{
+			"openshift_version": "pre-release-Z",
+			"cpu_architecture":  "s390x",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/pre-release/latest/rhcos-live.s390x.iso",
+			"version":           "s390x-pre",
+		},
+		{
+			"openshift_version": "pre-release-power",
+			"cpu_architecture":  "ppc64le",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/pre-release/latest/rhcos-live.ppc64le.iso",
+			"version":           "ppc64le-pre",
+		},
+		{
+			"openshift_version": "latest-arm",
+			"cpu_architecture":  "arm64",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/latest/rhcos-live.aarch64.iso",
 			"version":           "arm-latest",
 		},
 		{
-			"openshift_version": "4.8",
+			"openshift_version": "latest-x86",
 			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/latest/rhcos-live.x86_64.iso",
-			"version":           "4.8-latest",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/latest/rhcos-live.x86_64.iso",
+			"version":           "x86_64-latest",
 		},
 		{
-			"openshift_version": "pre-release",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live.x86_64.iso",
-			"version":           "x86_64-latest",
+			"openshift_version": "latest-Z",
+			"cpu_architecture":  "s390x",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/latest/rhcos-live.s390x.iso",
+			"version":           "s390x-latest",
+		},
+		{
+			"openshift_version": "latest-power",
+			"cpu_architecture":  "ppc64le",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/latest/rhcos-live.ppc64le.iso",
+			"version":           "ppc64le-latest",
 		},
 		{
 			"openshift_version": "fcos-pre-release",
@@ -59,18 +89,6 @@ var (
 			"cpu_architecture":  "arm64",
 			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
 			"version":           "arm-latest",
-		},
-		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "s390x",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-s390x-live.s390x.iso",
-			"version":           "s390x-latest",
-		},
-		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "ppc64le",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-ppc64le-live.ppc64le.iso",
-			"version":           "ppc64le-latest",
 		},
 		{
 			"openshift_version": "scos-prerelease",
@@ -235,6 +253,7 @@ var _ = Describe("Image integration tests", func() {
 					fs, err := d.GetFilesystem(0)
 					Expect(err).NotTo(HaveOccurred())
 
+					// TODO: Do this correctly based on the presence of /coreos/igninfo.json
 					By("verifying ignition content")
 					f, err := fs.OpenFile("/images/ignition.img", os.O_RDONLY)
 					Expect(err).NotTo(HaveOccurred())
