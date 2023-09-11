@@ -14,7 +14,7 @@ require (
 	github.com/onsi/gomega v1.27.10
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
-	github.com/rs/cors v1.9.0
+	github.com/rs/cors v1.10.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/thoas/go-funk v0.9.3
