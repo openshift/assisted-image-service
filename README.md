@@ -5,7 +5,7 @@ It downloads a set of RHCOS images on startup based on config and responds to a 
 
 ## Running the Image Service
 
-Build the image and run it locally using `podman`
+Build the image and run it locally using `podman`.
 
 ```bash
 make build run
