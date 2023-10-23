@@ -56,6 +56,9 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 
+		ignitionImagePath, err := GetInitionImagePath(isoFile)
+		Expect(err).NotTo(HaveOccurred())
+
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = io.Copy(f, streamReader)
@@ -63,7 +66,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(f.Sync()).To(Succeed())
 		Expect(f.Close()).To(Succeed())
 
-		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		Expect(isoFileContent(f.Name(), ignitionImagePath.Path)).To(Equal(ignitionArchiveBytes))
 	})
 
 	It("embeds the ignition and ramdisk content", func() {
@@ -71,6 +74,9 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, initrdContent, nil)
 		Expect(err).NotTo(HaveOccurred())
 
+		ignitionImagePath, err := GetInitionImagePath(isoFile)
+		Expect(err).NotTo(HaveOccurred())
+
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = io.Copy(f, streamReader)
@@ -78,7 +84,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(f.Sync()).To(Succeed())
 		Expect(f.Close()).To(Succeed())
 
-		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		Expect(isoFileContent(f.Name(), ignitionImagePath.Path)).To(Equal(ignitionArchiveBytes))
 		Expect(isoFileContent(f.Name(), ramDiskImagePath)).To(Equal(initrdContent))
 	})
 	It("embeds the ignition and kargs content", func() {
@@ -86,6 +92,9 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, kargs)
 		Expect(err).NotTo(HaveOccurred())
 
+		ignitionImagePath, err := GetInitionImagePath(isoFile)
+		Expect(err).NotTo(HaveOccurred())
+
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
 		Expect(err).NotTo(HaveOccurred())
 		_, err = io.Copy(f, streamReader)
@@ -93,7 +102,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		Expect(f.Sync()).To(Succeed())
 		Expect(f.Close()).To(Succeed())
 
-		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		Expect(isoFileContent(f.Name(), ignitionImagePath.Path)).To(Equal(ignitionArchiveBytes))
 		grubFileContent := string(isoFileContent(f.Name(), defaultGrubFilePath))
 		isolinuxContent := string(isoFileContent(f.Name(), defaultIsolinuxFilePath))
 		for _, content := range []string{grubFileContent, isolinuxContent} {

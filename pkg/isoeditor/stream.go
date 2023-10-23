@@ -2,21 +2,45 @@ package isoeditor
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"io"
-	"os"
-
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 	"github.com/pkg/errors"
+	"io"
+	"os"
 )
 
-const ignitionImagePath = "/images/ignition.img"
+const (
+	ignitionInfoPath        = "coreos/ignifo.json"
+	defaultIgnitionFilePath = "images/ignition.img"
+)
+
+type IgnitionImagePath struct {
+	Path string `json:"file"`
+}
 
 type ImageReader = overlay.OverlayReader
 
 type BoundariesFinder func(filePath, isoPath string) (int64, int64, error)
 
 type StreamGeneratorFunc func(isoPath string, ignitionContent *IgnitionContent, ramdiskContent, kargs []byte) (ImageReader, error)
+
+func GetInitionImagePath(isoPath string) (IgnitionImagePath, error) {
+	ignitionInfoByte, err := ReadFileFromISO(isoPath, ignitionInfoPath)
+	if err != nil {
+		// Backward capability returns old ignition
+		return IgnitionImagePath{Path: defaultIgnitionFilePath}, nil
+	}
+
+	var ignitionImagePath IgnitionImagePath
+
+	err = json.Unmarshal(ignitionInfoByte, &ignitionImagePath)
+	if err != nil {
+		return IgnitionImagePath{Path: ""}, errors.New(fmt.Sprintf("failed reading Json file : %v", ignitionInfoPath))
+	}
+	return ignitionImagePath, nil
+
+}
 
 func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
 	isoReader, err := os.Open(isoPath)
@@ -29,7 +53,11 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 		return nil, err
 	}
 
-	r, err := readerForFileContent(isoPath, ignitionImagePath, isoReader, ignitionReader)
+	ignitionImagePath, err := GetInitionImagePath(isoPath)
+	if err != nil {
+		return nil, err
+	}
+	r, err := readerForFileContent(isoPath, ignitionImagePath.Path, isoReader, ignitionReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
