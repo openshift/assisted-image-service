@@ -2,6 +2,7 @@ package isoeditor
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 
@@ -99,5 +100,46 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		for _, content := range []string{grubFileContent, isolinuxContent} {
 			Expect(content).To(MatchRegexp(string(kargs) + "#+ COREOS_KARG_EMBED_AREA"))
 		}
+	})
+
+	It("Embeds the ignition in a ISO that uses the 'igninfo.json' file", func() {
+		// Create input ISO:
+		tmpDir, inputFile := createS390TestFiles("Assisted123")
+		defer func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+			Expect(os.Remove(inputFile)).To(Succeed())
+		}()
+
+		// Copy the output ISO to a file:
+		outputReader, err := NewRHCOSStreamReader(inputFile, &IgnitionContent{ignitionContent}, nil, nil)
+		Expect(err).ToNot(HaveOccurred())
+		defer func() {
+			Expect(outputReader.Close()).To(Succeed())
+		}()
+		outputFd, err := os.CreateTemp(tmpDir, "streamed*.iso")
+		Expect(err).ToNot(HaveOccurred())
+		defer func() {
+			Expect(outputFd.Close()).To(Succeed())
+			Expect(os.Remove(outputFd.Name())).To(Succeed())
+		}()
+		_, err = io.Copy(outputFd, outputReader)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(outputFd.Sync()).To(Succeed())
+
+		// Read the 'igninfo.json' file:
+		ignInfoBytes, err := ReadFileFromISO(inputFile, ignitionInfoPath)
+		Expect(err).ToNot(HaveOccurred())
+		var ignInfo ignitionInfo
+		Expect(json.Unmarshal(ignInfoBytes, &ignInfo)).To(Succeed())
+
+		// Read the ignition content. Note that this will read the complete content of the
+		// area containing the ignition content, including the trailing zeros. We need to
+		// remove those before comparing to the input ignition.
+		containerBytes := isoFileContent(outputFd.Name(), ignInfo.File)
+		ignitionBytes := containerBytes[ignInfo.Offset : ignInfo.Offset+ignInfo.Length]
+		ignitionBytes = bytes.TrimRight(ignitionBytes, "\x00")
+
+		// Compare the actual ignition from the ISO with the input:
+		Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
 	})
 })
