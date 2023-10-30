@@ -1,6 +1,8 @@
 package isoeditor
 
 import (
+	"crypto/rand"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,4 +78,74 @@ func createTestFiles(volumeID string) (string, string) {
 	Expect(cmd.Run()).To(Succeed())
 
 	return filesDir, isoFile
+}
+
+// createS390TestFiles creates an ISO that resembles the ones used for the S390 architecture, in
+// particular it contains a '/coreos/inginfo.json' file that indicates that the ignition is
+// embedded in the '/images/cdboot.img' file instead of the usual location '/images/ignition.img'.
+func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
+	// Create a temporary directory:
+	tmpDir, err := os.MkdirTemp("", "isotest")
+	Expect(err).ToNot(HaveOccurred())
+
+	// Create a temporary file for the ISO:
+	isoFd, err := os.CreateTemp("", "*test.iso")
+	Expect(err).ToNot(HaveOccurred())
+	isoFile = isoFd.Name()
+	Expect(isoFd.Close()).To(Succeed())
+	Expect(os.Remove(isoFile)).To(Succeed())
+
+	// Create the '/images' directoy:
+	imagesDir := filepath.Join(tmpDir, "images")
+	Expect(os.MkdirAll(imagesDir, 0755)).To(Succeed())
+
+	// Create the '/images/cdboot.img' file containing a random prefix, the ignition data, and
+	// a random suffix. The random prefix and suffix are intended to make things crash loudly
+	// if the code tries to read and parse that as JSON.
+	cdBootFile := filepath.Join(imagesDir, "cdboot.img")
+	cdBootFd, err := os.OpenFile(cdBootFile, os.O_CREATE|os.O_WRONLY, 0600)
+	Expect(err).ToNot(HaveOccurred())
+	randomPrefix := make([]byte, 4096)
+	_, err = rand.Read(randomPrefix)
+	Expect(err).ToNot(HaveOccurred())
+	randomSuffix := make([]byte, 4096)
+	_, err = rand.Read(randomSuffix)
+	Expect(err).ToNot(HaveOccurred())
+	ignitionBytes := make([]byte, ignitionPaddingLength)
+	_, err = cdBootFd.Write(randomPrefix)
+	Expect(err).ToNot(HaveOccurred())
+	_, err = cdBootFd.Write(ignitionBytes)
+	Expect(err).ToNot(HaveOccurred())
+	_, err = cdBootFd.Write(randomSuffix)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cdBootFd.Close()).To(Succeed())
+
+	// Create the '/coreos' directory:
+	coreosDir := filepath.Join(tmpDir, "coreos")
+	Expect(os.MkdirAll(coreosDir, 0755)).To(Succeed())
+
+	// Create the '/coreos/igninfo.json' file:
+	ignInf := ignitionInfo{
+		File:   "images/cdboot.img",
+		Offset: int64(len(randomPrefix)),
+		Length: ignitionPaddingLength,
+	}
+	ignInfData, err := json.Marshal(ignInf)
+	Expect(err).ToNot(HaveOccurred())
+	ignInfFile := filepath.Join(coreosDir, "igninfo.json")
+	Expect(os.WriteFile(ignInfFile, ignInfData, 0600)).To(Succeed())
+
+	// Create the ISO:
+	cmd := exec.Command(
+		"genisoimage",
+		"-rational-rock",
+		"-J",
+		"-joliet-long",
+		"-V", volumeID,
+		"-o", isoFile,
+		tmpDir,
+	)
+	Expect(cmd.Run()).To(Succeed())
+
+	return tmpDir, isoFile
 }
