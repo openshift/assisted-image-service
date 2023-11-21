@@ -104,7 +104,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 
 	It("Embeds the ignition in a ISO that uses the 'igninfo.json' file", func() {
 		// Create input ISO:
-		tmpDir, inputFile := createS390TestFiles("Assisted123")
+		tmpDir, inputFile := createS390TestFiles("Assisted123", 0)
 		defer func() {
 			Expect(os.RemoveAll(tmpDir)).To(Succeed())
 			Expect(os.Remove(inputFile)).To(Succeed())
