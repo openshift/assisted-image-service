@@ -1,9 +1,12 @@
 package isoeditor
 
 import (
+	"encoding/binary"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	diskfs "github.com/diskfs/go-diskfs"
 	. "github.com/onsi/ginkgo"
@@ -48,6 +51,85 @@ var _ = Context("with test files", func() {
 	})
 
 	Describe("Create", func() {
+		// SeekToBlock sets the offset for the next read to the beginning of the 2048 bytes block.
+		SeekToBlock := func(isoFD *os.File, block uint32) {
+			_, err := isoFD.Seek(int64(block)*2048, 0)
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		// ExtractElToritoBootImage extracts the El Torito boot image from an ISO file.
+		ExtractElToritoBootImage := func(isoFile string) []byte {
+			// Open the file, and remember to close it:
+			isoFD, err := os.Open(isoFile)
+			Expect(err).ToNot(HaveOccurred())
+			defer func() {
+				err = isoFD.Close()
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			// Verify the boot record:
+			SeekToBlock(isoFD, 17)
+			type BootRecord struct {
+				VolDescType    byte
+				StdIdentifier  [5]byte
+				VolDescVersion byte
+				BootSysId      [32]byte
+				BootId         [32]byte
+				BootCatalog    uint32
+			}
+			var bootRecord BootRecord
+			err = binary.Read(isoFD, binary.LittleEndian, &bootRecord)
+			Expect(err).ToNot(HaveOccurred())
+			stdIdentifier := string(bootRecord.StdIdentifier[:])
+			Expect(stdIdentifier).To(Equal("CD001"))
+			bootSysId := strings.TrimRight(string(bootRecord.BootSysId[:]), "\x00")
+			Expect(bootSysId).To(Equal("EL TORITO SPECIFICATION"))
+
+			// Verify the boot catalog:
+			SeekToBlock(isoFD, bootRecord.BootCatalog)
+			type ValidationEntry struct {
+				HeaderID   byte
+				PlatformID byte
+				Unused1    uint16
+				IDString   [24]byte
+				Checksum   uint16
+				Key1       byte
+				Key2       byte
+			}
+			var validationEntry ValidationEntry
+			err = binary.Read(isoFD, binary.LittleEndian, &validationEntry)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(validationEntry.HeaderID).To(Equal(byte(1)))
+			Expect(validationEntry.Key1).To(Equal(byte(0x55)))
+			Expect(validationEntry.Key2).To(Equal(byte(0xaa)))
+
+			// Verify the initial entry:
+			type InitialEntry struct {
+				BootIndicator byte
+				BootMediaType byte
+				LoadSegment   uint16
+				SystemType    byte
+				Unused1       byte
+				SectorCount   uint16
+				Block         uint32
+				Unused2       byte
+			}
+			var initialEntry InitialEntry
+			err = binary.Read(isoFD, binary.LittleEndian, &initialEntry)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(initialEntry.BootIndicator).To(Equal(byte(0x88)))
+			Expect(initialEntry.BootMediaType).To(BeZero())
+
+			// Extract the image:
+			bootImageSize := int(initialEntry.SectorCount) * 512
+			bootImageBytes := make([]byte, bootImageSize)
+			SeekToBlock(isoFD, initialEntry.Block)
+			n, err := isoFD.Read(bootImageBytes)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(n).To(Equal(bootImageSize))
+			return bootImageBytes
+		}
+
 		It("generates an iso with the content in the given directory", func() {
 			dir, err := ioutil.TempDir("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
@@ -118,6 +200,103 @@ var _ = Context("with test files", func() {
 			Expect(haveBootFiles).To(BeFalse())
 
 			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
+		})
+
+		It("Preserves the El Torito boot image for s390x", func() {
+			// Create the input ISO:
+			var err error
+			inputDir, inputFile := createS390TestFiles("input", 0)
+			defer func() {
+				err = os.RemoveAll(inputDir)
+				Expect(err).ToNot(HaveOccurred())
+				err = os.Remove(inputFile)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			// Read the input boot image:
+			inputBootImageFile := filepath.Join(inputDir, "images", "cdboot.img")
+			inputBootImageBytes, err := os.ReadFile(inputBootImageFile)
+			Expect(err).ToNot(HaveOccurred())
+			inputBootImageSize := len(inputBootImageBytes)
+
+			// Create the output ISO:
+			outputDir, err := os.MkdirTemp("", "*.test")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() {
+				err = os.RemoveAll(outputDir)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+			outputFile := filepath.Join(outputDir, "output.iso")
+			err = Create(outputFile, inputDir, "output")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Read the output boot image and verify that is equal to the input. Note
+			// that the image written to disk may be larger than the input because of
+			// padding, so we need to take that into account.
+			outputBootImageBytes := ExtractElToritoBootImage(outputFile)
+			outputBootImageSize := len(outputBootImageBytes)
+			Expect(outputBootImageSize).To(BeNumerically(">=", inputBootImageSize))
+			Expect(outputBootImageBytes[0:inputBootImageSize]).To(Equal(inputBootImageBytes))
+		})
+
+		It("Round the El Torito boot image for s390x to a multiple of four 512 bytes sectors", func() {
+			// Create the input ISO:
+			var err error
+			inputDir, inputFile := createS390TestFiles("input", 1*1024*1024-512)
+			defer func() {
+				err = os.RemoveAll(inputDir)
+				Expect(err).ToNot(HaveOccurred())
+				err = os.Remove(inputFile)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			// Create the output ISO:
+			outputDir, err := os.MkdirTemp("", "*.test")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() {
+				err = os.RemoveAll(outputDir)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+			outputFile := filepath.Join(outputDir, "output.iso")
+			err = Create(outputFile, inputDir, "output")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Read the output boot image and verify that it has been truncated:
+			outputBootImageBytes := ExtractElToritoBootImage(outputFile)
+			outputBootImageSize := len(outputBootImageBytes)
+			Expect(outputBootImageSize % 2048).To(BeZero())
+		})
+
+		It("Truncates the El Torito boot image for s390x to 65535 sectors", func() {
+			// Note that doing this is arguable an error, but it is what the 'xorrisofs'
+			// tool used to generate the release ISO files does, and we want to do the
+			//same.
+
+			// Create the input ISO:
+			var err error
+			inputDir, inputFile := createS390TestFiles("input", 64*1024*1024)
+			defer func() {
+				err = os.RemoveAll(inputDir)
+				Expect(err).ToNot(HaveOccurred())
+				err = os.Remove(inputFile)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			// Create the output ISO:
+			outputDir, err := os.MkdirTemp("", "*.test")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() {
+				err = os.RemoveAll(outputDir)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+			outputFile := filepath.Join(outputDir, "output.iso")
+			err = Create(outputFile, inputDir, "output")
+			Expect(err).ToNot(HaveOccurred())
+
+			// Read the output boot image and verify that it has been truncated:
+			outputBootImageBytes := ExtractElToritoBootImage(outputFile)
+			outputBootImageSize := len(outputBootImageBytes)
+			Expect(outputBootImageSize).To(Equal(math.MaxUint16 * 512))
 		})
 	})
 

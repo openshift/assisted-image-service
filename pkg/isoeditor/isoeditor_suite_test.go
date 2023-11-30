@@ -3,6 +3,7 @@ package isoeditor
 import (
 	"crypto/rand"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,7 +84,7 @@ func createTestFiles(volumeID string) (string, string) {
 // createS390TestFiles creates an ISO that resembles the ones used for the S390 architecture, in
 // particular it contains a '/coreos/inginfo.json' file that indicates that the ignition is
 // embedded in the '/images/cdboot.img' file instead of the usual location '/images/ignition.img'.
-func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
+func createS390TestFiles(volumeID string, minBootImageSize int64) (tmpDir string, isoFile string) {
 	// Create a temporary directory:
 	tmpDir, err := os.MkdirTemp("", "isotest")
 	Expect(err).ToNot(HaveOccurred())
@@ -95,6 +96,11 @@ func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
 	Expect(isoFd.Close()).To(Succeed())
 	Expect(os.Remove(isoFile)).To(Succeed())
 
+	// Create the boot catalog file:
+	bootCatalogFile := filepath.Join(tmpDir, "boot.catalog")
+	bootCatalogBytes := make([]byte, 2048)
+	Expect(os.WriteFile(bootCatalogFile, bootCatalogBytes, 0600)).ToNot(HaveOccurred())
+
 	// Create the '/images' directoy:
 	imagesDir := filepath.Join(tmpDir, "images")
 	Expect(os.MkdirAll(imagesDir, 0755)).To(Succeed())
@@ -102,8 +108,8 @@ func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
 	// Create the '/images/cdboot.img' file containing a random prefix, the ignition data, and
 	// a random suffix. The random prefix and suffix are intended to make things crash loudly
 	// if the code tries to read and parse that as JSON.
-	cdBootFile := filepath.Join(imagesDir, "cdboot.img")
-	cdBootFd, err := os.OpenFile(cdBootFile, os.O_CREATE|os.O_WRONLY, 0600)
+	bootImageFile := filepath.Join(imagesDir, "cdboot.img")
+	bootImageFD, err := os.OpenFile(bootImageFile, os.O_CREATE|os.O_WRONLY, 0600)
 	Expect(err).ToNot(HaveOccurred())
 	randomPrefix := make([]byte, 4096)
 	_, err = rand.Read(randomPrefix)
@@ -112,13 +118,21 @@ func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
 	_, err = rand.Read(randomSuffix)
 	Expect(err).ToNot(HaveOccurred())
 	ignitionBytes := make([]byte, ignitionPaddingLength)
-	_, err = cdBootFd.Write(randomPrefix)
+	_, err = bootImageFD.Write(randomPrefix)
 	Expect(err).ToNot(HaveOccurred())
-	_, err = cdBootFd.Write(ignitionBytes)
+	_, err = bootImageFD.Write(ignitionBytes)
 	Expect(err).ToNot(HaveOccurred())
-	_, err = cdBootFd.Write(randomSuffix)
+	_, err = bootImageFD.Write(randomSuffix)
 	Expect(err).ToNot(HaveOccurred())
-	Expect(cdBootFd.Close()).To(Succeed())
+	bootImageSize, err := bootImageFD.Seek(0, io.SeekEnd)
+	Expect(err).ToNot(HaveOccurred())
+	if bootImageSize < minBootImageSize {
+		_, err = bootImageFD.Seek(minBootImageSize-1, io.SeekStart)
+		Expect(err).ToNot(HaveOccurred())
+		_, err = bootImageFD.Write([]byte{0})
+		Expect(err).ToNot(HaveOccurred())
+	}
+	Expect(bootImageFD.Close()).To(Succeed())
 
 	// Create the '/coreos' directory:
 	coreosDir := filepath.Join(tmpDir, "coreos")
@@ -142,6 +156,8 @@ func createS390TestFiles(volumeID string) (tmpDir string, isoFile string) {
 		"-J",
 		"-joliet-long",
 		"-V", volumeID,
+		"-eltorito-boot", "images/cdboot.img",
+		"-no-emul-boot",
 		"-o", isoFile,
 		tmpDir,
 	)
