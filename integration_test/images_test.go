@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -223,7 +222,7 @@ var _ = Describe("Image integration tests", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-					isoFile, err := ioutil.TempFile("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], tc.name, version["cpu_architecture"]))
+					isoFile, err := os.CreateTemp("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], tc.name, version["cpu_architecture"]))
 					Expect(err).NotTo(HaveOccurred())
 					_, err = io.Copy(isoFile, resp.Body)
 					Expect(err).NotTo(HaveOccurred())
@@ -245,7 +244,7 @@ var _ = Describe("Image integration tests", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(hdr.Name).To(Equal("config.ign"))
 					Expect(hdr.Size).To(Equal(int64(len(tc.expectedIgnition))))
-					content, err := ioutil.ReadAll(cpioReader)
+					content, err := io.ReadAll(cpioReader)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(content).To(Equal(tc.expectedIgnition))
 
@@ -254,7 +253,7 @@ var _ = Describe("Image integration tests", func() {
 						f, err := fs.OpenFile("/images/assisted_installer_custom.img", os.O_RDONLY)
 						Expect(err).NotTo(HaveOccurred())
 
-						content, err := ioutil.ReadAll(f)
+						content, err := io.ReadAll(f)
 						Expect(err).NotTo(HaveOccurred())
 						Expect(bytes.TrimRight(content, "\x00")).To(Equal(tc.expectedRamdisk))
 					}
@@ -265,7 +264,7 @@ var _ = Describe("Image integration tests", func() {
 						for _, fname := range files {
 							f, err := fs.OpenFile(fname, os.O_RDONLY)
 							Expect(err).ToNot(HaveOccurred())
-							b, err := ioutil.ReadAll(f)
+							b, err := io.ReadAll(f)
 							Expect(err).NotTo(HaveOccurred())
 							Expect(string(b)).To(MatchRegexp(" " + strings.Join(tc.expectedExtraKargs, " ") + "\n#+ COREOS_KARG_EMBED_AREA"))
 						}
@@ -279,7 +278,7 @@ var _ = Describe("Image integration tests", func() {
 var _ = BeforeSuite(func() {
 	var err error
 
-	imageDir, err = ioutil.TempDir("", "imagesTest")
+	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
 	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir), imageDir, imageServiceBaseURL, false, versions)

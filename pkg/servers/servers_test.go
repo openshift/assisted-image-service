@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
@@ -41,11 +40,11 @@ var NewServer = func(httpPort, httpsPort, HTTPSKeyFile, HTTPSCertFile string) *S
 var _ = BeforeSuite(func() {
 	var err error
 	// Generate self-signed key and cert
-	tmpDir, err = ioutil.TempDir("", "")
+	tmpDir, err = os.MkdirTemp("", "")
 	Expect(err).NotTo(HaveOccurred())
-	httpsKeyFile, err = ioutil.TempFile(tmpDir, "https.key")
+	httpsKeyFile, err = os.CreateTemp(tmpDir, "https.key")
 	Expect(err).NotTo(HaveOccurred())
-	httpsCertFile, err = ioutil.TempFile(tmpDir, "https.crt")
+	httpsCertFile, err = os.CreateTemp(tmpDir, "https.crt")
 	Expect(err).NotTo(HaveOccurred())
 
 	template := &x509.Certificate{

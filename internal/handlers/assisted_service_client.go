@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +30,7 @@ func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCert
 	}
 	client := &http.Client{}
 	if caCertFile != "" {
-		caCert, err := ioutil.ReadFile(caCertFile)
+		caCert, err := os.ReadFile(caCertFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open cert file %s, %s", caCertFile, err)
 		}
