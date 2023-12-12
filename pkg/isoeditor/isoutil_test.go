@@ -2,7 +2,7 @@ package isoeditor
 
 import (
 	"encoding/binary"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -21,7 +21,7 @@ var _ = Context("with test files", func() {
 	)
 
 	validateFileContent := func(filename string, content string) {
-		fileContent, err := ioutil.ReadFile(filename)
+		fileContent, err := os.ReadFile(filename)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(fileContent)).To(Equal(content))
 	}
@@ -37,7 +37,7 @@ var _ = Context("with test files", func() {
 
 	Describe("Extract", func() {
 		It("extracts the files from an iso", func() {
-			dir, err := ioutil.TempDir("", "isotest")
+			dir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 
@@ -131,7 +131,7 @@ var _ = Context("with test files", func() {
 		}
 
 		It("generates an iso with the content in the given directory", func() {
-			dir, err := ioutil.TempDir("", "isotest")
+			dir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")
@@ -145,19 +145,19 @@ var _ = Context("with test files", func() {
 
 			f, err := fs.OpenFile("/images/pxeboot/rootfs.img", os.O_RDONLY)
 			Expect(err).ToNot(HaveOccurred())
-			content, err := ioutil.ReadAll(f)
+			content, err := io.ReadAll(f)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(content)).To(Equal("this is rootfs"))
 
 			f, err = fs.OpenFile("/isolinux/boot.cat", os.O_RDONLY)
 			Expect(err).ToNot(HaveOccurred())
-			content, err = ioutil.ReadAll(f)
+			content, err = io.ReadAll(f)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(content)).To(Equal(""))
 		})
 
 		It("generates an iso - single boot file (efi)", func() {
-			dir, err := ioutil.TempDir("", "isotest")
+			dir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")
@@ -172,7 +172,7 @@ var _ = Context("with test files", func() {
 		})
 
 		It("generates an iso - single boot file, missing catalog file", func() {
-			dir, err := ioutil.TempDir("", "isotest")
+			dir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")
@@ -188,7 +188,7 @@ var _ = Context("with test files", func() {
 		})
 
 		It("generates an iso - no boot files", func() {
-			dir, err := ioutil.TempDir("", "isotest")
+			dir, err := os.MkdirTemp("", "isotest")
 			Expect(err).ToNot(HaveOccurred())
 			defer os.RemoveAll(dir)
 			isoPath := filepath.Join(dir, "test.iso")

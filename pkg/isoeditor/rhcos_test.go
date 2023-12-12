@@ -2,7 +2,6 @@ package isoeditor
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +25,7 @@ var _ = Context("with test files", func() {
 	)
 
 	validateFileContainsLine := func(filename string, content string) {
-		fileContent, err := ioutil.ReadFile(filename)
+		fileContent, err := os.ReadFile(filename)
 		Expect(err).NotTo(HaveOccurred())
 
 		found := false
@@ -43,7 +42,7 @@ var _ = Context("with test files", func() {
 		filesDir, isoFile = createTestFiles(volumeID)
 
 		var err error
-		workDir, err = ioutil.TempDir("", "testisoeditor")
+		workDir, err = os.MkdirTemp("", "testisoeditor")
 		Expect(err).NotTo(HaveOccurred())
 		minimalISOPath = filepath.Join(workDir, "minimal.iso")
 	})
