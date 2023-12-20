@@ -28,6 +28,7 @@ skipper make test
 - `DATA_DIR` - Path at which to store downloaded RHCOS images.
 - `HTTPS_CERT_FILE` - tls cert file path
 - `HTTPS_KEY_FILE` - tls key file path
+- `HTTPS_CA_FILE` - A file containing CA certificates the image service should trust when connecting to the Assisted Service and the image store
 - `HTTP_LISTEN_PORT` - When set, plain http listener is started on that port
 - `IMAGE_SERVICE_BASE_URL` - the base URL to use to query the image service
 - `LISTEN_PORT` - Image Service listen port

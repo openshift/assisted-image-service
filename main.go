@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -67,7 +69,12 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions)
+	caCertPool, err := certPoolFromFile(Options.HTTPSCAFile)
+	if err != nil {
+		log.Fatalf("Failed to create cert pool: %v\n", err)
+	}
+
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions, caCertPool)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
@@ -93,7 +100,7 @@ func main() {
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
-	asc, err := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
+	asc, err := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, caCertPool)
 	if err != nil {
 		log.Fatalf("Failed to create AssistedServiceClient: %v\n", err)
 	}
@@ -136,3 +143,19 @@ func main() {
 	<-stop
 	serverInfo.Shutdown()
 }
+
+func certPoolFromFile(caCertFile string) (*x509.CertPool, error) {
+	if caCertFile == "" {
+		return nil, nil
+	}
+	caCert, err := os.ReadFile(caCertFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open cert file %s: %w", caCertFile, err)
+	}
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to append cert %s: %w", caCertFile, err)
+	}
+	return caCertPool, nil
+}
+

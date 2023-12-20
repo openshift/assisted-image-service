@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -24,21 +23,12 @@ type AssistedServiceClient struct {
 
 const fileRouteFormat = "/api/assisted-install/v2/infra-envs/%s/downloads/files"
 
-func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost, caCertFile string) (*AssistedServiceClient, error) {
+func NewAssistedServiceClient(assistedServiceScheme, assistedServiceHost string, caCertPool *x509.CertPool) (*AssistedServiceClient, error) {
 	if len(assistedServiceHost) == 0 {
 		return nil, fmt.Errorf("ASSISTED_SERVICE_HOST is not set")
 	}
 	client := &http.Client{}
-	if caCertFile != "" {
-		caCert, err := os.ReadFile(caCertFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open cert file %s, %s", caCertFile, err)
-		}
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to append cert %s, %s", caCertFile, err)
-		}
-
+	if caCertPool != nil {
 		t := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs:    caCertPool,

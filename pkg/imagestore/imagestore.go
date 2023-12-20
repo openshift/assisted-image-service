@@ -3,6 +3,7 @@ package imagestore
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,7 +85,7 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string, caCertPool *x509.CertPool) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -94,6 +95,11 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 	}
 	myTransport := transportConfig.Clone()
 	myTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureSkipVerify} //nolint:gosec // Optionally ignore TLS (G402 error)
+
+	if caCertPool != nil {
+		myTransport.TLSClientConfig.RootCAs = caCertPool
+	}
+
 	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
