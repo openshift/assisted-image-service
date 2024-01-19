@@ -1,14 +1,24 @@
 package imagestore
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"io/fs"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -40,6 +50,133 @@ var _ = Context("with a data directory configured", func() {
 
 	AfterEach(func() {
 		os.RemoveAll(dataDir)
+	})
+
+	Context("with an HTTPS server", func() {
+
+		var (
+			ts             *ghttp.Server
+			ctx            = context.Background()
+			caCertDir      string
+			privateKeyDir  string
+			caCertFileName string
+		)
+
+		var setupTLSForTest = func() (*tls.Config, string) {
+			var err error
+			caCertDir, err = os.MkdirTemp("", "")
+			Expect(err).NotTo(HaveOccurred())
+			privateKeyDir, err = os.MkdirTemp("", "")
+			Expect(err).NotTo(HaveOccurred())
+			privateKeyFile, err := os.CreateTemp(privateKeyDir, "private.key")
+			Expect(err).NotTo(HaveOccurred())
+			caCertFile, err := os.CreateTemp(caCertDir, "ca.cert")
+			Expect(err).NotTo(HaveOccurred())
+			privateKeyBuffer := new(bytes.Buffer)
+			caCertBuffer := new(bytes.Buffer)
+			caCertTemplate := &x509.Certificate{
+				IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+				IsCA:                  true,
+				BasicConstraintsValid: true,
+				SubjectKeyId:          []byte{1, 2, 3},
+				SerialNumber:          big.NewInt(1234),
+				Subject: pkix.Name{
+					Country:      []string{"Earth"},
+					Organization: []string{"Yes"},
+				},
+				NotBefore:   time.Now(),
+				NotAfter:    time.Now().AddDate(5, 5, 5),
+				ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+				KeyUsage:    x509.KeyUsageCertSign,
+			}
+			privatekey, err := rsa.GenerateKey(rand.Reader, 2048)
+			Expect(err).NotTo(HaveOccurred())
+			var pemkey = &pem.Block{
+				Type:  "RSA PRIVATE KEY",
+				Bytes: x509.MarshalPKCS1PrivateKey(privatekey)}
+			err = pem.Encode(privateKeyFile, pemkey)
+			Expect(err).NotTo(HaveOccurred())
+			err = pem.Encode(privateKeyBuffer, pemkey)
+			Expect(err).NotTo(HaveOccurred())
+			publickey := &privatekey.PublicKey
+			var parent = caCertTemplate
+			caCert, err := x509.CreateCertificate(rand.Reader, caCertTemplate, parent, publickey, privatekey)
+			Expect(err).NotTo(HaveOccurred())
+			var pemcert = &pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: caCert}
+			err = pem.Encode(caCertFile, pemcert)
+			Expect(err).NotTo(HaveOccurred())
+			err = pem.Encode(caCertBuffer, pemcert)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			serverCert, err := tls.X509KeyPair(caCertBuffer.Bytes(), privateKeyBuffer.Bytes())
+			Expect(err).NotTo(HaveOccurred())
+			return &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{serverCert}}, caCertFile.Name()
+		}
+
+		BeforeEach(func() {
+			var tlsConfig *tls.Config
+			tlsConfig, caCertFileName = setupTLSForTest()
+			ts = ghttp.NewUnstartedServer()
+			ts.HTTPTestServer.TLS = tlsConfig
+			ts.HTTPTestServer.StartTLS()
+		})
+
+		AfterEach(func() {
+			ts.Close()
+			Expect(os.Unsetenv("RHCOS_VERSIONS")).To(Succeed())
+		})
+
+		Describe("Populate", func() {
+			var (
+				ctrl          *gomock.Controller
+				mockEditor    *isoeditor.MockEditor
+				validVolumeID = "rhcos-411.86.202210041459-0"
+				version       = map[string]string{
+					"openshift_version": "4.8",
+					"cpu_architecture":  "x86_64",
+					"version":           "48.84.202109241901-0",
+				}
+			)
+
+			BeforeEach(func() {
+				ctrl = gomock.NewController(GinkgoT())
+				mockEditor = isoeditor.NewMockEditor(ctrl)
+			})
+
+			isoInfo := func(id string) ([]byte, http.Header) {
+				content := make([]byte, 32840)
+				copy(content[32808:], id)
+				header := http.Header{}
+				header.Add("Content-Length", strconv.Itoa(len(content)))
+
+				return content, header
+			}
+
+			It("downloads an image correctly", func() {
+				isoContent, isoHeader := isoInfo(validVolumeID)
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
+					),
+				)
+
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, caCertFileName)
+				Expect(err).NotTo(HaveOccurred())
+
+				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any()).Return(nil)
+				Expect(is.Populate(ctx)).To(Succeed())
+
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(content).To(Equal(isoContent))
+			})
+
+		})
 	})
 
 	Context("with a test server", func() {
@@ -97,7 +234,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
@@ -117,7 +254,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/fail.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -132,7 +269,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -149,7 +286,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
@@ -165,7 +302,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/dontcallthis.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
@@ -176,7 +313,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("recreates the minimal iso even when it's already present", func() {
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				fullPath := filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso")
@@ -200,7 +337,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
@@ -223,7 +360,7 @@ var _ = Context("with a data directory configured", func() {
 						),
 					)
 					versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
-					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch})
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "")
 					Expect(err).NotTo(HaveOccurred())
 
 					rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
@@ -244,7 +381,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
@@ -263,7 +400,7 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				err = is.Populate(ctx)
@@ -275,7 +412,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("fails when imageServiceBaseURL is not set", func() {
-				is, err := NewImageStore(mockEditor, dataDir, "", false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, "", false, []map[string]string{version}, "")
 				Expect(err).NotTo(HaveOccurred())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", "x86_64", gomock.Any()).Return(nil)
@@ -292,7 +429,7 @@ var _ = Context("with a data directory configured", func() {
 				)
 				version["url"] = ts.URL() + "/some.iso"
 				baseURL := ":"
-				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []map[string]string{version})
+				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []map[string]string{version}, "")
 				Expect(err).ToNot(HaveOccurred())
 
 				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
@@ -313,7 +450,7 @@ var _ = Describe("PathForParams", func() {
 			"url":               "http://example.com/image/x86_64-48.iso",
 			"version":           "48.84.202109241901-0",
 		}}
-		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions)
+		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "")
 		Expect(err).NotTo(HaveOccurred())
 		expected := "/tmp/some/dir/rhcos-full-4.8-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
@@ -341,7 +478,7 @@ var _ = Describe("HaveVersion", func() {
 
 	BeforeEach(func() {
 		var err error
-		store, err = NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		store, err = NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).NotTo(HaveOccurred())
 	})
 	AfterEach(func() {
@@ -370,13 +507,13 @@ var _ = Describe("NewImageStore", func() {
 				"version":           "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should error when RHCOS_IMAGES are not set i.e. versions is an empty slice", func() {
 		versions := []map[string]string{}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal("invalid versions: must not be empty"))
 
@@ -390,7 +527,7 @@ var _ = Describe("NewImageStore", func() {
 				"version":          "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -402,7 +539,7 @@ var _ = Describe("NewImageStore", func() {
 				"version":           "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -414,7 +551,7 @@ var _ = Describe("NewImageStore", func() {
 				"version":           "48.84.202109241901-0",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -426,7 +563,7 @@ var _ = Describe("NewImageStore", func() {
 				"url":               "http://example.com/image/x86_64-48.iso",
 			},
 		}
-		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions)
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "")
 		Expect(err).To(HaveOccurred())
 	})
 })

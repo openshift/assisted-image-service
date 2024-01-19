@@ -27,7 +27,10 @@ var Options struct {
 	DataDir               string `envconfig:"DATA_DIR"`
 	HTTPSKeyFile          string `envconfig:"HTTPS_KEY_FILE"`
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
-	HTTPSCAFile           string `envconfig:"HTTPS_CA_FILE"`
+
+	// Deprecated - use ASSISTED_SERVICE_API_TRUSTED_CA_FILE instead
+	HTTPSCAFile string `envconfig:"HTTPS_CA_FILE"`
+
 	ListenPort            string `envconfig:"LISTEN_PORT" default:"8080"`
 	HTTPListenPort        string `envconfig:"HTTP_LISTEN_PORT"`
 	MaxConcurrentRequests int64  `envconfig:"MAX_CONCURRENT_REQUESTS" default:"400"`
@@ -37,9 +40,21 @@ var Options struct {
 	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 	ImageServiceBaseURL   string `envconfig:"IMAGE_SERVICE_BASE_URL"`
 	LogLevel              string `envconfig:"LOGLEVEL" default:"info"`
+
+	// This is a path to a CA file that will be trusted when fetching OS Images
+	// intended for scenarios where the OS images are served from a service that uses a custom CA
+	OSImageDownloadTrustedCAFile string `envconfig:"OS_IMAGE_DOWNLOAD_TRUSTED_CA_FILE" default:""`
+
+	// This is a path to a CA file that will be trusted for TLS connections to the Assisted Service API
+	// this will be used for API calls back to the Assisted Service API
+	// Will default to the value held in HTTPS_CA_FILE unless overridden
+	AssistedServiceApiTrustedCAFile string `envconfig:"ASSISTED_SERVICE_API_TRUSTED_CA_FILE" default:""`
 }
 
 func main() {
+	if Options.HTTPSCAFile != "" {
+		Options.AssistedServiceApiTrustedCAFile = Options.HTTPSCAFile
+	}
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.JSONFormatter{})
 	err := envconfig.Process("cluster-image", &Options)
@@ -67,7 +82,7 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions)
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions, Options.AssistedServiceApiTrustedCAFile)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}

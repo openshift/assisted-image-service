@@ -3,6 +3,7 @@ package imagestore
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,7 +85,7 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string, osImageDownloadTrustedCAFile string) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -92,8 +93,26 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 	if !ok {
 		return nil, fmt.Errorf("expected http.DefaultTransport to be of type *http.Transport")
 	}
+
 	myTransport := transportConfig.Clone()
 	myTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureSkipVerify} //nolint:gosec // Optionally ignore TLS (G402 error)
+
+	// Add additional TLS certificates (if available) for fetching OS images
+	if osImageDownloadTrustedCAFile != "" {
+		caCertPool := x509.NewCertPool()
+		additionalTLSCert, err := os.ReadFile(osImageDownloadTrustedCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open additional certificate file %s, %w", osImageDownloadTrustedCAFile, err)
+		}
+		if !caCertPool.AppendCertsFromPEM(additionalTLSCert) {
+			return nil, fmt.Errorf("failed to append additional certificate %s to pool", osImageDownloadTrustedCAFile)
+		}
+		myTransport.TLSClientConfig = &tls.Config{
+			RootCAs:    caCertPool,
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
 	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
