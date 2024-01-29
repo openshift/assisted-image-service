@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 	"golang.org/x/sync/errgroup"
@@ -73,11 +74,13 @@ type ImageStore interface {
 }
 
 type rhcosStore struct {
-	versions            []map[string]string
-	isoEditor           isoeditor.Editor
-	dataDir             string
-	httpClient          *http.Client
-	imageServiceBaseURL string
+	versions                      []map[string]string
+	isoEditor                     isoeditor.Editor
+	dataDir                       string
+	httpClient                    *http.Client
+	imageServiceBaseURL           string
+	osImageDownloadHeadersMap     map[string]string
+	osImageDownloadQueryParamsMap map[string]string
 }
 
 const (
@@ -85,7 +88,8 @@ const (
 	ImageTypeMinimal = "minimal-iso"
 )
 
-func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string, osImageDownloadTrustedCAFile string) (ImageStore, error) {
+func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string,
+	osImageDownloadTrustedCAFile string, osImageDownloadHeadersMap map[string]string, osImageDownloadQueryParamsMap map[string]string) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -116,11 +120,13 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 	httpClient := &http.Client{Transport: myTransport}
 
 	return &rhcosStore{
-		versions:            versions,
-		isoEditor:           ed,
-		dataDir:             dataDir,
-		httpClient:          httpClient,
-		imageServiceBaseURL: imageServiceBaseURL,
+		versions:                      versions,
+		isoEditor:                     ed,
+		dataDir:                       dataDir,
+		httpClient:                    httpClient,
+		imageServiceBaseURL:           imageServiceBaseURL,
+		osImageDownloadHeadersMap:     osImageDownloadHeadersMap,
+		osImageDownloadQueryParamsMap: osImageDownloadQueryParamsMap,
 	}, nil
 }
 
@@ -147,11 +153,32 @@ func validateVersions(versions []map[string]string) error {
 	return nil
 }
 
-func (s *rhcosStore) downloadURLToFile(url string, path string) error {
-	resp, err := s.httpClient.Get(url)
-
+func (s *rhcosStore) doHttpRequest(url string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return err
+		return nil, errors.Wrapf(err, "failed to make http request due to error: %s", err.Error())
+	}
+	for key, value := range s.osImageDownloadHeadersMap {
+		req.Header.Set(key, value)
+	}
+	if len(s.osImageDownloadQueryParamsMap) > 0 {
+		query := req.URL.Query()
+		for key, value := range s.osImageDownloadQueryParamsMap {
+			query.Add(key, value)
+		}
+		req.URL.RawQuery = query.Encode()
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to make http request due to error: %s", err.Error())
+	}
+	return resp, nil
+}
+
+func (s *rhcosStore) downloadURLToFile(url string, path string) error {
+	resp, err := s.doHttpRequest(url)
+	if err != nil {
+		return fmt.Errorf("http request to %s failed: %w", url, err)
 	}
 	defer resp.Body.Close()
 
