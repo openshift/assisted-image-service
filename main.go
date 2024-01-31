@@ -48,18 +48,18 @@ var Options struct {
 	// This is a path to a CA file that will be trusted for TLS connections to the Assisted Service API
 	// this will be used for API calls back to the Assisted Service API
 	// Will default to the value held in HTTPS_CA_FILE unless overridden
-	AssistedServiceApiTrustedCAFile string `envconfig:"ASSISTED_SERVICE_API_TRUSTED_CA_FILE" default:""`
+	AssistedServiceApiTrustedCAFile string `envconfig:"ASSISTED_SERVICE_API_TRUSTED_CA_FILE"`
 }
 
 func main() {
-	if Options.HTTPSCAFile != "" {
-		Options.AssistedServiceApiTrustedCAFile = Options.HTTPSCAFile
-	}
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.JSONFormatter{})
 	err := envconfig.Process("cluster-image", &Options)
 	if err != nil {
 		log.Fatalf("Failed to process config: %v\n", err)
+	}
+	if Options.AssistedServiceApiTrustedCAFile == "" {
+		Options.AssistedServiceApiTrustedCAFile = Options.HTTPSCAFile
 	}
 	logLevel, err := log.ParseLevel(Options.LogLevel)
 	if err != nil {
@@ -82,7 +82,7 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions, Options.AssistedServiceApiTrustedCAFile)
+	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions, Options.OSImageDownloadTrustedCAFile)
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
@@ -108,7 +108,7 @@ func main() {
 		Recorder: metrics.NewRecorder(metricsConfig),
 	})
 
-	asc, err := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.HTTPSCAFile)
+	asc, err := handlers.NewAssistedServiceClient(Options.AssistedServiceScheme, Options.AssistedServiceHost, Options.AssistedServiceApiTrustedCAFile)
 	if err != nil {
 		log.Fatalf("Failed to create AssistedServiceClient: %v\n", err)
 	}
