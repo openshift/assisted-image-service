@@ -48,7 +48,25 @@ var Options struct {
 	// This is a path to a CA file that will be trusted for TLS connections to the Assisted Service API
 	// this will be used for API calls back to the Assisted Service API
 	// Will default to the value held in HTTPS_CA_FILE unless overridden
+
 	AssistedServiceApiTrustedCAFile string `envconfig:"ASSISTED_SERVICE_API_TRUSTED_CA_FILE"`
+
+	// OSImagesHttpRequestHeaders contains a JSON encoded representation of any
+	// HTTP headers to be sent with every request to download an OS image.
+	OSImagesHttpRequestHeaders string `envconfig:"OS_IMAGES_HTTP_REQUEST_HEADERS" default:""`
+	// OSImagesHttpRequestQueryParams contains a JSON encoded representation of any
+	// query parameters to be sent with every request to download an OS image.
+	OSImagesHttpRequestQueryParams string `envconfig:"OS_IMAGES_HTTP_REQUEST_QUERY_PARAMS" default:""`
+}
+
+func unmarshallJSONMap(jsonMap string) (map[string]string, error) {
+	result := make(map[string]string, 0)
+	if jsonMap != "" {
+		if err := json.Unmarshal([]byte(jsonMap), &result); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
 
 func main() {
@@ -82,7 +100,26 @@ func main() {
 		}
 	}
 
-	is, err := imagestore.NewImageStore(isoeditor.NewEditor(Options.DataDir), Options.DataDir, Options.ImageServiceBaseURL, Options.InsecureSkipVerify, versions, Options.OSImageDownloadTrustedCAFile)
+	osImageDownloadHeadersMap, err := unmarshallJSONMap(Options.OSImagesHttpRequestHeaders)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal OSImageDownloadHeaders: %v\n", err)
+	}
+
+	osImageDownloadQueryParamsMap, err := unmarshallJSONMap(Options.OSImagesHttpRequestQueryParams)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal OSImageDownloadQueryParams: %v\n", err)
+	}
+
+	is, err := imagestore.NewImageStore(
+		isoeditor.NewEditor(Options.DataDir),
+		Options.DataDir,
+		Options.ImageServiceBaseURL,
+		Options.InsecureSkipVerify,
+		versions,
+		Options.OSImageDownloadTrustedCAFile,
+		osImageDownloadHeadersMap,
+		osImageDownloadQueryParamsMap)
+
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)
 	}
