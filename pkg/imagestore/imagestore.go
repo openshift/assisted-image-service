@@ -103,7 +103,11 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 
 	// Add additional TLS certificates (if available) for fetching OS images
 	if osImageDownloadTrustedCAFile != "" {
-		caCertPool := x509.NewCertPool()
+		// In order to make sure we can use the "built in" CA's in addition to our custom CA, we need to make sure these are loaded in.
+		caCertPool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, fmt.Errorf("failed to obtain system cert pool: %w", err)
+		}
 		additionalTLSCert, err := os.ReadFile(osImageDownloadTrustedCAFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open additional certificate file %s, %w", osImageDownloadTrustedCAFile, err)
