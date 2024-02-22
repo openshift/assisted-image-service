@@ -51,12 +51,12 @@ var Options struct {
 
 	AssistedServiceApiTrustedCAFile string `envconfig:"ASSISTED_SERVICE_API_TRUSTED_CA_FILE"`
 
-	// OSImagesHttpRequestHeaders contains a JSON encoded representation of any
+	// OSImagesRequestHeaders contains a JSON encoded representation of any
 	// HTTP headers to be sent with every request to download an OS image.
-	OSImagesHttpRequestHeaders string `envconfig:"OS_IMAGES_HTTP_REQUEST_HEADERS" default:""`
-	// OSImagesHttpRequestQueryParams contains a JSON encoded representation of any
+	OSImagesRequestHeaders string `envconfig:"OS_IMAGES_REQUEST_HEADERS" default:""`
+	// OSImagesRequestQueryParams contains a JSON encoded representation of any
 	// query parameters to be sent with every request to download an OS image.
-	OSImagesHttpRequestQueryParams string `envconfig:"OS_IMAGES_HTTP_REQUEST_QUERY_PARAMS" default:""`
+	OSImagesRequestQueryParams string `envconfig:"OS_IMAGES_REQUEST_QUERY_PARAMS" default:""`
 }
 
 func unmarshallJSONMap(jsonMap string) (map[string]string, error) {
@@ -100,12 +100,12 @@ func main() {
 		}
 	}
 
-	osImageDownloadHeadersMap, err := unmarshallJSONMap(Options.OSImagesHttpRequestHeaders)
+	osImageDownloadHeadersMap, err := unmarshallJSONMap(Options.OSImagesRequestHeaders)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal OSImageDownloadHeaders: %v\n", err)
 	}
 
-	osImageDownloadQueryParamsMap, err := unmarshallJSONMap(Options.OSImagesHttpRequestQueryParams)
+	osImageDownloadQueryParamsMap, err := unmarshallJSONMap(Options.OSImagesRequestQueryParams)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal OSImageDownloadQueryParams: %v\n", err)
 	}
