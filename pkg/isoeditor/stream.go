@@ -27,7 +27,7 @@ type ignitionInfo struct {
 }
 
 func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
-	r, err := ignitionOverlay(isoPath, ignitionContent)
+	_, r, err := ignitionOverlay(isoPath, ignitionContent)
 	if err != nil {
 		return nil, err
 	}
@@ -55,26 +55,32 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 	return r, nil
 }
 
-func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (overlay.OverlayReader, error) {
+func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (*ignitionInfo, overlay.OverlayReader, error) {
 	isoReader, err := os.Open(isoPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ignitionReader, err := ignitionContent.Archive()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ignitionBoundariesFinder)
+	ibf := &ignitionBoundaryFinder{}
+
+	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ibf.findBoundaries)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
+		return nil, nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
-	return r, nil
+	return &ibf.info, r, nil
 }
 
-func ignitionBoundariesFinder(filePath, isoPath string) (int64, int64, error) {
-	info := &ignitionInfo{}
+type ignitionBoundaryFinder struct {
+	info ignitionInfo
+}
+
+func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int64, int64, error) {
+	info := &ibf.info
 
 	ignitionInfoData, err := ReadFileFromISO(isoPath, ignitionInfoPath)
 	// If the igninfo.json file doesn't exist or we fail to access it, fall back to using the given ignition file
