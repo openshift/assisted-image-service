@@ -27,19 +27,9 @@ type ignitionInfo struct {
 }
 
 func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
-	isoReader, err := os.Open(isoPath)
+	r, err := ignitionOverlay(isoPath, ignitionContent)
 	if err != nil {
 		return nil, err
-	}
-
-	ignitionReader, err := ignitionContent.Archive()
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ignitionBoundariesFinder)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
 
 	if ramdiskContent != nil {
@@ -62,6 +52,24 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 		}
 	}
 
+	return r, nil
+}
+
+func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (overlay.OverlayReader, error) {
+	isoReader, err := os.Open(isoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	ignitionReader, err := ignitionContent.Archive()
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ignitionBoundariesFinder)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
+	}
 	return r, nil
 }
 
