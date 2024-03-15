@@ -12,13 +12,19 @@ type FileData struct {
 // This can be used to overwrite the ignition image file of an ISO previously
 // unpacked by Extract() in order to embed ignition data.
 func NewIgnitionImageReader(isoPath string, ignitionContent *IgnitionContent) (FileData, error) {
-	info, iso, err := ignitionOverlay(isoPath, ignitionContent)
+	info, iso, err := ignitionOverlay(isoPath, ignitionContent, true)
 	if err != nil {
 		return FileData{}, err
 	}
 	imageOffset, imageLength, err := GetISOFileInfo(info.File, isoPath)
 	if err != nil {
 		return FileData{}, err
+	}
+
+	length := info.Offset + info.Length
+	// include any trailing data
+	if imageLength > length {
+		length = imageLength
 	}
 
 	if _, err := iso.Seek(imageOffset, io.SeekStart); err != nil {
@@ -29,7 +35,7 @@ func NewIgnitionImageReader(isoPath string, ignitionContent *IgnitionContent) (F
 		io.Reader
 		io.Closer
 	}{
-		Reader: io.LimitReader(iso, imageLength),
+		Reader: io.LimitReader(iso, length),
 		Closer: iso,
 	}
 

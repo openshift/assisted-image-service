@@ -27,7 +27,7 @@ type ignitionInfo struct {
 }
 
 func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
-	_, r, err := ignitionOverlay(isoPath, ignitionContent)
+	_, r, err := ignitionOverlay(isoPath, ignitionContent, false)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 	return r, nil
 }
 
-func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (*ignitionInfo, overlay.OverlayReader, error) {
+func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOverflow bool) (*ignitionInfo, overlay.OverlayReader, error) {
 	isoReader, err := os.Open(isoPath)
 	if err != nil {
 		return nil, nil, err
@@ -66,7 +66,10 @@ func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (*ignitio
 		return nil, nil, err
 	}
 
-	ibf := &ignitionBoundaryFinder{}
+	ibf := &ignitionBoundaryFinder{
+		allowOverflow: allowOverflow,
+		dataSize:      ignitionReader.Size(),
+	}
 
 	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ibf.findBoundaries)
 	if err != nil {
@@ -76,7 +79,9 @@ func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent) (*ignitio
 }
 
 type ignitionBoundaryFinder struct {
-	info ignitionInfo
+	info          ignitionInfo
+	allowOverflow bool
+	dataSize      int64
 }
 
 func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int64, int64, error) {
@@ -102,6 +107,13 @@ func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int
 	// use the entire file offset and length if they are not specified in the info struct
 	if info.Length == 0 && info.Offset == 0 {
 		info.Length = isoFileLength
+	}
+	// allow overflow if requested and if the embed area extends all the way
+	// to the end of the file
+	if ibf.allowOverflow && ((info.Offset + info.Length) >= isoFileLength) {
+		if ibf.dataSize > info.Length {
+			info.Length = ibf.dataSize
+		}
 	}
 
 	// the final offset is the file offset within the ISO plus the offset within the file
