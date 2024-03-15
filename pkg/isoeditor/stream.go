@@ -66,17 +66,18 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 }
 
 func ignitionBoundariesFinder(filePath, isoPath string) (int64, int64, error) {
+	info := &ignitionInfo{}
+
 	ignitionInfoData, err := ReadFileFromISO(isoPath, ignitionInfoPath)
 	// If the igninfo.json file doesn't exist or we fail to access it, fall back to using the given ignition file
 	// This will be the case for earlier versions of RHCOS
 	if err != nil {
-		return GetISOFileInfo(filePath, isoPath)
-	}
-
-	info := &ignitionInfo{}
-	err = json.Unmarshal(ignitionInfoData, info)
-	if err != nil {
-		return 0, 0, err
+		info.File = filePath
+	} else {
+		err = json.Unmarshal(ignitionInfoData, info)
+		if err != nil {
+			return 0, 0, err
+		}
 	}
 
 	isoFileOffset, isoFileLength, err := GetISOFileInfo(info.File, isoPath)
@@ -86,7 +87,7 @@ func ignitionBoundariesFinder(filePath, isoPath string) (int64, int64, error) {
 
 	// use the entire file offset and length if they are not specified in the info struct
 	if info.Length == 0 && info.Offset == 0 {
-		return isoFileOffset, isoFileLength, nil
+		info.Length = isoFileLength
 	}
 
 	// the final offset is the file offset within the ISO plus the offset within the file
