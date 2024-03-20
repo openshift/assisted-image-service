@@ -35,16 +35,17 @@ var _ = Describe("IgnitionContent.Archive", func() {
 	It("streams the ignition image", func() {
 		content := IgnitionContent{ignitionContent}
 
-		output, err := NewIgnitionImageReader(isoFile, &content)
+		outputs, err := NewIgnitionImageReader(isoFile, &content)
 		Expect(err).NotTo(HaveOccurred())
 
-		imgBytes, err := io.ReadAll(output.Data)
+		Expect(len(outputs)).To(Equal(1))
+		imgBytes, err := io.ReadAll(outputs[0].Data)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(imgBytes[:len(ignitionArchiveBytes)]).To(Equal(ignitionArchiveBytes))
 		Expect(len(imgBytes)).To(Equal(256 * 1024))
 		for i := len(ignitionArchiveBytes); i < len(imgBytes); i++ {
 			Expect(imgBytes[i]).To(Equal(byte(0)))
 		}
-		Expect(output.Filename).To(Equal("images/ignition.img"))
+		Expect(outputs[0].Filename).To(Equal("images/ignition.img"))
 	})
 })
