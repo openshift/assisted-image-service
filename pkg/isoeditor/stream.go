@@ -75,6 +75,26 @@ func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOver
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
+
+	if ibf.info.Length > ibf.dataSize {
+		offset, _, err := GetISOFileInfo(ibf.info.File, isoPath)
+		if err != nil {
+			r.Close()
+			return nil, nil, err
+		}
+		paddingLen := ibf.info.Length - ibf.dataSize
+		paddingOverlay := overlay.Overlay{
+			Reader: bytes.NewReader(bytes.Repeat([]byte{0}, int(paddingLen))),
+			Offset: offset + ibf.info.Offset + ibf.dataSize,
+			Length: paddingLen,
+		}
+		if r2, err := overlay.NewOverlayReader(r, paddingOverlay); err == nil {
+			r = r2
+		} else {
+			r.Close()
+			return nil, nil, errors.Wrap(err, "failed to create overwrite reader for padding")
+		}
+	}
 	return &ibf.info, r, nil
 }
 
