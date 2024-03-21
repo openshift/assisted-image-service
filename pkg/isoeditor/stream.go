@@ -131,8 +131,11 @@ func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int
 	// allow overflow if requested and if the embed area extends all the way
 	// to the end of the file
 	if ibf.allowOverflow && ((info.Offset + info.Length) >= isoFileLength) {
-		if ibf.dataSize > info.Length {
-			info.Length = ibf.dataSize
+		chunkSize := (info.Length + 3) / 4
+		if (ibf.dataSize + chunkSize) > info.Length {
+			// increase size in chunks equal to a quarter of the original size,
+			// ensuring that there is always at least one full chunk free
+			info.Length = (1 + ((ibf.dataSize + chunkSize - 1) / chunkSize)) * chunkSize
 		}
 	}
 
