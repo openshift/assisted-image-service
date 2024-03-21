@@ -41,11 +41,6 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isoPath := h.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
-	fsFile, err := isoeditor.GetFileFromISO(isoPath, "/images/pxeboot/initrd.img")
-	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "failed to get base initrd: %v", err)
-		return
-	}
 
 	ignition, lastModified, code, err := h.client.ignitionContent(r, imageID, "")
 	if err != nil {
@@ -53,15 +48,9 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignitionReader, err := ignition.Archive()
+	initrdReader, err := isoeditor.NewInitRamFSStreamReaderFromISO(isoPath, ignition)
 	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Failed to create ignition archive: %v", err)
-		return
-	}
-
-	initrdReader, err := overlay.NewAppendReader(fsFile, ignitionReader)
-	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Failed to create append reader for initrd: %v", err)
+		httpErrorf(w, http.StatusInternalServerError, "Failed to get initrd: %v", err)
 		return
 	}
 	defer initrdReader.Close()
