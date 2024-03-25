@@ -75,6 +75,26 @@ func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOver
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
+
+	if ibf.info.Length > ibf.dataSize {
+		offset, _, err := GetISOFileInfo(ibf.info.File, isoPath)
+		if err != nil {
+			r.Close()
+			return nil, nil, err
+		}
+		paddingLen := ibf.info.Length - ibf.dataSize
+		paddingOverlay := overlay.Overlay{
+			Reader: bytes.NewReader(bytes.Repeat([]byte{0}, int(paddingLen))),
+			Offset: offset + ibf.info.Offset + ibf.dataSize,
+			Length: paddingLen,
+		}
+		if r2, err := overlay.NewOverlayReader(r, paddingOverlay); err == nil {
+			r = r2
+		} else {
+			r.Close()
+			return nil, nil, errors.Wrap(err, "failed to create overwrite reader for padding")
+		}
+	}
 	return &ibf.info, r, nil
 }
 
@@ -111,8 +131,11 @@ func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int
 	// allow overflow if requested and if the embed area extends all the way
 	// to the end of the file
 	if ibf.allowOverflow && ((info.Offset + info.Length) >= isoFileLength) {
-		if ibf.dataSize > info.Length {
-			info.Length = ibf.dataSize
+		chunkSize := (info.Length + 3) / 4
+		if (ibf.dataSize + chunkSize) > info.Length {
+			// increase size in chunks equal to a quarter of the original size,
+			// ensuring that there is always at least one full chunk free
+			info.Length = (1 + ((ibf.dataSize + chunkSize - 1) / chunkSize)) * chunkSize
 		}
 	}
 
