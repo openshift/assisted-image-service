@@ -27,19 +27,9 @@ type ignitionInfo struct {
 }
 
 func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramdiskContent []byte, kargs []byte) (ImageReader, error) {
-	isoReader, err := os.Open(isoPath)
+	_, r, err := ignitionOverlay(isoPath, ignitionContent, false)
 	if err != nil {
 		return nil, err
-	}
-
-	ignitionReader, err := ignitionContent.Archive()
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ignitionBoundariesFinder)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
 	}
 
 	if ramdiskContent != nil {
@@ -65,18 +55,48 @@ func NewRHCOSStreamReader(isoPath string, ignitionContent *IgnitionContent, ramd
 	return r, nil
 }
 
-func ignitionBoundariesFinder(filePath, isoPath string) (int64, int64, error) {
+func ignitionOverlay(isoPath string, ignitionContent *IgnitionContent, allowOverflow bool) (*ignitionInfo, overlay.OverlayReader, error) {
+	isoReader, err := os.Open(isoPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ignitionReader, err := ignitionContent.Archive()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ibf := &ignitionBoundaryFinder{
+		allowOverflow: allowOverflow,
+		dataSize:      ignitionReader.Size(),
+	}
+
+	r, err := readerForContent(isoPath, ignitionImagePath, isoReader, ignitionReader, ibf.findBoundaries)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create overwrite reader for ignition")
+	}
+	return &ibf.info, r, nil
+}
+
+type ignitionBoundaryFinder struct {
+	info          ignitionInfo
+	allowOverflow bool
+	dataSize      int64
+}
+
+func (ibf *ignitionBoundaryFinder) findBoundaries(filePath, isoPath string) (int64, int64, error) {
+	info := &ibf.info
+
 	ignitionInfoData, err := ReadFileFromISO(isoPath, ignitionInfoPath)
 	// If the igninfo.json file doesn't exist or we fail to access it, fall back to using the given ignition file
 	// This will be the case for earlier versions of RHCOS
 	if err != nil {
-		return GetISOFileInfo(filePath, isoPath)
-	}
-
-	info := &ignitionInfo{}
-	err = json.Unmarshal(ignitionInfoData, info)
-	if err != nil {
-		return 0, 0, err
+		info.File = filePath
+	} else {
+		err = json.Unmarshal(ignitionInfoData, info)
+		if err != nil {
+			return 0, 0, err
+		}
 	}
 
 	isoFileOffset, isoFileLength, err := GetISOFileInfo(info.File, isoPath)
@@ -86,7 +106,14 @@ func ignitionBoundariesFinder(filePath, isoPath string) (int64, int64, error) {
 
 	// use the entire file offset and length if they are not specified in the info struct
 	if info.Length == 0 && info.Offset == 0 {
-		return isoFileOffset, isoFileLength, nil
+		info.Length = isoFileLength
+	}
+	// allow overflow if requested and if the embed area extends all the way
+	// to the end of the file
+	if ibf.allowOverflow && ((info.Offset + info.Length) >= isoFileLength) {
+		if ibf.dataSize > info.Length {
+			info.Length = ibf.dataSize
+		}
 	}
 
 	// the final offset is the file offset within the ISO plus the offset within the file
