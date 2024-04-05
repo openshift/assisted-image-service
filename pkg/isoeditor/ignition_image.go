@@ -6,11 +6,6 @@ import (
 	"io"
 )
 
-type FileData struct {
-	Filename string
-	Data     io.ReadCloser
-}
-
 // NewIgnitionImageReader returns the filename of the ignition image in the ISO,
 // along with a stream of the ignition image with ignition content embedded.
 // This can be used to overwrite the ignition image file of an ISO previously
@@ -21,36 +16,16 @@ func NewIgnitionImageReader(isoPath string, ignitionContent *IgnitionContent) ([
 		return nil, err
 	}
 
-	imageOffset, imageLength, err := GetISOFileInfo(info.File, isoPath)
+	minLength := info.Offset + info.Length
+	ignitionImage, expanded, err := isolateISOFile(isoPath, info.File, iso, minLength)
 	if err != nil {
-		return nil, err
-	}
-
-	length := info.Offset + info.Length
-	// include any trailing data
-	if imageLength > length {
-		length = imageLength
-	}
-
-	if _, err := iso.Seek(imageOffset, io.SeekStart); err != nil {
 		iso.Close()
 		return nil, err
 	}
-	data := struct {
-		io.Reader
-		io.Closer
-	}{
-		Reader: io.LimitReader(iso, length),
-		Closer: iso,
-	}
-
-	output := []FileData{{
-		Filename: info.File,
-		Data:     data,
-	}}
+	output := []FileData{ignitionImage}
 
 	// output updated igninfo.json if we have expanded the embed area
-	if length > imageLength {
+	if expanded {
 		if _, _, err := GetISOFileInfo(ignitionInfoPath, isoPath); err == nil {
 			if ignitionInfoData, err := json.Marshal(info); err == nil {
 				output = append(output, FileData{
