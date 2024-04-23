@@ -37,6 +37,12 @@ func parseArtifact(path, arch string) (string, error) {
 		} else {
 			artifact = "vmlinuz"
 		}
+	case "ins-file":
+		if arch == "s390x" {
+			artifact = "generic.ins"
+		} else {
+			return "", fmt.Errorf("ins-file is only available for the s390x architecture. Current arch: %s", arch)
+		}
 	default:
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
@@ -64,7 +70,13 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
-	fileReader, err := isoeditor.GetFileFromISO(isoFileName, fmt.Sprintf("/images/pxeboot/%s", artifact))
+	file_path := fmt.Sprintf("/images/pxeboot/%s", artifact)
+	if artifact == "generic.ins" {
+		// s390x only, unlike other artifacts this one is at the root of the ISO
+		file_path = fmt.Sprintf("/%s", artifact)
+	}
+
+	fileReader, err := isoeditor.GetFileFromISO(isoFileName, file_path)
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error creating file reader stream: %v", err)
 		return

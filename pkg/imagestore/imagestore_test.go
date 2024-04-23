@@ -529,6 +529,12 @@ var _ = Describe("HaveVersion", func() {
 				"url":               "http://example.com/image/arm64-49.iso",
 				"version":           "49.84.202110081407-0",
 			},
+			{
+				"openshift_version": "4.15",
+				"cpu_architecture":  "s390x",
+				"url":               "http://example.com/image/s390x-415.iso",
+				"version":           "415.92.202403212258-0",
+			},
 		}
 		store ImageStore
 	)
@@ -544,6 +550,7 @@ var _ = Describe("HaveVersion", func() {
 	It("is true for versions that are present", func() {
 		Expect(store.HaveVersion("4.8", "x86_64")).To(BeTrue())
 		Expect(store.HaveVersion("4.9", "arm64")).To(BeTrue())
+		Expect(store.HaveVersion("4.15", "s390x")).To(BeTrue())
 	})
 
 	It("is false for versions that are missing", func() {
@@ -551,6 +558,7 @@ var _ = Describe("HaveVersion", func() {
 		Expect(store.HaveVersion("4.8", "arm64")).To(BeFalse())
 		Expect(store.HaveVersion("4.7", "x86_64")).To(BeFalse())
 		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
+		Expect(store.HaveVersion("4.11", "s390x")).To(BeFalse())
 	})
 })
 

@@ -24,7 +24,9 @@ var _ = Describe("ServeHTTP", func() {
 		fullImageFilename string
 		kernelArtifact    = "kernel"
 		rootfsArtifact    = "rootfs"
+		insfileArtifact   = "ins-file"
 		defaultArch       = "x86_64"
+		s390xArch         = "s390x"
 	)
 
 	Context("with image files", func() {
@@ -81,6 +83,22 @@ var _ = Describe("ServeHTTP", func() {
 			resp, err := client.Get(server.URL + path)
 			Expect(err).NotTo(HaveOccurred())
 			expectSuccessfulResponse(resp, []byte("this is rootfs"), "rootfs.img")
+		})
+
+		It("returns a ins-file artifact", func() {
+			mockImage("4.15", imagestore.ImageTypeFull, s390xArch)
+			path := fmt.Sprintf("/boot-artifacts/%s?version=4.15&arch=s390x", insfileArtifact)
+			resp, err := client.Get(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			expectSuccessfulResponse(resp, []byte("this is generic.ins"), "generic.ins")
+		})
+
+		It("Error: returns a ins-file artifact", func() {
+			mockImage("4.8", imagestore.ImageTypeFull, defaultArch)
+			path := fmt.Sprintf("/boot-artifacts/%s?version=4.8&arch=x86_64", insfileArtifact)
+			resp, err := client.Get(server.URL + path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 		})
 
 		It("supports HEAD requests", func() {
@@ -146,4 +164,6 @@ var _ = DescribeTable("parseArtifact",
 	Entry("returns s390x kernel correctly", "/boot-artifacts/kernel", "s390x", "kernel.img", true),
 	Entry("fails for an invalid artifact", "/boot-artifacts/asdf", "x86_64", "", false),
 	Entry("fails for an incorrect path", "/wrong-path/rootfs", "x86_64", "", false),
+	Entry("returns generic.ins correctly", "/boot-artifacts/ins-file", "s390x", "generic.ins", true),
+	Entry("fails generic.ins incorrect arch", "/boot-artifacts/ins-file", "x86_64", "", false),
 )
