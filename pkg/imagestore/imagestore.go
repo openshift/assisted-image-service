@@ -64,6 +64,12 @@ var DefaultVersions = []map[string]string{
 		"url":               "https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/pre-release/4.11.0-0.nightly-arm64-2022-04-19-171931/rhcos-4.11.0-0.nightly-arm64-2022-04-19-171931-aarch64-live.aarch64.iso",
 		"version":           "411.86.202204190940-0",
 	},
+	{
+		"openshift_version": "4.15",
+		"cpu_architecture":  "s390x",
+		"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.15/4.15.0/rhcos-live.s390x.iso",
+		"version":           "415.92.202403212258-0",
+	},
 }
 
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore

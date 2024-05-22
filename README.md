@@ -133,7 +133,14 @@ Downloads the RHCOS initrd with the ignition for the specified image appended.
 
 ### `GET /boot-artifacts/{artifact}`
 
-Downloads the artifact specified from the ISO.
+Downloads the artifact specified from the ISO. Artifacts are:
+
+- `rootfs`: rootfs.img 
+- `kernel`: vmlinuz (kernel.img when arch is s390x)
+
+#### Architecture specific artifacts
+##### s390x
+- `ins-file`: generic.ins
 
 #### Query parameters
 
