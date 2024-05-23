@@ -32,6 +32,8 @@ func createTestISO() string {
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/vmlinuz"), []byte("this is kernel"), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/initrd.img"), []byte("this is initrd"), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "generic.ins"), []byte("this is generic.ins"), 0600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(filesDir, "images/initrd.addrsize"), []byte{
+		1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8}, 0600)).To(Succeed())
 
 	cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-o", isoFile, filesDir)
 	Expect(cmd.Run()).To(Succeed())
