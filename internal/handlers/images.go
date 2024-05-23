@@ -14,11 +14,12 @@ import (
 const defaultArch = "x86_64"
 
 type ImageHandler struct {
-	long     http.Handler
-	byAPIKey http.Handler
-	byID     http.Handler
-	byToken  http.Handler
-	initrd   http.Handler
+	long                http.Handler
+	byAPIKey            http.Handler
+	byID                http.Handler
+	byToken             http.Handler
+	initrd              http.Handler
+	s390xInitrdAddrsize http.Handler
 }
 
 func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedServiceClient, maxRequests int64, mdw metricsmiddleware.Middleware) http.Handler {
@@ -61,6 +62,12 @@ func NewImageHandler(is imagestore.ImageStore, assistedServiceClient *AssistedSe
 				client:     assistedServiceClient,
 			},
 		),
+		s390xInitrdAddrsize: stdmiddleware.Handler("/images/:imageID/s390x-initrd-addrsize", mdw,
+			&initrdAddrSizeHandler{
+				ImageStore: is,
+				client:     assistedServiceClient,
+			},
+		),
 	}
 
 	return h.router(maxRequests)
@@ -70,6 +77,7 @@ func (h *ImageHandler) router(maxRequests int64) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(WithRequestLimit(maxRequests))
 	router.Handle("/images/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/pxe-initrd", h.initrd)
+	router.Handle("/images/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/s390x-initrd-addrsize", h.s390xInitrdAddrsize)
 	router.Handle("/images/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}", h.long)
 	router.Handle("/byid/{image_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/{version}/{arch}/{filename}", h.byID)
 	router.Handle("/byapikey/{api_key}/{version}/{arch}/{filename}", h.byAPIKey)

@@ -183,6 +183,7 @@ func main() {
 	http.Handle("/byapikey/", imageHandler)
 	http.Handle("/byid/", imageHandler)
 	http.Handle("/bytoken/", imageHandler)
+	http.Handle("/s390x-initrd-addrsize", imageHandler)
 
 	serverInfo.ListenAndServe()
 	<-stop
