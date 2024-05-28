@@ -34,7 +34,7 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
 		_, err = w.Write([]byte(err.Error()))
 		if err != nil {
-			log.Errorf("Failed to write response: %v\n", err)
+			log.Errorf("plouf Failed to write response: %v\n", err)
 		}
 		return
 	}
