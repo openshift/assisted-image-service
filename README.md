@@ -131,6 +131,20 @@ Downloads the RHCOS initrd with the ignition for the specified image appended.
 
 - `Authorization`: this header is passed directly through to assisted service requests to handle RHSSO authentication
 
+### `GET /images/{image_id}/s390x-initrd-addrsize`
+
+Only for the s390x architecture. Downloads the initrd.addrsize (16 bytes) containing the psw of the initrd (8 bytes) and the size of the initrd (8 bytes).
+
+#### Query parameters
+
+- `version`: indicates the version of the RHCOS base image to use (must match an entry in `RHCOS_VERSIONS`)
+- `api_key`: the api token to pass through to the assisted service calls if local authentication is required
+- `image_token`: the token to pass through to the Image-Token assisted service header if image pre-signed authentication is required
+
+#### Headers
+
+- `Authorization`: this header is passed directly through to assisted service requests to handle RHSSO authentication
+
 ### `GET /boot-artifacts/{artifact}`
 
 Downloads the artifact specified from the ISO. Artifacts are:

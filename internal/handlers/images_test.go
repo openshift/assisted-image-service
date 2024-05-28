@@ -68,4 +68,28 @@ var _ = Describe("ServeHTTP", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(respContent).To(Equal([]byte("initrdcontent")))
 	})
+
+	It("calls the initrdAddrsize handler ServeHTTP", func() {
+		imageID := "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+		stubs390xInitrdAddrsize := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			Expect(r.Method).To(Equal(http.MethodGet))
+			Expect(r.URL.Path).To(Equal(fmt.Sprintf("/images/%s/s390x-initrd-addrsize", imageID)))
+			http.ServeContent(w, r, "initrd.addrsize", time.Now(), strings.NewReader("initrdaddrcontent"))
+		})
+
+		imageHandler := &ImageHandler{
+			s390xInitrdAddrsize: stubs390xInitrdAddrsize,
+		}
+		server := httptest.NewServer(imageHandler.router(100))
+		client := server.Client()
+		defer server.Close()
+
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/s390x-initrd-addrsize", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		respContent, err := io.ReadAll(resp.Body)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(respContent).To(Equal([]byte("initrdaddrcontent")))
+	})
 })
