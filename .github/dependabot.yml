@@ -19,6 +19,8 @@ updates:
       go-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "go-http-metrics"
 
   - package-ecosystem: "docker"
     directory: "/"
