@@ -70,6 +70,7 @@ func unmarshallJSONMap(jsonMap string) (map[string]string, error) {
 }
 
 func main() {
+	os.Exit(1)
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.JSONFormatter{})
 	err := envconfig.Process("cluster-image", &Options)
