@@ -40,7 +40,6 @@ const testIgnitionInfo = `
   "file": "images/ignition.img"
 }
 `
-
 const ignitionPaddingLength = 256 * 1024 // 256KB
 
 func createTestFiles(volumeID string) (string, string) {
@@ -85,6 +84,10 @@ func createTestFiles(volumeID string) (string, string) {
 // particular it contains a '/coreos/inginfo.json' file that indicates that the ignition is
 // embedded in the '/images/cdboot.img' file instead of the usual location '/images/ignition.img'.
 func createS390TestFiles(volumeID string, minBootImageSize int64) (tmpDir string, isoFile string) {
+	initrdAddr := []byte{
+		1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 122}
+	insFileContent := []byte("someinscontent")
+
 	// Create a temporary directory:
 	tmpDir, err := os.MkdirTemp("", "isotest")
 	Expect(err).ToNot(HaveOccurred())
@@ -104,6 +107,11 @@ func createS390TestFiles(volumeID string, minBootImageSize int64) (tmpDir string
 	// Create the '/images' directoy:
 	imagesDir := filepath.Join(tmpDir, "images")
 	Expect(os.MkdirAll(imagesDir, 0755)).To(Succeed())
+
+	// Create the  '/images/initrd.addrsize', /images/ignition.img and /generic.ins files
+	Expect(os.WriteFile(filepath.Join(imagesDir, "initrd.addrsize"), initrdAddr, 0600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(imagesDir, "ignition.img"), make([]byte, ignitionPaddingLength), 0600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(tmpDir, "generic.ins"), insFileContent, 0600)).To(Succeed())
 
 	// Create the '/images/cdboot.img' file containing a random prefix, the ignition data, and
 	// a random suffix. The random prefix and suffix are intended to make things crash loudly
