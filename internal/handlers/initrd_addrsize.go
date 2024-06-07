@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -14,8 +11,6 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
-
-const initrdAddrsizePathInISO = "images/initrd.addrsize"
 
 type initrdAddrSizeHandler struct {
 	ImageStore imagestore.ImageStore
@@ -44,32 +39,10 @@ func (h *initrdAddrSizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	defer initrdReader.Close()
 
 	fileName := fmt.Sprintf("%s-initrd.addrsize", imageID)
-	addrsizeReader, err := isoeditor.GetFileFromISO(isoPath, initrdAddrsizePathInISO)
+	newAddrsizeFile, err := isoeditor.NewInitrdAddrsizeReaderFromISO(isoPath, initrdReader)
 	if err != nil {
-		log.Errorf("Error retrieving initrd.addsize file: %v, isoPath; %s\n", err, isoPath)
+		log.Errorf("Error calculate initrd.addsize file: %v, isoPath; %s\n", err, isoPath)
 		httpErrorf(w, http.StatusInternalServerError, "Failed to get initrd.addrsize: %v", err)
-		return
-	}
-	defer addrsizeReader.Close()
-
-	// get the size of the initrd including the embedded ignition
-	sizeOfInitrd, err := initrdReader.Seek(0, io.SeekEnd)
-	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Failed to determine size of initrd: %v", err)
-		return
-	}
-
-	addrsizeBytes := new(bytes.Buffer)
-	err = binary.Write(addrsizeBytes, binary.BigEndian, sizeOfInitrd)
-	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Error during write buffer: %v", err)
-		return
-	}
-	initrdPSW := make([]byte, 8)
-	m, err := addrsizeReader.Read(initrdPSW)
-	if err != nil || m != 8 {
-		log.Errorf("Error reading initrd.addsize file: %v, isoPath; %s\n", err, isoPath)
-		httpErrorf(w, http.StatusInternalServerError, "Failed to read initrd.addrsize: %v", err)
 		return
 	}
 
@@ -80,5 +53,5 @@ func (h *initrdAddrSizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 
-	http.ServeContent(w, r, fileName, modTime, bytes.NewReader(append(initrdPSW, addrsizeBytes.Bytes()...)))
+	http.ServeContent(w, r, fileName, modTime, newAddrsizeFile)
 }
