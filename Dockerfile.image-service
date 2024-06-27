@@ -1,3 +1,4 @@
+## Build
 FROM registry.ci.openshift.org/openshift/release:golang-1.21 as builder
 
 COPY go.mod go.mod
@@ -6,7 +7,34 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service main.go
 
+## Licenses
+FROM registry.access.redhat.com/ubi9/go-toolset:1.18 AS licenses
+
+ADD . /app
+WORKDIR /app
+
+RUN go install github.com/google/go-licenses@v1.6.0
+RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
+
+## Runtime
 FROM quay.io/centos/centos:stream9
+
+ARG release=main
+ARG version=latest
+
+LABEL com.redhat.component assisted-image-service
+LABEL description "Provide RHCOS image customization and serving for assisted-installer"
+LABEL summary "Provide RHCOS image customization and serving for assisted-installer"
+LABEL io.k8s.description "Provide RHCOS image customization and serving for assisted-installer"
+LABEL distribution-scope public
+LABEL name assisted-image-service
+LABEL release ${release}
+LABEL version ${version}
+LABEL url https://github.com/openshift/assisted-image-service
+LABEL vendor "Red Hat, Inc."
+LABEL maintainer "Red Hat"
+
+COPY --from=licenses /tmp/licenses /licenses
 
 ARG DATA_DIR=/data
 RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
@@ -14,4 +42,7 @@ VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
 COPY --from=builder /assisted-image-service /assisted-image-service
+
+USER 1001:1001
+
 CMD ["/assisted-image-service"]
