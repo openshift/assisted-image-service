@@ -1,6 +1,20 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.21
+FROM registry.ci.openshift.org/openshift/release:golang-1.21 AS golang
+
 ENV GO111MODULE=on
 ENV GOFLAGS=""
 
-COPY hack/setup_env.sh ./
-RUN ./setup_env.sh
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+RUN go install golang.org/x/tools/cmd/goimports@v0.22.0
+RUN go install github.com/golang/mock/mockgen@v1.6.0
+
+FROM quay.io/centos/centos:stream9
+
+RUN dnf install -y podman genisoimage && dnf clean all
+
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+
+COPY --from=golang $GOPATH $GOPATH
+COPY --from=golang $GOROOT $GOROOT
+COPY --from=golang /bin/make /bin/make 
