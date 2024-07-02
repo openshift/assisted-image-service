@@ -36,13 +36,13 @@ LABEL maintainer "Red Hat"
 
 COPY --from=licenses /tmp/licenses /licenses
 
+COPY --from=builder /assisted-image-service /assisted-image-service
+
+USER 1001:1001
+
 ARG DATA_DIR=/data
 RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
-
-COPY --from=builder /assisted-image-service /assisted-image-service
-
-USER 1001:1001
 
 CMD ["/assisted-image-service"]
