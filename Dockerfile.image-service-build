@@ -1,6 +1,27 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.19
-ENV GO111MODULE=on
+FROM registry.access.redhat.com/ubi9/go-toolset:1.18 AS golang
+
 ENV GOFLAGS=""
 
-COPY hack/setup_env.sh ./
-RUN ./setup_env.sh
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.46.0 && \
+        go install golang.org/x/tools/cmd/goimports@v0.1.5 && \
+        go install github.com/golang/mock/mockgen@v1.6.0
+
+FROM quay.io/centos/centos:stream9
+
+RUN dnf install -y \
+        podman \ 
+        genisoimage \ 
+        make \
+        git \ 
+        gcc \
+        openssl-devel && \
+        dnf clean all
+
+ENV GOPATH=/opt/app-root/src/go
+ENV GOROOT=/usr/lib/golang
+ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+
+COPY --from=golang $GOPATH $GOPATH
+COPY --from=golang $GOROOT $GOROOT
+
+RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT
