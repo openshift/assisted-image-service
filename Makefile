@@ -12,9 +12,6 @@ COVER_PROFILE := $(or ${COVER_PROFILE},$(REPORTS)/unit_coverage.out)
 build:
 	podman build -f Dockerfile.image-service . -t $(IMAGE)
 
-build-openshift-ci-test-bin:
-	./hack/setup_env.sh
-
 lint:
 	golangci-lint run -v
 
