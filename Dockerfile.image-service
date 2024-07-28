@@ -1,4 +1,6 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.21 as builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.21 AS golang
+
+USER 0
 
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -13,5 +15,5 @@ RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
-COPY --from=builder /assisted-image-service /assisted-image-service
+COPY --from=golang /assisted-image-service /assisted-image-service
 CMD ["/assisted-image-service"]
