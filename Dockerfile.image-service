@@ -1,4 +1,6 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.17 as builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.17 AS golang
+
+USER 0
 
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -6,15 +8,14 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service main.go
 
-FROM quay.io/centos/centos:stream8
+FROM quay.io/centos/centos:stream9
 
-RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+RUN dnf install -y glibc && dnf clean all
 
 ARG DATA_DIR=/data
 RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
-COPY --from=builder /assisted-image-service /assisted-image-service
+COPY --from=golang /assisted-image-service /assisted-image-service
 CMD ["/assisted-image-service"]
