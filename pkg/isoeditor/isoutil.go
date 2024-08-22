@@ -1,6 +1,8 @@
 package isoeditor
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"math"
@@ -8,11 +10,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cavaliercoder/go-cpio"
 	diskfs "github.com/diskfs/go-diskfs"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/filesystem"
 	"github.com/diskfs/go-diskfs/filesystem/iso9660"
 	"github.com/pkg/errors"
+)
+
+const (
+	AMD64CPUArchitecture   = "amd64"
+	X86CPUArchitecture     = "x86_64"
+	ARM64CPUArchitecture   = "arm64"
+	AARCH64CPUArchitecture = "aarch64"
 )
 
 // Extract unpacks the iso contents into the working directory
@@ -341,4 +351,50 @@ func ReadFileFromISO(isoPath, filePath string) ([]byte, error) {
 // Gets directly the ISO 9660 filesystem (equivalent to GetFileSystem(0)).
 func GetISO9660FileSystem(d *disk.Disk) (filesystem.FileSystem, error) {
 	return iso9660.Read(d.File, d.Size, 0, 0)
+}
+
+func generateCompressedCPIO(fileContent []byte, filePath string, mode cpio.FileMode) ([]byte, error) {
+	// Run gzip compression
+	compressedBuffer := new(bytes.Buffer)
+	gzipWriter := gzip.NewWriter(compressedBuffer)
+	// Create CPIO archive
+	cpioWriter := cpio.NewWriter(gzipWriter)
+
+	if err := cpioWriter.WriteHeader(&cpio.Header{
+		Name: filePath,
+		Mode: mode,
+		Size: int64(len(fileContent)),
+	}); err != nil {
+		return nil, errors.Wrap(err, "Failed to write CPIO header")
+	}
+	if _, err := cpioWriter.Write(fileContent); err != nil {
+		return nil, errors.Wrap(err, "Failed to write CPIO archive")
+	}
+
+	if err := cpioWriter.Close(); err != nil {
+		return nil, errors.Wrap(err, "Failed to close CPIO archive")
+	}
+	if err := gzipWriter.Close(); err != nil {
+		return nil, errors.Wrap(err, "Failed to gzip ignition config")
+	}
+
+	padSize := (4 - (compressedBuffer.Len() % 4)) % 4
+	for i := 0; i < padSize; i++ {
+		if err := compressedBuffer.WriteByte(0); err != nil {
+			return nil, err
+		}
+	}
+
+	return compressedBuffer.Bytes(), nil
+}
+
+func normalizeCPUArchitecture(arch string) string {
+	switch arch {
+	case AMD64CPUArchitecture:
+		return X86CPUArchitecture
+	case AARCH64CPUArchitecture:
+		return ARM64CPUArchitecture
+	default:
+		return arch
+	}
 }

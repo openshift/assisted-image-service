@@ -43,6 +43,8 @@ RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR && chown $UID:$GID /data
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
+RUN dnf install -y nmstate && dnf clean all
+
 USER $UID:$GID
 
 COPY --from=golang /tmp/licenses /licenses
