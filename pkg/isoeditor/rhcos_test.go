@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
@@ -55,52 +56,152 @@ var _ = Context("with test files", func() {
 
 	Describe("CreateMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
-			editor := NewEditor(workDir)
+			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
+			Expect(err).ToNot(HaveOccurred())
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, nmstatectl.Name())
+			err = editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
-			editor := NewEditor(workDir)
+			editor := NewEditor(workDir, "")
 			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
+		})
+
+		It("missing nmstatectl binary", func() {
+			editor := NewEditor(workDir, "")
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("cpu arch mismatch", func() {
+			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
+			Expect(err).ToNot(HaveOccurred())
+
+			editor := NewEditor(workDir, nmstatectl.Name())
+			err = editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "some-arch", minimalISOPath)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Describe("CreateFCOSMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
-			editor := NewEditor(workDir)
+			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
+			Expect(err).ToNot(HaveOccurred())
 
-			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, nmstatectl.Name())
+
+			err = editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
-			editor := NewEditor(workDir)
+			editor := NewEditor(workDir, "")
 			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
-	It("fixGrubConfig alters the kernel parameters correctly", func() {
-		err := fixGrubConfig(testRootFSURL, filesDir)
-		Expect(err).ToNot(HaveOccurred())
 
-		newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
-		grubCfg := fmt.Sprintf(newLine, testRootFSURL)
-		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+	Describe("createNmstateRamDisk", func() {
+		var (
+			nmstatectlPath, extractDir, arch, ramDiskPath string
+			err                                           error
+		)
 
-		newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
-		grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
-		validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+		BeforeEach(func() {
+			extractDir, err = os.MkdirTemp(os.TempDir(), "isoutil")
+			Expect(err).ToNot(HaveOccurred())
 
+			nmstatectl, err := os.CreateTemp(extractDir, "nmstatectl")
+			Expect(err).ToNot(HaveOccurred())
+			nmstatectlPath = nmstatectl.Name()
+
+			ramDisk, err := os.CreateTemp(extractDir, "nmstate.img")
+			Expect(err).ToNot(HaveOccurred())
+			ramDiskPath = ramDisk.Name()
+
+			arch = normalizeCPUArchitecture(runtime.GOARCH)
+		})
+
+		AfterEach(func() {
+			os.Remove(extractDir)
+		})
+
+		It("ram disk created successfully", func() {
+			err := createNmstateRamDisk(arch, nmstatectlPath, ramDiskPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			exists, err := fileExists(ramDiskPath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(exists).To(BeTrue())
+		})
+
+		It("missing nmstatectl binary", func() {
+			err := createNmstateRamDisk(arch, "", ramDiskPath)
+			Expect(err).To(HaveOccurred())
+			Expect(os.IsNotExist(err)).To(BeTrue())
+		})
+
+		It("cpu arch mismatch", func() {
+			extractDir := os.TempDir()
+			err := createNmstateRamDisk("some-arch", nmstatectlPath, ramDiskPath)
+			Expect(err).ToNot(HaveOccurred())
+
+			exists, err := fileExists(filepath.Join(extractDir, nmstateDiskImagePath))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(exists).To(BeFalse())
+		})
 	})
-	It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
-		err := fixIsolinuxConfig(testRootFSURL, filesDir)
-		Expect(err).ToNot(HaveOccurred())
 
-		newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
-		isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
-		validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
+	Describe("Fix Config", func() {
+		Context("with including nmstate disk image", func() {
+			It("fixGrubConfig alters the kernel parameters correctly", func() {
+				err := fixGrubConfig(testRootFSURL, filesDir, true)
+				Expect(err).ToNot(HaveOccurred())
+
+				newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
+				grubCfg := fmt.Sprintf(newLine, testRootFSURL)
+				validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+
+				newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s %s"
+				grubCfg = fmt.Sprintf(newLine, ramDiskImagePath, nmstateDiskImagePath)
+				validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+			})
+
+			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
+				err := fixIsolinuxConfig(testRootFSURL, filesDir, true)
+				Expect(err).ToNot(HaveOccurred())
+
+				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+				isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, nmstateDiskImagePath, testRootFSURL)
+				validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
+			})
+		})
+
+		Context("without including nmstate disk image", func() {
+			It("fixGrubConfig alters the kernel parameters correctly", func() {
+				err := fixGrubConfig(testRootFSURL, filesDir, false)
+				Expect(err).ToNot(HaveOccurred())
+
+				newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=%s'"
+				grubCfg := fmt.Sprintf(newLine, testRootFSURL)
+				validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+
+				newLine = "	initrd /images/pxeboot/initrd.img /images/ignition.img %s"
+				grubCfg = fmt.Sprintf(newLine, ramDiskImagePath)
+				validateFileContainsLine(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), grubCfg)
+			})
+
+			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
+				err := fixIsolinuxConfig(testRootFSURL, filesDir, false)
+				Expect(err).ToNot(HaveOccurred())
+
+				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+				isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
+				validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
+			})
+		})
 	})
 })
