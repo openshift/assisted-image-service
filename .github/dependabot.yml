@@ -7,7 +7,7 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     labels:
       - "go"
       - "dependabot"
@@ -16,6 +16,10 @@ updates:
     commit-message:
       prefix: "NO-ISSUE"
     groups:
+      go-security-dependencies:
+        applies-to: security-updates
+        patterns:
+          - "*"
       go-dependencies:
         patterns:
           - "*"
