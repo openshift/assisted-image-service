@@ -155,6 +155,18 @@ parameters:
 - name: IMAGE_SERVICE_BASE_URL
   value: ''
   required: true
+- name: LIVENESS_PROBE_FAILURE_THRESHOLD
+  value: "3"
+- name: LIVENESS_PROBE_PERIOD_SECONDS
+  value: "10"
+- name: LIVENESS_PROBE_SUCCESS_THRESHOLD
+  value: "1"
+- name: READINESS_PROBE_FAILURE_THRESHOLD
+  value: "3"
+- name: READINESS_PROBE_PERIOD_SECONDS
+  value: "10"
+- name: READINESS_PROBE_SUCCESS_THRESHOLD
+  value: "1"
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -221,10 +233,16 @@ objects:
             httpGet:
               path: /live
               port: 8080
+            failureThreshold: ${{LIVENESS_PROBE_FAILURE_THRESHOLD}}
+            periodSeconds: ${{LIVENESS_PROBE_PERIOD_SECONDS}}
+            successThreshold: ${{LIVENESS_PROBE_SUCCESS_THRESHOLD}}
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
+            failureThreshold: ${{READINESS_PROBE_FAILURE_THRESHOLD}}
+            periodSeconds: ${{READINESS_PROBE_PERIOD_SECONDS}}
+            successThreshold: ${{READINESS_PROBE_SUCCESS_THRESHOLD}}
           volumeMounts:
           - name: assisted-image-service
             mountPath: "/data"

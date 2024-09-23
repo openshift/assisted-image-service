@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/golang/mock/gomock"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -18,11 +19,14 @@ const (
 
 var _ = Context("with test files", func() {
 	var (
-		isoFile        string
-		filesDir       string
-		workDir        string
-		minimalISOPath string
-		volumeID       = "Assisted123"
+		isoFile            string
+		filesDir           string
+		workDir            string
+		minimalISOPath     string
+		volumeID           = "Assisted123"
+		ctrl               *gomock.Controller
+		mockNmstateHandler *MockNmstateHandler
+		mockExecuter       *MockExecuter
 	)
 
 	validateFileContainsLine := func(filename string, content string) {
@@ -46,6 +50,12 @@ var _ = Context("with test files", func() {
 		workDir, err = os.MkdirTemp("", "testisoeditor")
 		Expect(err).NotTo(HaveOccurred())
 		minimalISOPath = filepath.Join(workDir, "minimal.iso")
+
+		ctrl = gomock.NewController(GinkgoT())
+		mockNmstateHandler = NewMockNmstateHandler(ctrl)
+		mockExecuter = NewMockExecuter(ctrl)
+		mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("some string", nil).Times(3)
+		mockNmstateHandler.EXPECT().CreateNmstateRamDisk(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	})
 
 	AfterEach(func() {
@@ -56,102 +66,29 @@ var _ = Context("with test files", func() {
 
 	Describe("CreateMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
-			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
-			Expect(err).ToNot(HaveOccurred())
-
-			editor := NewEditor(workDir, nmstatectl.Name())
-			err = editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, mockNmstateHandler)
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath, "4.17")
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
-			editor := NewEditor(workDir, "")
-			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, mockNmstateHandler)
+			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath, "4.18")
 			Expect(err).To(HaveOccurred())
-		})
-
-		It("missing nmstatectl binary", func() {
-			editor := NewEditor(workDir, "")
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath)
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("cpu arch mismatch", func() {
-			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
-			Expect(err).ToNot(HaveOccurred())
-
-			editor := NewEditor(workDir, nmstatectl.Name())
-			err = editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "some-arch", minimalISOPath)
-			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	Describe("CreateFCOSMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
-			nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
-			Expect(err).ToNot(HaveOccurred())
-
-			editor := NewEditor(workDir, nmstatectl.Name())
-
-			err = editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, mockNmstateHandler)
+			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath, "4.17")
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
-			editor := NewEditor(workDir, "")
-			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath)
+			editor := NewEditor(workDir, mockNmstateHandler)
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath, "4.18")
 			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	Describe("createNmstateRamDisk", func() {
-		var (
-			nmstatectlPath, extractDir, arch, ramDiskPath string
-			err                                           error
-		)
-
-		BeforeEach(func() {
-			extractDir, err = os.MkdirTemp(os.TempDir(), "isoutil")
-			Expect(err).ToNot(HaveOccurred())
-
-			nmstatectl, err := os.CreateTemp(extractDir, "nmstatectl")
-			Expect(err).ToNot(HaveOccurred())
-			nmstatectlPath = nmstatectl.Name()
-
-			ramDisk, err := os.CreateTemp(extractDir, "nmstate.img")
-			Expect(err).ToNot(HaveOccurred())
-			ramDiskPath = ramDisk.Name()
-
-			arch = normalizeCPUArchitecture(runtime.GOARCH)
-		})
-
-		AfterEach(func() {
-			os.Remove(extractDir)
-		})
-
-		It("ram disk created successfully", func() {
-			err := createNmstateRamDisk(arch, nmstatectlPath, ramDiskPath)
-			Expect(err).ToNot(HaveOccurred())
-
-			exists, err := fileExists(ramDiskPath)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(exists).To(BeTrue())
-		})
-
-		It("missing nmstatectl binary", func() {
-			err := createNmstateRamDisk(arch, "", ramDiskPath)
-			Expect(err).To(HaveOccurred())
-			Expect(os.IsNotExist(err)).To(BeTrue())
-		})
-
-		It("cpu arch mismatch", func() {
-			extractDir := os.TempDir()
-			err := createNmstateRamDisk("some-arch", nmstatectlPath, ramDiskPath)
-			Expect(err).ToNot(HaveOccurred())
-
-			exists, err := fileExists(filepath.Join(extractDir, nmstateDiskImagePath))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(exists).To(BeFalse())
 		})
 	})
 

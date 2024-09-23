@@ -30,7 +30,7 @@ import (
 var (
 	versions = []map[string]string{
 		{
-			"openshift_version": "pre-release",
+			"openshift_version": "4.17.0-ec.1",
 			"cpu_architecture":  "arm64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live.aarch64.iso",
 			"version":           "arm-latest",
@@ -42,19 +42,19 @@ var (
 			"version":           "4.8-latest",
 		},
 		{
-			"openshift_version": "pre-release",
+			"openshift_version": "4.10.0-rc.0",
 			"cpu_architecture":  "x86_64",
 			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live.x86_64.iso",
 			"version":           "x86_64-latest",
 		},
 		{
-			"openshift_version": "fcos-pre-release",
+			"openshift_version": "4.11",
 			"cpu_architecture":  "x86_64",
 			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live.x86_64.iso",
 			"version":           "x86_64-latest",
 		},
 		{
-			"openshift_version": "fcos-pre-release",
+			"openshift_version": "4.11",
 			"cpu_architecture":  "arm64",
 			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
 			"version":           "arm-latest",
@@ -72,7 +72,7 @@ var (
 			"version":           "ppc64le-latest",
 		},
 		{
-			"openshift_version": "scos-prerelease",
+			"openshift_version": "4.13",
 			"cpu_architecture":  "x86_64",
 			"url":               "https://okd-scos.s3.amazonaws.com/okd-scos/builds/413.9.202302280609-0/x86_64/scos-413.9.202302280609-0-live.x86_64.iso",
 			"version":           "x86_64-latest",
@@ -281,10 +281,7 @@ var _ = BeforeSuite(func() {
 	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	nmstatectl, err := os.CreateTemp(os.TempDir(), "nmstatectl")
-	Expect(err).ToNot(HaveOccurred())
-
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstatectl.Name()), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{})), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
 	Expect(err).NotTo(HaveOccurred())
 
 	err = imageStore.Populate(context.Background())
