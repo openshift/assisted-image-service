@@ -2,27 +2,11 @@
 
 aliases:
   approvers:
-    - eranco74
-    - gamli75
     - romfreiman
-    - avishayt
-    - ori-amizur
-    - tsorya
-    - nmagnezi
-    - carbonin
-    - danielerez
-    - omertuc
+    - oourfali
+    - gamli75
     - eliorerz
-    - eifrach
+    - rccrdpccl
     - adriengentil
     - danmanor
-    - rccrdpccl
-    - pastequo
-  emeritus_approvers:
-    - empovit
-    - yevgeny-shnaidman
-    - rwsu
-    - lranjbar
-    - pawanpinjarkar
-    - sagidayan
-    - ybettan
+    - eifrach
