@@ -1,25 +1,30 @@
 package isoeditor
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
+	"strings"
 
+	"github.com/openshift/assisted-image-service/internal/common"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	RamDiskPaddingLength = uint64(1024 * 1024) // 1MB
-	NmstatectlPath       = "/usr/bin/nmstatectl"
-	ramDiskImagePath     = "/images/assisted_installer_custom.img"
-	nmstateDiskImagePath = "/images/nmstate.img"
+	RamDiskPaddingLength        = uint64(1024 * 1024) // 1MB
+	NmstatectlPathInRamdisk     = "/usr/bin/nmstatectl"
+	ramDiskImagePath            = "/images/assisted_installer_custom.img"
+	nmstateDiskImagePath        = "/images/nmstate.img"
+	MinimalVersionForNmstatectl = "4.14"
 )
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
-	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath string) error
+	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion string) error
 }
 
 type rhcosEditor struct {
@@ -68,8 +73,60 @@ func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath stri
 	return nil
 }
 
+func execute(command, workDir string) (string, error) {
+	var stdoutBytes, stderrBytes bytes.Buffer
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Stdout = &stdoutBytes
+	cmd.Stderr = &stderrBytes
+	log.Infof(fmt.Sprintf("Running cmd: %s\n", command))
+	cmd.Dir = workDir
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to execute cmd (%s): %s", cmd, stderrBytes.String())
+	}
+
+	return strings.TrimSuffix(stdoutBytes.String(), "\n"), nil
+}
+
+func extractNmstatectl(extractDir, workDir string) (string, error) {
+	nmstateDir, err := os.MkdirTemp(workDir, "nmstate")
+	if err != nil {
+		return "", err
+	}
+	rootfsPath := filepath.Join(extractDir, "images/pxeboot/rootfs.img")
+	_, err = execute(fmt.Sprintf("7z x %s", rootfsPath), nmstateDir)
+	if err != nil {
+		log.Errorf("failed to 7z x rootfs.img: %v", err.Error())
+		return "", err
+	}
+	// limiting files is needed on el<=9 due to https://github.com/plougher/squashfs-tools/issues/125
+	ulimit := "ulimit -n 1024"
+	list, err := execute(fmt.Sprintf("%s ; unsquashfs -d '' -lc %s", ulimit, "root.squashfs"), nmstateDir)
+	if err != nil {
+		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
+		return "", err
+	}
+
+	r, err := regexp.Compile(".*nmstatectl")
+	if err != nil {
+		log.Errorf("failed to compile regexp: %v", err.Error())
+		return "", err
+	}
+	binaryPath := r.FindString(list)
+	if err != nil {
+		log.Errorf("failed to compile regexp: %v", err.Error())
+		return "", err
+	}
+	_, err = execute(fmt.Sprintf("%s ; unsquashfs -no-xattrs %s -extract-file %s", ulimit, "root.squashfs", binaryPath), nmstateDir)
+	if err != nil {
+		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
+		return "", err
+	}
+	return filepath.Join(nmstateDir, "squashfs-root", binaryPath), nil
+}
+
 // CreateMinimalISOTemplate Creates the template minimal iso by removing the rootfs and adding the url
-func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath string) error {
+func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion string) error {
 	extractDir, err := os.MkdirTemp(e.workDir, "isoutil")
 	if err != nil {
 		return err
@@ -86,9 +143,18 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 
 	ramDiskPath := filepath.Join(extractDir, nmstateDiskImagePath)
 
-	// Ensure that the runtime CPU arch equals to the requested arch
-	if normalizeCPUArchitecture(runtime.GOARCH) == arch {
-		err = createNmstateRamDisk(arch, e.nmstatectlPath, ramDiskPath)
+	versionOK, err := common.VersionGreaterOrEqual(openshiftVersion, MinimalVersionForNmstatectl)
+	if err != nil {
+		return err
+	}
+
+	if versionOK {
+		e.nmstatectlPath, err = extractNmstatectl(extractDir, e.workDir)
+		if err != nil {
+			return err
+		}
+
+		err = createNmstateRamDisk(e.nmstatectlPath, ramDiskPath)
 		if err != nil {
 			return fmt.Errorf("failed to create nmstate ram disk for arch %s: %v", arch, err)
 		}
@@ -102,7 +168,7 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 	return nil
 }
 
-func createNmstateRamDisk(arch, nmstatectlPath, ramDiskPath string) error {
+func createNmstateRamDisk(nmstatectlPath, ramDiskPath string) error {
 	// Check if nmstatectl binary file exists
 	if _, err := os.Stat(nmstatectlPath); os.IsNotExist(err) {
 		return err
@@ -115,7 +181,7 @@ func createNmstateRamDisk(arch, nmstatectlPath, ramDiskPath string) error {
 	}
 
 	// Create a compressed RAM disk image with the nmstatectl binary
-	compressedCpio, err := generateCompressedCPIO(nmstateBinContent, nmstatectlPath, 0o100_755)
+	compressedCpio, err := generateCompressedCPIO(nmstateBinContent, NmstatectlPathInRamdisk, 0o100_755)
 	if err != nil {
 		return err
 	}
