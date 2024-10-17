@@ -205,12 +205,14 @@ func Create(outPath string, workDir string, volumeLabel string) error {
 
 // Returns the number of sectors to load for efi boot
 // Load Sectors * 2048 should be the size of efiboot.img rounded up to a multiple of 2048
+// For UEFI boot, the sector size is 512
+// To support iso9660 (2048) and UEFI (512), sectors must be in blocks of 512, but must also be a multiple of 2048
 func efiLoadSectors(workDir string) (uint16, error) {
 	efiStat, err := os.Stat(filepath.Join(workDir, "images/efiboot.img"))
 	if err != nil {
 		return 0, err
 	}
-	return uint16(math.Ceil(float64(efiStat.Size()) / 2048)), nil
+	return uint16(math.Ceil(float64(efiStat.Size())/2048) * 4), nil
 }
 
 func cdbootLoadSectors(workDir string) (result uint16, err error) {
