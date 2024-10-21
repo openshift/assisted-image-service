@@ -387,14 +387,3 @@ func generateCompressedCPIO(fileContent []byte, filePath string, mode cpio.FileM
 
 	return compressedBuffer.Bytes(), nil
 }
-
-func normalizeCPUArchitecture(arch string) string {
-	switch arch {
-	case AMD64CPUArchitecture:
-		return X86CPUArchitecture
-	case AARCH64CPUArchitecture:
-		return ARM64CPUArchitecture
-	default:
-		return arch
-	}
-}
