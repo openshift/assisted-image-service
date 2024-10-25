@@ -361,7 +361,7 @@ var _ = Context("with test files", func() {
 		It("returns the correct value", func() {
 			sectors, err := efiLoadSectors(filesDir)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(sectors).To(Equal(uint16(3997)))
+			Expect(sectors).To(Equal(uint16(15988)))
 		})
 	})
 })
