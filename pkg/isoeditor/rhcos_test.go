@@ -73,7 +73,7 @@ var _ = Context("with test files", func() {
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath, "4.18")
+			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0")
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -87,7 +87,7 @@ var _ = Context("with test files", func() {
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath, "4.18")
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0")
 			Expect(err).To(HaveOccurred())
 		})
 	})

@@ -15,7 +15,7 @@ const (
 	NmstatectlPathInRamdisk     = "/usr/bin/nmstatectl"
 	ramDiskImagePath            = "/images/assisted_installer_custom.img"
 	nmstateDiskImagePath        = "/images/nmstate.img"
-	MinimalVersionForNmstatectl = "4.18"
+	MinimalVersionForNmstatectl = "4.18.0-ec.0"
 )
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
