@@ -80,9 +80,9 @@ func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath string) er
 
 // TODO: Update the code to utilize go-diskfs's squashfs instead of unsquashfs once go-diskfs supports the zstd compression format used by CoreOS - MGMT-19227
 func (n *nmstateHandler) extractNmstatectl(rootfsPath, nmstateDir string) (string, error) {
-	_, err := n.executer.Execute(fmt.Sprintf("7z x %s", rootfsPath), nmstateDir)
+	_, err := n.executer.Execute(fmt.Sprintf("cat %s | cpio -i", rootfsPath), nmstateDir)
 	if err != nil {
-		log.Errorf("failed to 7z x rootfs.img: %v", err.Error())
+		log.Errorf("failed to extract rootfs.img using cpio command: %v", err.Error())
 		return "", err
 	}
 	// limiting files is needed on el<=9 due to https://github.com/plougher/squashfs-tools/issues/125
