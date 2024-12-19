@@ -19,7 +19,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slok/go-http-metrics v0.11.0
 	github.com/thoas/go-funk v0.9.3
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -37,11 +37,13 @@ require (
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
-	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace golang.org/x/net => golang.org/x/net v0.33.0
