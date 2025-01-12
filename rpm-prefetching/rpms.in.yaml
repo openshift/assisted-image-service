@@ -1,0 +1,10 @@
+contentOrigin:
+  repofiles: ["./redhat.repo"]
+packages:
+  - cpio
+  - squashfs-tools
+arches:
+  - aarch64
+  - x86_64
+  - ppc64le
+  - s390x
