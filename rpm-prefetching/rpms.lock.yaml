@@ -1,0 +1,104 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/c/cpio-2.13-16.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 284454
+    checksum: sha256:78fee8fcfe783db8c45e6b7dbeda079d5a5002def9a8c46bb41bf97b03e1bdcf
+    name: cpio
+    evr: 2.13-16.el9
+    sourcerpm: cpio-2.13-16.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/lzo-2.10-7.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 68292
+    checksum: sha256:b29667fe952bf1acbbb8ab8f78e5c8197a434ac3df0eb99ec31cf25b851c399c
+    name: lzo
+    evr: 2.10-7.el9
+    sourcerpm: lzo-2.10-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/squashfs-tools-4.4-10.git1.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 169050
+    checksum: sha256:f978a6e77635ba6cb4159fc7e6fe128a37efd715bc6a4a1ac77f218c7da9072e
+    name: squashfs-tools
+    evr: 4.4-10.git1.el9
+    sourcerpm: squashfs-tools-4.4-10.git1.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: ppc64le
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/c/cpio-2.13-16.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 292586
+    checksum: sha256:27c456d0fb6513828323590000cebc6aebeb15023cd268a88a6d4ac1a1d73b98
+    name: cpio
+    evr: 2.13-16.el9
+    sourcerpm: cpio-2.13-16.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/lzo-2.10-7.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 79799
+    checksum: sha256:ce140e68125c6dcd448acb01ec6c5523f1568b5270711f9d0cfdc4708babdcc0
+    name: lzo
+    evr: 2.10-7.el9
+    sourcerpm: lzo-2.10-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/s/squashfs-tools-4.4-10.git1.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 184088
+    checksum: sha256:5c4dfc832f18334da49973b5570ffff33fbb278a145cf4a19eb53132bb7233ff
+    name: squashfs-tools
+    evr: 4.4-10.git1.el9
+    sourcerpm: squashfs-tools-4.4-10.git1.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: s390x
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/c/cpio-2.13-16.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 284105
+    checksum: sha256:c14f986f05e27e0352f7a045eb19931064e2e6cc30623ad39bc0ad3bfe5e6096
+    name: cpio
+    evr: 2.13-16.el9
+    sourcerpm: cpio-2.13-16.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/lzo-2.10-7.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 66721
+    checksum: sha256:9a8ccd454340fe85b786cf2d9a08733004a4ba631b7303a7efb479d36d1d2305
+    name: lzo
+    evr: 2.10-7.el9
+    sourcerpm: lzo-2.10-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/s/squashfs-tools-4.4-10.git1.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 169708
+    checksum: sha256:41eabee74f9bd0a52fdaebf336bb97a7a0ed1ac73393b0f7ce71261890e9c5a1
+    name: squashfs-tools
+    evr: 4.4-10.git1.el9
+    sourcerpm: squashfs-tools-4.4-10.git1.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/c/cpio-2.13-16.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 286157
+    checksum: sha256:d9b53fda4b8757fd63b53a415f533ab876c18c28a94fd21d10658de85978f254
+    name: cpio
+    evr: 2.13-16.el9
+    sourcerpm: cpio-2.13-16.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/lzo-2.10-7.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 70686
+    checksum: sha256:2703054410f61e3a0cc8bf082800a75170644141e4f98aea3f483765ae372d3f
+    name: lzo
+    evr: 2.10-7.el9
+    sourcerpm: lzo-2.10-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/squashfs-tools-4.4-10.git1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 172047
+    checksum: sha256:a892b543eca94673ae19b1948d37ce515d70ddccd89f30794cae5c8931b74c43
+    name: squashfs-tools
+    evr: 4.4-10.git1.el9
+    sourcerpm: squashfs-tools-4.4-10.git1.el9.src.rpm
+  source: []
+  module_metadata: []

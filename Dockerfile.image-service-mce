@@ -15,9 +15,6 @@ ENV USER_UID=1001 \
 COPY --chown=${USER_UID} . /app
 WORKDIR /app
 
-RUN go install github.com/google/go-licenses@v1.6.0
-RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
-
 RUN GO111MODULE=on GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-image-service main.go
 
 
@@ -33,9 +30,9 @@ RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
-RUN subscription-manager refresh && dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
+RUN dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
 
-COPY --from=builder /tmp/licenses /licenses
+COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-image-service /assisted-image-service
 
 CMD ["/assisted-image-service"]
@@ -55,6 +52,7 @@ LABEL com.redhat.component="multicluster-engine-assisted-image-service-container
       distribution-scope="public" \
       release="${release}" \
       vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
       org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service"

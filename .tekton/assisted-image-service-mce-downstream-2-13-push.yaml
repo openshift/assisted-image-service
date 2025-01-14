@@ -34,6 +34,12 @@ spec:
     value:
     - release={{target_branch}}
     - version={{revision}}
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/"}]'
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -187,6 +193,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: "true"
       runAfter:
       - clone-repository
       taskRef:
@@ -242,7 +250,7 @@ spec:
         - name: name
           value: buildah-remote-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.2@sha256:f8b47e7205f836bd6fe5920d6c414a7d9a7a18939d167f1c3f5534902f51fd15
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.2@sha256:df6bd6b7e902077da3794f271c9b9036f742ac8efe94600dafdb738026ba2b11
         - name: kind
           value: task
         resolver: bundles
@@ -382,6 +390,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: ARGS
+        value: "--project-name=assisted-image-service --report --org=3e6fd93b-b325-49dd-8a33-432a0160ab66"
       runAfter:
       - build-image-index
       taskRef:

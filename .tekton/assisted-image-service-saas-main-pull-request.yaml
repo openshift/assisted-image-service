@@ -31,8 +31,10 @@ spec:
     value: .
   - name: build-args
     value:
-    - release={{target_branch}
+    - release={{target_branch}}
     - version={{revision}}
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     finally:
     - name: show-sbom
@@ -137,9 +139,6 @@ spec:
     - description: ""
       name: CHAINS-GIT_COMMIT
       value: $(tasks.clone-repository.results.commit)
-    - description: ""
-      name: JAVA_COMMUNITY_DEPENDENCIES
-      value: $(tasks.build-container.results.JAVA_COMMUNITY_DEPENDENCIES)
     tasks:
     - name: init
       params:
@@ -366,6 +365,8 @@ spec:
         value: $(tasks.build-container.results.IMAGE_DIGEST)
       - name: image-url
         value: $(tasks.build-container.results.IMAGE_URL)
+      - name: ARGS
+        value: "--project-name=assisted-image-service --report --org=3e6fd93b-b325-49dd-8a33-432a0160ab66"
     - name: clamav-scan
       params:
       - name: image-digest
