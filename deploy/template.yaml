@@ -167,6 +167,14 @@ parameters:
   value: "10"
 - name: READINESS_PROBE_SUCCESS_THRESHOLD
   value: "1"
+- name: CPU_REQUEST
+  value: "100m"
+- name: CPU_LIMIT
+  value: "200m"
+- name: MEMORY_REQUEST
+  value: "400Mi"
+- name: MEMORY_LIMIT
+  value: "800Mi"
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -224,11 +232,11 @@ objects:
             containerPort: 8080
           resources:
             requests:
-              cpu: 100m
-              memory: 400Mi
+              cpu: ${{CPU_REQUEST}}
+              memory: ${{MEMORY_REQUEST}}
             limits:
-              cpu: 200m
-              memory: 800Mi
+              cpu: ${{CPU_LIMIT}}
+              memory: ${{MEMORY_LIMIT}}
           livenessProbe:
             httpGet:
               path: /live
