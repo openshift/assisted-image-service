@@ -22,6 +22,7 @@ ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
 ENV GO111MODULE=on
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+ENV GOTOOLCHAIN=auto
 
 COPY --from=golang $GOPATH $GOPATH
 COPY --from=golang $GOROOT $GOROOT

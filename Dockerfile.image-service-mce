@@ -8,6 +8,7 @@ ENV COMPONENT_TAG_EXTENSION=" "
 ENV GOFLAGS="-p=4"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV BUILD_TAGS="strictfipsruntime"
+ENV GOTOOLCHAIN=auto
 
 ENV USER_UID=1001 \
     USER_NAME=assisted-installer

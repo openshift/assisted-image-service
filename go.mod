@@ -1,6 +1,7 @@
 module github.com/openshift/assisted-image-service
 
-go 1.21
+go 1.23
+
 toolchain go1.23.6
 
 require (
