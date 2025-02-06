@@ -1,8 +1,8 @@
 module github.com/openshift/assisted-image-service
 
-go 1.23
+go 1.22.0
 
-toolchain go1.23.6
+toolchain go1.22.9
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
@@ -19,7 +19,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rs/cors v1.11.1
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
-	github.com/slok/go-http-metrics v0.13.0
+	github.com/slok/go-http-metrics v0.11.0
 	github.com/thoas/go-funk v0.9.3
 	golang.org/x/sync v0.11.0
 )
@@ -32,6 +32,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pierrec/lz4/v4 v4.1.17 // indirect

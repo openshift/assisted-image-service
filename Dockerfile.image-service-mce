@@ -8,7 +8,6 @@ ENV COMPONENT_TAG_EXTENSION=" "
 ENV GOFLAGS="-p=4"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV BUILD_TAGS="strictfipsruntime"
-ENV GOTOOLCHAIN=auto
 
 ENV USER_UID=1001 \
     USER_NAME=assisted-installer
@@ -41,19 +40,19 @@ CMD ["/assisted-image-service"]
 USER ${USER_UID}
 
 LABEL com.redhat.component="multicluster-engine-assisted-image-service-container" \
-      name="multicluster-engine/assisted-image-service-rhel9" \
-      version="${version}" \
-      upstream-ref="${version}" \
-      upstream-url="https://github.com/openshift/assisted-image-service" \
-      summary="OpenShift Assisted Image Service" \
-      io.k8s.display-name="OpenShift Assisted Image Service" \
-      maintainer="Liat Gamliel <lgamliel@redhat.com>" \
-      description="OpenShift Assisted Image Service" \
-      io.k8s.description="OpenShift Assisted Image Service" \
-      distribution-scope="public" \
-      release="${release}" \
-      vendor="Red Hat, Inc." \
-      io.openshift.tags="OpenShift 4" \
-      upstream_commit="${version}" \
-      org.label-schema.vcs-ref="${version}" \
-      org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service"
+    name="multicluster-engine/assisted-image-service-rhel9" \
+    version="${version}" \
+    upstream-ref="${version}" \
+    upstream-url="https://github.com/openshift/assisted-image-service" \
+    summary="OpenShift Assisted Image Service" \
+    io.k8s.display-name="OpenShift Assisted Image Service" \
+    maintainer="Liat Gamliel <lgamliel@redhat.com>" \
+    description="OpenShift Assisted Image Service" \
+    io.k8s.description="OpenShift Assisted Image Service" \
+    distribution-scope="public" \
+    release="${release}" \
+    vendor="Red Hat, Inc." \
+    io.openshift.tags="OpenShift 4" \
+    upstream_commit="${version}" \
+    org.label-schema.vcs-ref="${version}" \
+    org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service"
