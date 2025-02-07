@@ -170,7 +170,7 @@ parameters:
 - name: CPU_REQUEST
   value: "100m"
 - name: CPU_LIMIT
-  value: "200m"
+  value: "1"
 - name: MEMORY_REQUEST
   value: "400Mi"
 - name: MEMORY_LIMIT
