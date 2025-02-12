@@ -40,6 +40,7 @@ var Options struct {
 	InsecureSkipVerify    bool   `envconfig:"INSECURE_SKIP_VERIFY" default:"false"`
 	ImageServiceBaseURL   string `envconfig:"IMAGE_SERVICE_BASE_URL"`
 	LogLevel              string `envconfig:"LOGLEVEL" default:"info"`
+	ImageWorkers          int    `envconfig:"MINIMAL_ISO_CREATION_WORKERS" default:"1"`
 
 	// This is a path to a CA file that will be trusted when fetching OS Images
 	// intended for scenarios where the OS images are served from a service that uses a custom CA
@@ -111,7 +112,7 @@ func main() {
 	}
 
 	is, err := imagestore.NewImageStore(
-		isoeditor.NewEditor(Options.DataDir, isoeditor.NewNmstateHandler(Options.DataDir, &isoeditor.CommonExecuter{})),
+		isoeditor.NewEditor(Options.DataDir, isoeditor.NewNmstateHandler(Options.DataDir, &isoeditor.CommonExecuter{}, &isoeditor.CommonIsoutil{})),
 		Options.DataDir,
 		Options.ImageServiceBaseURL,
 		Options.InsecureSkipVerify,
@@ -127,7 +128,7 @@ func main() {
 	readinessHandler := handlers.NewReadinessHandler()
 
 	go func() {
-		err = is.Populate(context.Background())
+		err = is.Populate(Options.ImageWorkers, context.Background())
 		if err != nil {
 			log.Fatalf("Failed to populate image store: %v\n", err)
 		}

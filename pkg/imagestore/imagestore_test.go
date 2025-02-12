@@ -30,6 +30,7 @@ import (
 var (
 	imageServiceBaseURL = "http://images.example.com"
 	rootfsURL           = "http://images.example.com/boot-artifacts/rootfs?arch=x86_64&version=%s"
+	imageWorkers        = 3
 )
 
 func TestImageStore(t *testing.T) {
@@ -172,7 +173,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
@@ -248,7 +249,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
@@ -275,7 +276,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
@@ -296,7 +297,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
@@ -314,7 +315,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(is.Populate(ctx)).NotTo(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).NotTo(Succeed())
 			})
 
 			It("fails and removes the file when the downloaded iso has an invalid volume ID", func() {
@@ -329,7 +330,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(is.Populate(ctx)).NotTo(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).NotTo(Succeed())
 
 				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).To(MatchError(fs.ErrNotExist))
@@ -348,7 +349,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(fmt.Errorf("minimal iso creation failed"))
-				Expect(is.Populate(ctx)).NotTo(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).NotTo(Succeed())
 			})
 
 			It("doesn't download if the file already exists", func() {
@@ -366,7 +367,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 			})
 
 			It("recreates the minimal iso even when it's already present", func() {
@@ -382,7 +383,7 @@ var _ = Context("with a data directory configured", func() {
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version["openshift_version"]).Return(nil)
 
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 			})
 
 			It("downloads image with x.y.z openshift_version correctly", func() {
@@ -399,7 +400,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8.1-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
@@ -422,7 +423,7 @@ var _ = Context("with a data directory configured", func() {
 
 					rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
 					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"]).Return(nil)
-					Expect(is.Populate(ctx)).To(Succeed())
+					Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 				}
 			})
 
@@ -443,7 +444,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
-				Expect(is.Populate(ctx)).To(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).To(Succeed())
 
 				_, err = os.Stat(oldISOPath)
 				Expect(err).To(MatchError(fs.ErrNotExist))
@@ -460,7 +461,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = is.Populate(ctx)
+				err = is.Populate(imageWorkers, ctx)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("unexpected EOF"))
 
@@ -473,7 +474,7 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", "x86_64", gomock.Any(), gomock.Any()).Return(nil)
-				Expect(is.Populate(ctx)).NotTo(Succeed())
+				Expect(is.Populate(imageWorkers, ctx)).NotTo(Succeed())
 			})
 
 			It("downloads fails when imageServiceBaseURL is invalid", func() {
@@ -491,7 +492,7 @@ var _ = Context("with a data directory configured", func() {
 
 				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), gomock.Any()).Return(nil)
-				err = is.Populate(ctx)
+				err = is.Populate(imageWorkers, ctx)
 				Expect(err).ToNot(Succeed())
 				Expect(err.Error()).To(Equal("failed to build rootfs URL: parse \":\": missing protocol scheme"))
 			})

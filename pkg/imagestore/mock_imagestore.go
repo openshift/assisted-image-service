@@ -63,15 +63,15 @@ func (mr *MockImageStoreMockRecorder) PathForParams(arg0, arg1, arg2 interface{}
 }
 
 // Populate mocks base method.
-func (m *MockImageStore) Populate(arg0 context.Context) error {
+func (m *MockImageStore) Populate(arg0 int, arg1 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Populate", arg0)
+	ret := m.ctrl.Call(m, "Populate", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Populate indicates an expected call of Populate.
-func (mr *MockImageStoreMockRecorder) Populate(arg0 interface{}) *gomock.Call {
+func (mr *MockImageStoreMockRecorder) Populate(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockImageStore)(nil).Populate), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Populate", reflect.TypeOf((*MockImageStore)(nil).Populate), arg0, arg1)
 }
