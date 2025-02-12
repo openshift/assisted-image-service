@@ -82,6 +82,7 @@ var (
 	imageDir            string
 	imageStore          imagestore.ImageStore
 	imageServiceBaseURL = "http://images.example.com"
+	imageWorkers        = 3
 )
 
 var _ = Describe("Image integration tests", func() {
@@ -281,10 +282,10 @@ var _ = BeforeSuite(func() {
 	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{})), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{}, &isoeditor.CommonIsoutil{})), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = imageStore.Populate(context.Background())
+	err = imageStore.Populate(imageWorkers, context.Background())
 	Expect(err).NotTo(HaveOccurred())
 })
 

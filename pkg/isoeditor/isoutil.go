@@ -389,3 +389,14 @@ func generateCompressedCPIO(fileContent []byte, filePath string, mode cpio.FileM
 
 	return compressedBuffer.Bytes(), nil
 }
+
+//go:generate mockgen -package=isoeditor -destination=mock_isoutil.go . IsoutilInterface
+type IsoutilInterface interface {
+	CreateNmstateWorkdir(baseDir string) (string, error)
+}
+
+type CommonIsoutil struct{}
+
+func (i *CommonIsoutil) CreateNmstateWorkdir(baseDir string) (string, error) {
+	return os.MkdirTemp(baseDir, "nmstate")
+}

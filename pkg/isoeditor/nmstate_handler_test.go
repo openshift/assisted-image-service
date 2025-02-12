@@ -39,6 +39,7 @@ var _ = Context("with test files", func() {
 			nmstateHandler          NmstateHandler
 			ctrl                    *gomock.Controller
 			mockExecuter            *MockExecuter
+			mockIsoutil             *MockIsoutilInterface
 		)
 
 		BeforeEach(func() {
@@ -59,7 +60,9 @@ var _ = Context("with test files", func() {
 			ctrl = gomock.NewController(GinkgoT())
 			mockExecuter = NewMockExecuter(ctrl)
 			mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("nmstatectl", nil).Times(3)
-			nmstateHandler = NewNmstateHandler(os.TempDir(), mockExecuter)
+			mockIsoutil = NewMockIsoutilInterface(ctrl)
+			mockIsoutil.EXPECT().CreateNmstateWorkdir(gomock.Any()).Return(filepath.Join(extractDir, "nmstate"), nil)
+			nmstateHandler = NewNmstateHandler(os.TempDir(), mockExecuter, mockIsoutil)
 		})
 
 		AfterEach(func() {

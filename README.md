@@ -34,6 +34,7 @@ skipper make test
 - `LOG_LEVEL` - log level, such as "info" or "debug"; see logrus docs for a complete list
 - `MAX_CONCURRENT_REQUESTS` - caps the number of inflight image downloads to avoid things like open file limits
 - `RHCOS_VERSIONS`/`OS_IMAGES` - JSON string indicating the supported versions and their required urls. `OS_IMAGES` takes precedence.
+- `MINIMAL_ISO_CREATION_WORKERS` - number of images being processed in parallel during the container startup phase. Higher number results in shorter startup time but requires more storage space. Default is 1.
 
 Example `OS_IMAGES`:
 ```json

@@ -74,7 +74,7 @@ var DefaultVersions = []map[string]string{
 
 //go:generate mockgen -package=imagestore -destination=mock_imagestore.go . ImageStore
 type ImageStore interface {
-	Populate(ctx context.Context) error
+	Populate(imageWorkers int, ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
 }
@@ -234,7 +234,7 @@ func validateISOID(path string) error {
 	return nil
 }
 
-func (s *rhcosStore) Populate(ctx context.Context) error {
+func (s *rhcosStore) Populate(imageWorkers int, ctx context.Context) error {
 	if err := s.cleanDataDir(); err != nil {
 		return err
 	}
@@ -276,6 +276,9 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		return err
 	}
 
+	grp, _ := errgroup.WithContext(ctx)
+	grp.SetLimit(imageWorkers)
+
 	for i := range s.versions {
 		imageInfo := s.versions[i]
 		openshiftVersion := imageInfo["openshift_version"]
@@ -287,25 +290,31 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		if arch == "s390x" {
 			continue
 		}
-		minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, openshiftVersion, imageVersion, arch))
-		if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
-			log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
+		grp.Go(func() error {
+			minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, openshiftVersion, imageVersion, arch))
+			if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
+				log.Infof("Creating minimal iso for %s-%s-%s", openshiftVersion, imageVersion, arch)
 
-			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
-			rootfsURL, err := buildRootfsURL(s.imageServiceBaseURL, arch, openshiftVersion)
-			if err != nil {
-				return fmt.Errorf("failed to build rootfs URL: %v", err)
+				fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
+				rootfsURL, err := buildRootfsURL(s.imageServiceBaseURL, arch, openshiftVersion)
+				if err != nil {
+					return fmt.Errorf("failed to build rootfs URL: %v", err)
+				}
+
+				err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, arch, minimalPath, openshiftVersion)
+				if err != nil {
+					return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
+				}
+
+				log.Infof("Finished creating minimal iso for %s-%s (%s)", openshiftVersion, arch, imageVersion)
 			}
-
-			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, arch, minimalPath, openshiftVersion)
-			if err != nil {
-				return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
-			}
-
-			log.Infof("Finished creating minimal iso for %s-%s (%s)", openshiftVersion, arch, imageVersion)
-		}
+			return nil
+		})
 	}
 
+	if err := grp.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
