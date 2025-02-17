@@ -1,3 +1,29 @@
+# Used to build tools:
+FROM quay.io/centos/centos:stream9 AS tools
+
+# Install the build tools and the required libraries:
+RUN \
+  dnf install -y \
+  \
+  gcc \
+  libtool \
+  make \
+  \
+  libselinux-devel \
+  libuuid-devel \
+  libzstd-devel \
+  lz4-devel \
+  zlib-devel \
+  \
+  && \
+  dnf clean all
+
+# Build the external packages:
+COPY packages /packages
+RUN cd packages && ./build.sh
+
+
+# Used to build the service:
 FROM registry.access.redhat.com/ubi9/go-toolset:1.21 AS golang
 
 USER 0
@@ -52,6 +78,11 @@ RUN dnf install -y cpio squashfs-tools && dnf clean all
 COPY --from=golang /commit-reference.txt /commit-reference.txt
 
 USER $UID:$GID
+
+# Copy very minimum that we need from the tools container. That is the 'dump.erofs' binary and the
+# compression library (from the 'xz' package) that it needs.
+COPY --from=tools /usr/local/lib/liblzma.so.5 /usr/local/lib
+COPY --from=tools /usr/local/bin/dump.erofs /usr/local/bin
 
 COPY --from=golang /tmp/licenses /licenses
 COPY --from=golang /assisted-image-service /assisted-image-service

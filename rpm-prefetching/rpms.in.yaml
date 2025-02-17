@@ -2,7 +2,15 @@ contentOrigin:
   repofiles: ["./redhat.repo"]
 packages:
   - cpio
+  - gcc
+  - libselinux-devel
+  - libtool
+  - libuuid-devel
+  - libzstd-devel
+  - lz4-devel
+  - make
   - squashfs-tools
+  - zlib-devel
 arches:
   - aarch64
   - x86_64
