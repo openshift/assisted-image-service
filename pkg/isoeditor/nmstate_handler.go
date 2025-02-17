@@ -21,23 +21,24 @@ type NmstateHandler interface {
 type nmstateHandler struct {
 	workDir  string
 	executer Executer
+	isoutil  IsoutilInterface
 }
 
-func NewNmstateHandler(workDir string, executer Executer) NmstateHandler {
+func NewNmstateHandler(workDir string, executer Executer, isoutil IsoutilInterface) NmstateHandler {
 	return &nmstateHandler{
 		workDir:  workDir,
 		executer: executer,
+		isoutil:  isoutil,
 	}
 }
 
 func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath string) error {
-	// Extract nmstatectl binary
-	var err error
-	nmstateDir := filepath.Join(n.workDir, "nmstate")
-	err = os.MkdirAll(nmstateDir, os.ModePerm)
+	nmstateDir, err := n.isoutil.CreateNmstateWorkdir(n.workDir)
 	if err != nil {
 		return err
 	}
+
+	// Extract nmstatectl binary
 	binaryPath, err := n.extractNmstatectl(rootfsPath, nmstateDir)
 	if err != nil {
 		return err

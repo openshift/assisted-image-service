@@ -175,6 +175,8 @@ parameters:
   value: "400Mi"
 - name: MEMORY_LIMIT
   value: "800Mi"
+- name: MINIMAL_ISO_CREATION_WORKERS
+  value: "1"
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -227,6 +229,8 @@ objects:
             value: ${IMAGE_SERVICE_BASE_URL}
           - name: DATA_DIR
             value: "/data"
+          - name: MINIMAL_ISO_CREATION_WORKERS
+            value: ${MINIMAL_ISO_CREATION_WORKERS}
           ports:
           - protocol: TCP
             containerPort: 8080
