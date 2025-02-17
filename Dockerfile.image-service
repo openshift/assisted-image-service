@@ -1,3 +1,31 @@
+# Used to build tools:
+FROM quay.io/centos/centos:stream9 AS tools
+
+# Install packages:
+RUN \
+  dnf install -y \
+  gcc \
+  git \
+  libtool \
+  libuuid-devel \
+  libzstd-devel \
+  lz4-devel \
+  make \
+  && \
+  dnf clean all
+
+# Build erofs-utils:
+RUN \
+  git clone https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git /tmp/build && \
+  cd /tmp/build && \
+  git checkout -b build v1.8.5 && \
+  ./autogen.sh && \
+  ./configure && \
+  make && \
+  make install && \
+  rm -rf /tmp/build
+
+# Used to build the service:
 FROM registry.access.redhat.com/ubi9/go-toolset:1.21 AS golang
 
 USER 0
@@ -53,7 +81,11 @@ COPY --from=golang /commit-reference.txt /commit-reference.txt
 
 USER $UID:$GID
 
+COPY --from=tools /usr/local/bin/* /usr/local/bin
 COPY --from=golang /tmp/licenses /licenses
 COPY --from=golang /assisted-image-service /assisted-image-service
+
+# TODO: This is just to show that the binary is working, should be removed.
+RUN dump.erofs --help
 
 CMD ["/assisted-image-service"]
