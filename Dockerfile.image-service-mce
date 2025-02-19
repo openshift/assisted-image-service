@@ -30,6 +30,11 @@ RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
+ARG DATA_TEMP_DIR=/data_temp
+RUN mkdir $DATA_TEMP_DIR && chmod 775 $DATA_TEMP_DIR
+VOLUME $DATA_TEMP_DIR
+ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
+
 RUN dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
 
 COPY LICENSE /licenses/

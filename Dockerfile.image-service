@@ -46,6 +46,13 @@ RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR && chown $UID:$GID /data
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
 
+ARG DATA_TEMP_DIR=/data_temp
+ARG UID=1001
+ARG GID=0
+RUN mkdir $DATA_TEMP_DIR && chmod 775 $DATA_TEMP_DIR && chown $UID:$GID /data
+VOLUME $DATA_TEMP_DIR
+ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
+
 RUN dnf install -y cpio squashfs-tools && dnf clean all
 
 # Copy the commit reference from the builder

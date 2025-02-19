@@ -26,6 +26,7 @@ skipper make test
 - `ASSISTED_SERVICE_HOST` - host or host:port to use to query assisted service for image information
 - `ASSISTED_SERVICE_SCHEME` - protocol to use to query assisted service for image information
 - `DATA_DIR` - Path at which to store downloaded RHCOS images.
+- `DATA_TEMP_DIR` - Path at which to extract downloaded images, preferably mounted as tmpfs.
 - `HTTPS_CERT_FILE` - tls cert file path
 - `HTTPS_KEY_FILE` - tls key file path
 - `HTTP_LISTEN_PORT` - When set, plain http listener is started on that port

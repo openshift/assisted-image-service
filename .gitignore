@@ -1,5 +1,6 @@
 /vendor
 /data
+/data_temp
 /certs
 /reports
 /.idea
