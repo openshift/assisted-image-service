@@ -8,12 +8,19 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service main.go
 
+# Extract the commit reference from which the image is built
+RUN git config --global --add safe.directory '*' && \
+    git rev-parse --short HEAD > /commit-reference.txt
+
 FROM quay.io/centos/centos:stream9
 
 ARG DATA_DIR=/data
 RUN mkdir $DATA_DIR && chmod 775 $DATA_DIR
 VOLUME $DATA_DIR
 ENV DATA_DIR=$DATA_DIR
+
+# Copy the commit reference from the builder
+COPY --from=golang /commit-reference.txt /commit-reference.txt
 
 COPY --from=golang /assisted-image-service /assisted-image-service
 CMD ["/assisted-image-service"]
