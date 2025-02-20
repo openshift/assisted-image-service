@@ -175,6 +175,10 @@ parameters:
   value: "400Mi"
 - name: MEMORY_LIMIT
   value: "800Mi"
+- name: EPHEMERAL_STORAGE_REQUEST
+  value: "3Gi"
+- name: EPHEMERAL_STORAGE_LIMIT
+  value: "6Gi"
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -227,6 +231,8 @@ objects:
             value: ${IMAGE_SERVICE_BASE_URL}
           - name: DATA_DIR
             value: "/data"
+          - name: DATA_TEMP_DIR
+            value: "/data_temp"
           ports:
           - protocol: TCP
             containerPort: 8080
@@ -234,9 +240,11 @@ objects:
             requests:
               cpu: ${{CPU_REQUEST}}
               memory: ${{MEMORY_REQUEST}}
+              ephemeral-storage: ${{EPHEMERAL_STORAGE_REQUEST}}
             limits:
               cpu: ${{CPU_LIMIT}}
               memory: ${{MEMORY_LIMIT}}
+              ephemeral-storage: ${{EPHEMERAL_STORAGE_LIMIT}}
           livenessProbe:
             httpGet:
               path: /live
@@ -253,7 +261,12 @@ objects:
             successThreshold: ${{READINESS_PROBE_SUCCESS_THRESHOLD}}
           volumeMounts:
           - name: assisted-image-service
-            mountPath: "/data"
+            mountPath: "${DATA_DIR}"
+          - name: data-temp-volume
+            mountPath: "${DATA_TEMP_DIR}"
+        volumes:
+        - name: data-temp-volume
+          emptyDir: {}
         serviceAccountName: assisted-service
     volumeClaimTemplates:
     - metadata:

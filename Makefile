@@ -42,7 +42,9 @@ format:
 
 run: certs
 	podman run --rm \
-		-v $(PWD)/data:/data:Z -v $(PWD)/certs:/certs:Z \
+		-v $(PWD)/data:/data:Z \
+		-v $(PWD)/data_temp:/data_temp:Z \
+		-v $(PWD)/certs:/certs:Z \
 		-p$(LISTEN_PORT):$(LISTEN_PORT) \
 		-e LISTEN_PORT=$(LISTEN_PORT) \
 		-e HTTPS_KEY_FILE=/certs/tls.key -e HTTPS_CERT_FILE=/certs/tls.crt \

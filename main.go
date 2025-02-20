@@ -25,6 +25,7 @@ var Options struct {
 	AssistedServiceScheme string `envconfig:"ASSISTED_SERVICE_SCHEME"`
 	AssistedServiceHost   string `envconfig:"ASSISTED_SERVICE_HOST"`
 	DataDir               string `envconfig:"DATA_DIR"`
+	DataTempDir           string `envconfig:"DATA_TEMP_DIR" default:"/data_temp"`
 	HTTPSKeyFile          string `envconfig:"HTTPS_KEY_FILE"`
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
 
@@ -111,7 +112,7 @@ func main() {
 	}
 
 	is, err := imagestore.NewImageStore(
-		isoeditor.NewEditor(Options.DataDir, isoeditor.NewNmstateHandler(Options.DataDir, &isoeditor.CommonExecuter{})),
+		isoeditor.NewEditor(Options.DataTempDir, isoeditor.NewNmstateHandler(Options.DataTempDir, &isoeditor.CommonExecuter{})),
 		Options.DataDir,
 		Options.ImageServiceBaseURL,
 		Options.InsecureSkipVerify,
