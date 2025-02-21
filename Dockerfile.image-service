@@ -1,3 +1,55 @@
+# Used to build tools:
+FROM quay.io/centos/centos:stream9 AS tools
+
+# Install the build tools and the required libraries:
+RUN \
+  dnf install -y \
+  \
+  gcc \
+  libtool \
+  make \
+  \
+  libselinux-devel \
+  libuuid-devel \
+  libzstd-devel \
+  lz4-devel \
+  zlib-devel \
+  \
+  && \
+  dnf clean all
+
+# Copy the source code of the external packages:
+COPY packages /packages
+
+# We will be installing tools to the '/usr/local' directories, so we need to configure the package
+# search path and generate the binaries so that they will look for dynamic libraries there.
+ENV \
+  PKG_CONFIG_PATH="/usr/local/lib/pkgconfig" \
+  LDFLAGS="-Wl,-rpath=/usr/local/lib"
+
+# The version of 'xz' required by 'erofs-utils' is newer than what is provided by RHEL 9, so we need
+# to build it from source and install it in parallel to the one included in the distribution.
+RUN \
+  mkdir /tmp/build && \
+  cd /tmp/build && \
+  tar --extract --strip-components 1 --file /packages/xz-5.6.4.tar.gz && \
+  ./configure && \
+  make install && \
+  rm -rf /tmp/build
+
+# Build erofs-utils:
+RUN \
+  mkdir /tmp/build && \
+  cd /tmp/build && \
+  tar --extract --strip-components 1 --file /packages/erofs-utils-1.8.5.tar.gz && \
+  ./autogen.sh && \
+  ./configure --with-selinux \
+  && \
+  make install && \
+  rm -rf /tmp/build
+
+
+# Used to build the service:
 FROM registry.access.redhat.com/ubi9/go-toolset:1.21 AS golang
 
 USER 0
@@ -60,7 +112,13 @@ COPY --from=golang /commit-reference.txt /commit-reference.txt
 
 USER $UID:$GID
 
+COPY --from=tools /usr/local /usr/local
 COPY --from=golang /tmp/licenses /licenses
 COPY --from=golang /assisted-image-service /assisted-image-service
+
+# TODO: This is just to show that the binary is working, should be removed.
+RUN \
+  ldd /usr/local/bin/dump.erofs && \
+  dump.erofs --help
 
 CMD ["/assisted-image-service"]
