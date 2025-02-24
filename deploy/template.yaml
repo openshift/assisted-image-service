@@ -261,9 +261,9 @@ objects:
             successThreshold: ${{READINESS_PROBE_SUCCESS_THRESHOLD}}
           volumeMounts:
           - name: assisted-image-service
-            mountPath: "${DATA_DIR}"
+            mountPath: /data
           - name: data-temp-volume
-            mountPath: "${DATA_TEMP_DIR}"
+            mountPath: /data_temp
         volumes:
         - name: data-temp-volume
           emptyDir: {}
