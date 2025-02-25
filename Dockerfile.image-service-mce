@@ -13,6 +13,7 @@ RUN \
   libuuid-devel \
   libzstd-devel \
   lz4-devel \
+  lzo-devel \
   zlib-devel \
   \
   && \
@@ -61,7 +62,10 @@ RUN dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
 # Copy very minimum that we need from the tools container. That is the 'dump.erofs' binary and the
 # compression library (from the 'xz' package) that it needs.
 COPY --from=tools /usr/local/lib/liblzma.so.5 /usr/local/lib
-COPY --from=tools /usr/local/bin/dump.erofs /usr/local/bin
+COPY --from=tools \
+  /usr/local/bin/dump.erofs \
+  /usr/local/bin/unsquashfs \
+  /usr/local/bin
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-image-service /assisted-image-service

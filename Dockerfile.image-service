@@ -13,6 +13,7 @@ RUN \
   libuuid-devel \
   libzstd-devel \
   lz4-devel \
+  lzo-devel \
   zlib-devel \
   \
   && \
@@ -79,10 +80,13 @@ COPY --from=golang /commit-reference.txt /commit-reference.txt
 
 USER $UID:$GID
 
-# Copy very minimum that we need from the tools container. That is the 'dump.erofs' binary and the
-# compression library (from the 'xz' package) that it needs.
+# Copy very minimum that we need from the tools container. That is the 'dump.erofs' and 'unsquashfs'
+# binaries and the compression library (from the 'xz' package) that then need.
 COPY --from=tools /usr/local/lib/liblzma.so.5 /usr/local/lib
-COPY --from=tools /usr/local/bin/dump.erofs /usr/local/bin
+COPY --from=tools \
+  /usr/local/bin/dump.erofs \
+  /usr/local/bin/unsquashfs \
+  /usr/local/bin
 
 COPY --from=golang /tmp/licenses /licenses
 COPY --from=golang /assisted-image-service /assisted-image-service

@@ -8,3 +8,4 @@ export LDFLAGS="-Wl,-rpath=/usr/local/lib"
 # Build the package, in the right order to account for build dependencies:
 (cd xz && ./build.sh)
 (cd erofs-utils && ./build.sh)
+(cd squashfs-tools && ./build.sh)
