@@ -1,3 +1,29 @@
+# Used to build external packages:
+FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4 AS packages
+
+# Install the build tools and the required libraries:
+RUN \
+  dnf install -y \
+  \
+  gcc \
+  libtool \
+  make \
+  \
+  libselinux-devel \
+  libuuid-devel \
+  libzstd-devel \
+  lz4-devel \
+  zlib-devel \
+  \
+  && \
+  dnf clean all
+
+# Build the packages:
+COPY packages /packages
+RUN cd /packages && ./build.sh
+
+
+# Used to build the service:
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1.21 AS builder
 ARG TARGETOS
 ARG TARGETARCH
@@ -36,6 +62,11 @@ VOLUME $DATA_TEMP_DIR
 ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
 
 RUN dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
+
+# Copy the very minimum that we need from the external packages container. That is the 'dump.erofs'
+# binary and the compression library (from the 'xz' package) that it needs.
+COPY --from=packages /usr/local/lib/liblzma.so.5 /usr/local/lib
+COPY --from=packages /usr/local/bin/dump.erofs /usr/local/bin
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-image-service /assisted-image-service

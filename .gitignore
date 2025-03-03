@@ -4,3 +4,4 @@
 /certs
 /reports
 /.idea
+/packages/*/build
