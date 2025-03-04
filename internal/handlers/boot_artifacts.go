@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
@@ -19,23 +20,29 @@ type BootArtifactsHandler struct {
 
 var _ http.Handler = &BootArtifactsHandler{}
 
+var IsoFileName string
+
 var bootpathRegexp = regexp.MustCompile(`^/boot-artifacts/(.+)`)
 
-func parseArtifact(path, arch string) (string, error) {
+func parseArtifact(path, arch, version string) (string, error) {
 	match := bootpathRegexp.FindStringSubmatch(path)
 	if len(match) < 1 {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
 
 	var artifact string
+	rhelVersion, err := strconv.Atoi(strings.Split(strings.Split(IsoFileName, version+"-")[1], ".")[1])
+	if err != nil {
+		fmt.Println("Error in fetching RHCOS Version from ISO file")
+		return "", err
+	}
 	switch match[1] {
 	case "rootfs":
 		artifact = "rootfs.img"
 	case "kernel":
-		if arch == "s390x" {
+		artifact = "vmlinuz"
+		if arch == "s390x" && rhelVersion < 96 {
 			artifact = "kernel.img"
-		} else {
-			artifact = "vmlinuz"
 		}
 	case "ins-file":
 		if arch == "s390x" {
@@ -63,29 +70,29 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	artifact, err := parseArtifact(r.URL.Path, arch)
+	IsoFileName = b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
+	artifact, err := parseArtifact(r.URL.Path, arch, version)
 	if err != nil {
 		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
 		return
 	}
 
-	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
 	file_path := fmt.Sprintf("/images/pxeboot/%s", artifact)
 	if artifact == "generic.ins" {
 		// s390x only, unlike other artifacts this one is at the root of the ISO
 		file_path = fmt.Sprintf("/%s", artifact)
 	}
 
-	fileReader, err := isoeditor.GetFileFromISO(isoFileName, file_path)
+	fileReader, err := isoeditor.GetFileFromISO(IsoFileName, file_path)
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error creating file reader stream: %v", err)
 		return
 	}
 	defer fileReader.Close()
 
-	fileInfo, err := os.Stat(isoFileName)
+	fileInfo, err := os.Stat(IsoFileName)
 	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", isoFileName)
+		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", IsoFileName)
 		return
 	}
 
