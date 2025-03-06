@@ -150,8 +150,8 @@ var _ = Describe("ServeHTTP", func() {
 })
 
 var _ = DescribeTable("parseArtifact",
-	func(path, arch, version, artifact string, success bool) {
-		a, err := parseArtifact(path, arch, version)
+	func(path, arch, version, isoFileName, artifact string, success bool) {
+		a, err := parseArtifact(path, arch, version, isoFileName)
 		if success {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(a).To(Equal(artifact))
@@ -159,11 +159,11 @@ var _ = DescribeTable("parseArtifact",
 			Expect(err).To(HaveOccurred())
 		}
 	},
-	Entry("returns rootfs correctly", "/boot-artifacts/rootfs", "x86_64", "4.18.0", "rootfs.img", true),
-	Entry("returns kernel correctly", "/boot-artifacts/kernel", "x86_64", "4.19.0", "vmlinuz", true),
-	Entry("returns s390x kernel correctly", "/boot-artifacts/kernel", "s390x", "4.18.0", "kernel.img", true),
-	Entry("fails for an invalid artifact", "/boot-artifacts/asdf", "x86_64", "4.19.0", "", false),
-	Entry("fails for an incorrect path", "/wrong-path/rootfs", "x86_64", "4.18.0", "", false),
-	Entry("returns generic.ins correctly", "/boot-artifacts/ins-file", "s390x", "4.18.0", "generic.ins", true),
-	Entry("fails generic.ins incorrect arch", "/boot-artifacts/ins-file", "x86_64", "4.19.0", "", false),
+	Entry("returns rootfs correctly", "/boot-artifacts/rootfs", "x86_64", "4.18.1", "/data/rhcos-full-iso-4.18.1-418.94.202502100215-0-x86_64.iso", "rootfs.img", true),
+	Entry("returns kernel correctly", "/boot-artifacts/kernel", "x86_64", "4.19.0", "/data/rhcos-full-iso-4.19.0-419.96.202502102012-0-x86_64.iso", "vmlinuz", true),
+	Entry("returns s390x kernel correctly", "/boot-artifacts/kernel", "s390x", "4.18.1", "/data/rhcos-full-iso-4.18.1-418.94.202502100215-0-s390x.iso", "kernel.img", true),
+	Entry("fails for an invalid artifact", "/boot-artifacts/asdf", "x86_64", "4.19.0", "/data/rhcos-full-iso-4.19.0-419.96.202502102012-0-x86_64.iso", "", false),
+	Entry("fails for an incorrect path", "/wrong-path/rootfs", "x86_64", "4.18.1", "/data/rhcos-full-iso-4.18.1-418.94.202502100215-0-x86_64.iso", "", false),
+	Entry("returns generic.ins correctly", "/boot-artifacts/ins-file", "s390x", "4.18.1", "/data/rhcos-full-iso-4.18.1-418.94.202502100215-0-s390x.iso", "generic.ins", true),
+	Entry("fails generic.ins incorrect arch", "/boot-artifacts/ins-file", "x86_64", "4.19.0", "/data/rhcos-full-iso-4.19.0-419.96.202502102012-0-x86_64.iso", "", false),
 )

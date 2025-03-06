@@ -20,19 +20,18 @@ type BootArtifactsHandler struct {
 
 var _ http.Handler = &BootArtifactsHandler{}
 
-var IsoFileName string
-
 var bootpathRegexp = regexp.MustCompile(`^/boot-artifacts/(.+)`)
 
-func parseArtifact(path, arch, version string) (string, error) {
+func parseArtifact(path, arch, version, isoFileName string) (string, error) {
 	match := bootpathRegexp.FindStringSubmatch(path)
 	if len(match) < 1 {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
 
 	var artifact string
+
 	// Fetching rhelVersion from IsoFileName
-	rhelVersion, err := strconv.Atoi(strings.Split(strings.Split(IsoFileName, version+"-")[1], ".")[1])
+	rhelVersion, err := strconv.Atoi(strings.Split(strings.Split(isoFileName, version+"-")[1], ".")[1])
 	if err != nil {
 		fmt.Println("Error in fetching RHCOS Version from ISO file")
 		return "", err
@@ -71,8 +70,8 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	IsoFileName = b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
-	artifact, err := parseArtifact(r.URL.Path, arch, version)
+	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
+	artifact, err := parseArtifact(r.URL.Path, arch, version, isoFileName)
 	if err != nil {
 		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
 		return
@@ -84,16 +83,16 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		file_path = fmt.Sprintf("/%s", artifact)
 	}
 
-	fileReader, err := isoeditor.GetFileFromISO(IsoFileName, file_path)
+	fileReader, err := isoeditor.GetFileFromISO(isoFileName, file_path)
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error creating file reader stream: %v", err)
 		return
 	}
 	defer fileReader.Close()
 
-	fileInfo, err := os.Stat(IsoFileName)
+	fileInfo, err := os.Stat(isoFileName)
 	if err != nil {
-		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", IsoFileName)
+		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", isoFileName)
 		return
 	}
 
