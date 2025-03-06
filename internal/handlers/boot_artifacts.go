@@ -29,9 +29,19 @@ func parseArtifact(path, arch, version, isoFileName string) (string, error) {
 	}
 
 	var artifact string
+	var rhelVersion int
+	var err error
 
-	// Fetching rhelVersion from IsoFileName
-	rhelVersion, err := strconv.Atoi(strings.Split(strings.Split(isoFileName, version+"-")[1], ".")[1])
+	// Fetching rhcosVersion from isoFileName
+
+	rhcosVersionSplit := strings.Split(isoFileName, version+"-")
+	rhcosVersion := rhcosVersionSplit[len(rhcosVersionSplit)-1]
+
+	// Fetching rhelVersion from rhcosVersiom
+	if len(strings.Split(rhcosVersion, ".")) > 1 {
+		rhelVersion, err = strconv.Atoi(strings.Split(rhcosVersion, ".")[1])
+	}
+
 	if err != nil {
 		fmt.Println("Error in fetching RHCOS Version from ISO file")
 		return "", err
