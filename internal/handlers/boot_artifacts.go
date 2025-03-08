@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
@@ -22,38 +21,18 @@ var _ http.Handler = &BootArtifactsHandler{}
 
 var bootpathRegexp = regexp.MustCompile(`^/boot-artifacts/(.+)`)
 
-func parseArtifact(path, arch, version, isoFileName string) (string, error) {
+func parseArtifact(path, arch string) (string, error) {
 	match := bootpathRegexp.FindStringSubmatch(path)
 	if len(match) < 1 {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
 
 	var artifact string
-	var rhelVersion int
-	var err error
-
-	// Fetching rhcosVersion from isoFileName
-
-	rhcosVersionSplit := strings.Split(isoFileName, version+"-")
-	rhcosVersion := rhcosVersionSplit[len(rhcosVersionSplit)-1]
-
-	// Fetching rhelVersion from rhcosVersiom
-	if len(strings.Split(rhcosVersion, ".")) > 1 {
-		rhelVersion, err = strconv.Atoi(strings.Split(rhcosVersion, ".")[1])
-	}
-
-	if err != nil {
-		fmt.Println("Error in fetching RHCOS Version from ISO file")
-		return "", err
-	}
 	switch match[1] {
 	case "rootfs":
 		artifact = "rootfs.img"
 	case "kernel":
 		artifact = "vmlinuz"
-		if arch == "s390x" && rhelVersion < 96 {
-			artifact = "kernel.img"
-		}
 	case "ins-file":
 		if arch == "s390x" {
 			artifact = "generic.ins"
@@ -64,6 +43,15 @@ func parseArtifact(path, arch, version, isoFileName string) (string, error) {
 		return "", fmt.Errorf("malformed download path: %s", path)
 	}
 	return artifact, nil
+}
+
+func getArtifactFilePath(artifact string) string {
+	filePath := fmt.Sprintf("/images/pxeboot/%s", artifact)
+	if artifact == "generic.ins" {
+		// s390x only, unlike other artifacts this one is at the root of the ISO
+		filePath = fmt.Sprintf("/%s", artifact)
+	}
+	return filePath
 }
 
 func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -80,20 +68,20 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
-	artifact, err := parseArtifact(r.URL.Path, arch, version, isoFileName)
+	artifact, err := parseArtifact(r.URL.Path, arch)
 	if err != nil {
 		httpErrorf(w, http.StatusNotFound, "Failed to parse artifact: %v", err)
 		return
 	}
 
-	file_path := fmt.Sprintf("/images/pxeboot/%s", artifact)
-	if artifact == "generic.ins" {
-		// s390x only, unlike other artifacts this one is at the root of the ISO
-		file_path = fmt.Sprintf("/%s", artifact)
+	isoFileName := b.ImageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
+	fileReader, err := isoeditor.GetFileFromISO(isoFileName, getArtifactFilePath(artifact))
+
+	if err != nil && arch == "s390x" && artifact == "vmlinuz" {
+		// Reading with artifact name as kernel.img for s390x if vmlinuz is not present
+		fileReader, err = isoeditor.GetFileFromISO(isoFileName, getArtifactFilePath("kernel.img"))
 	}
 
-	fileReader, err := isoeditor.GetFileFromISO(isoFileName, file_path)
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error creating file reader stream: %v", err)
 		return
