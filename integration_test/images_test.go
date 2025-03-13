@@ -32,7 +32,7 @@ var (
 		{
 			"openshift_version": "pre-release",
 			"cpu_architecture":  "arm64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live.aarch64.iso",
+			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live-iso.aarch64.iso",
 			"version":           "arm-latest",
 		},
 		{
