@@ -25,13 +25,13 @@ arches:
     name: cpp
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-10.el9_4.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-11.el9_5.1.noarch.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 9490
-    checksum: sha256:e04cd595ed5641c8622ff123a8bc5df9ccfecd5f53204c3944f9e9a31e60e2cf
+    size: 9756
+    checksum: sha256:0c0a41c8f61f7509326ccba340211fcd5638397df397d942fb486f1c37966d13
     name: emacs-filesystem
-    evr: 1:27.2-10.el9_4
-    sourcerpm: emacs-27.2-10.el9_4.src.rpm
+    evr: 1:27.2-11.el9_5.1
+    sourcerpm: emacs-27.2-11.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/g/gcc-11.5.0-5.el9_5.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 31300907
@@ -39,20 +39,20 @@ arches:
     name: gcc
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/g/glibc-devel-2.34-100.el9_4.4.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/g/glibc-devel-2.34-125.el9_5.3.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 562909
-    checksum: sha256:659ea1f0a46b8ac68babb9db5494e549ba366e18a2ed02e9b9da170c0bdefa9d
+    size: 558887
+    checksum: sha256:2698c0da1a458887869e9078526ea432ec723d9c6c23055ea3c4f8e722526f91
     name: glibc-devel
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-503.26.1.el9_5.aarch64.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-503.31.1.el9_5.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 3890829
-    checksum: sha256:16663c5a90ef1be3bf9348dc14bc78aa6eca55f7daf8bbdae078fa513784dcb9
+    size: 3899909
+    checksum: sha256:bd525b2bd48766ff012e2fe0c6688bdf11a0e8321c02b689ff0d23baa2db734c
     name: kernel-headers
-    evr: 5.14.0-503.26.1.el9_5
-    sourcerpm: kernel-5.14.0-503.26.1.el9_5.src.rpm
+    evr: 5.14.0-503.31.1.el9_5
+    sourcerpm: kernel-5.14.0-503.31.1.el9_5.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/libasan-11.5.0-5.el9_5.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 413819
@@ -634,6 +634,34 @@ arches:
     name: elfutils-debuginfod-client
     evr: 0.190-2.el9
     sourcerpm: elfutils-0.190-2.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/glibc-2.34-125.el9_5.3.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 1797593
+    checksum: sha256:34d7c08796ddddf49e859bc830e7711b06f8f4bb8d84c5b7ff3fc49d9b8fd5c3
+    name: glibc
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/glibc-common-2.34-125.el9_5.3.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 300295
+    checksum: sha256:82c67b890ab3094110fe667b50d6b42e748cf09babb0f6693f4af71c48a939a5
+    name: glibc-common
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/glibc-langpack-en-2.34-125.el9_5.3.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 671094
+    checksum: sha256:56da1af4b4d9998a4291eeba37a42ff3b1f61dfeba3532bbfddc80b629575f09
+    name: glibc-langpack-en
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/glibc-minimal-langpack-2.34-125.el9_5.3.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 16933
+    checksum: sha256:544eb08746c347e6529c481f6248000f5d0c1396f3dbe9077431604c99d496f6
+    name: glibc-minimal-langpack
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/groff-base-1.22.4-10.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 1088949
@@ -792,13 +820,13 @@ arches:
     name: cpp
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-10.el9_4.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-11.el9_5.1.noarch.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 9490
-    checksum: sha256:e04cd595ed5641c8622ff123a8bc5df9ccfecd5f53204c3944f9e9a31e60e2cf
+    size: 9756
+    checksum: sha256:0c0a41c8f61f7509326ccba340211fcd5638397df397d942fb486f1c37966d13
     name: emacs-filesystem
-    evr: 1:27.2-10.el9_4
-    sourcerpm: emacs-27.2-10.el9_4.src.rpm
+    evr: 1:27.2-11.el9_5.1
+    sourcerpm: emacs-27.2-11.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/g/gcc-11.5.0-5.el9_5.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 29056841
@@ -806,20 +834,20 @@ arches:
     name: gcc
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/g/glibc-devel-2.34-100.el9_4.4.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/g/glibc-devel-2.34-125.el9_5.3.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 574257
-    checksum: sha256:8b76e50c446c65c3fc5d8f9a87877a8b6c03123a32eee0aa1edaec6acdce8913
+    size: 573297
+    checksum: sha256:81c4740548b57c9a1080e6d8a3283b99b7c82c3eb5e632d33f87385028d325c9
     name: glibc-devel
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-503.26.1.el9_5.ppc64le.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-503.31.1.el9_5.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 3912821
-    checksum: sha256:8b65d40d8b9330176758dd02d730f4bc70dd8277151f15f09a6ee8183128040d
+    size: 3921837
+    checksum: sha256:6a4cd4e80cbe91ddf471243284d7465321ad185b918f75ca056dc0baeae10faa
     name: kernel-headers
-    evr: 5.14.0-503.26.1.el9_5
-    sourcerpm: kernel-5.14.0-503.26.1.el9_5.src.rpm
+    evr: 5.14.0-503.31.1.el9_5
+    sourcerpm: kernel-5.14.0-503.31.1.el9_5.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/libasan-11.5.0-5.el9_5.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 445773
@@ -1401,6 +1429,34 @@ arches:
     name: elfutils-debuginfod-client
     evr: 0.190-2.el9
     sourcerpm: elfutils-0.190-2.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/glibc-2.34-125.el9_5.3.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 2862480
+    checksum: sha256:c490a3dde20109ffa92b56c4cdc2abc3da71a0726ba4df5002cdbabe5a567cc9
+    name: glibc
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/glibc-common-2.34-125.el9_5.3.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 325441
+    checksum: sha256:8ca779283db749b73a550bf269f8fc587d5f9c253775946a21c10c93d3ee392e
+    name: glibc-common
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/glibc-langpack-en-2.34-125.el9_5.3.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 671010
+    checksum: sha256:192139926c12bf7a0e932d5260d3efbe25d38f5720cd36bb042c550767fc5431
+    name: glibc-langpack-en
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/glibc-minimal-langpack-2.34-125.el9_5.3.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 16957
+    checksum: sha256:f5326f08c50bc138e700cb55030e8a15696e8275fc56bf14e1918de23778c0ea
+    name: glibc-minimal-langpack
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/groff-base-1.22.4-10.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 1156956
@@ -1559,13 +1615,13 @@ arches:
     name: cpp
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-10.el9_4.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-11.el9_5.1.noarch.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 9490
-    checksum: sha256:e04cd595ed5641c8622ff123a8bc5df9ccfecd5f53204c3944f9e9a31e60e2cf
+    size: 9756
+    checksum: sha256:0c0a41c8f61f7509326ccba340211fcd5638397df397d942fb486f1c37966d13
     name: emacs-filesystem
-    evr: 1:27.2-10.el9_4
-    sourcerpm: emacs-27.2-10.el9_4.src.rpm
+    evr: 1:27.2-11.el9_5.1
+    sourcerpm: emacs-27.2-11.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/gcc-11.5.0-5.el9_5.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 26862907
@@ -1573,27 +1629,27 @@ arches:
     name: gcc
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/glibc-devel-2.34-100.el9_4.4.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/glibc-devel-2.34-125.el9_5.3.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 44083
-    checksum: sha256:3c206e7202d79f4d5adac33ea8662712c76b829e6f286e2dec85e6365d466093
+    size: 43298
+    checksum: sha256:4125ec425e59b161f129a8be16a454731db9f2aa61de404947423242ba41e75f
     name: glibc-devel
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/glibc-headers-2.34-100.el9_4.4.s390x.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/glibc-headers-2.34-125.el9_5.3.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 544741
-    checksum: sha256:a0a904a22142e7f1e89882984915cd8760786f75d446c591617bf4ce1504bfe3
+    size: 540760
+    checksum: sha256:b8288be26f1968df527583ee1f5aa9b71d3a9fae1ae199dc10d01de95a171da8
     name: glibc-headers
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-503.26.1.el9_5.s390x.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-503.31.1.el9_5.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 3920817
-    checksum: sha256:9a4a653afaefca2837432009f26b60a36e042ace629718753741c43c7250eb62
+    size: 3929873
+    checksum: sha256:4b8e4860bb5d4143a70f7aaa25756c5145f8105dd9ed0df88ef7ef3e451b2f03
     name: kernel-headers
-    evr: 5.14.0-503.26.1.el9_5
-    sourcerpm: kernel-5.14.0-503.26.1.el9_5.src.rpm
+    evr: 5.14.0-503.31.1.el9_5
+    sourcerpm: kernel-5.14.0-503.31.1.el9_5.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/libasan-11.5.0-5.el9_5.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 415917
@@ -2175,6 +2231,34 @@ arches:
     name: elfutils-debuginfod-client
     evr: 0.190-2.el9
     sourcerpm: elfutils-0.190-2.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/glibc-2.34-125.el9_5.3.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 1773830
+    checksum: sha256:d4b47a751b3a560204d15b286964fc5cbcec3a86e8bd16b1a759ccace0a8101c
+    name: glibc
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/glibc-common-2.34-125.el9_5.3.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 313327
+    checksum: sha256:437784885badf93bcb8619869bf837a74699c4954575ef4186d3dcab1cb82cb1
+    name: glibc-common
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/glibc-langpack-en-2.34-125.el9_5.3.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 621674
+    checksum: sha256:a5adb94e8072ac565c889d444847fc9150fbd4e7029dc6a460bb0a80482446c2
+    name: glibc-langpack-en
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/glibc-minimal-langpack-2.34-125.el9_5.3.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 16941
+    checksum: sha256:ae7b17ac96bf527d76807f99453e46dabe0596f6f9cbbb49d2b39537a1886742
+    name: glibc-minimal-langpack
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/groff-base-1.22.4-10.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 1100747
@@ -2333,13 +2417,13 @@ arches:
     name: cpp
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-10.el9_4.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-11.el9_5.1.noarch.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 9490
-    checksum: sha256:e04cd595ed5641c8622ff123a8bc5df9ccfecd5f53204c3944f9e9a31e60e2cf
+    size: 9756
+    checksum: sha256:0c0a41c8f61f7509326ccba340211fcd5638397df397d942fb486f1c37966d13
     name: emacs-filesystem
-    evr: 1:27.2-10.el9_4
-    sourcerpm: emacs-27.2-10.el9_4.src.rpm
+    evr: 1:27.2-11.el9_5.1
+    sourcerpm: emacs-27.2-11.el9_5.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/gcc-11.5.0-5.el9_5.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 34006000
@@ -2347,27 +2431,27 @@ arches:
     name: gcc
     evr: 11.5.0-5.el9_5
     sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/glibc-devel-2.34-100.el9_4.4.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/glibc-devel-2.34-125.el9_5.3.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 36205
-    checksum: sha256:c7c88469c845e5550037d17d544c2fdcde683e6410e6aad77b5cdd09580d15ca
+    size: 32111
+    checksum: sha256:e11b718441a5034c7dca3f8515862c599716ea7d02254c78287c32de16f3e068
     name: glibc-devel
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/glibc-headers-2.34-100.el9_4.4.x86_64.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/glibc-headers-2.34-125.el9_5.3.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 553893
-    checksum: sha256:2dc0c045df41e6d5f34c846a8c8ffd77b1618bdd05b920f85bb27742b208bcff
+    size: 549855
+    checksum: sha256:33d7d6af61db9697b6980d16de47fcd92acd8472c2e6500ac7863ec9feb51391
     name: glibc-headers
-    evr: 2.34-100.el9_4.4
-    sourcerpm: glibc-2.34-100.el9_4.4.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-503.26.1.el9_5.x86_64.rpm
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-503.31.1.el9_5.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 3929365
-    checksum: sha256:e3f6f637b01b759feb82ec8604552afb1c1d455381e06da7080bd666ebc45d68
+    size: 3938401
+    checksum: sha256:6640d6a4583362ddadf1a2bf72d7d6f444ec1fec9d8c8566375d49871fcd2da4
     name: kernel-headers
-    evr: 5.14.0-503.26.1.el9_5
-    sourcerpm: kernel-5.14.0-503.26.1.el9_5.src.rpm
+    evr: 5.14.0-503.31.1.el9_5
+    sourcerpm: kernel-5.14.0-503.31.1.el9_5.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libmpc-1.2.1-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 66075
@@ -2935,6 +3019,34 @@ arches:
     name: elfutils-debuginfod-client
     evr: 0.190-2.el9
     sourcerpm: elfutils-0.190-2.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/glibc-2.34-125.el9_5.3.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 2064994
+    checksum: sha256:ed99fdb1e7e6961738188aedda701f0b3937455abfb2d493cd852d5b0c65e36e
+    name: glibc
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/glibc-common-2.34-125.el9_5.3.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 310308
+    checksum: sha256:3987d332cfe660906639782722df749c04c77bda9da50c91ed1678c5acafc01d
+    name: glibc-common
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/glibc-langpack-en-2.34-125.el9_5.3.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 671162
+    checksum: sha256:e98503528366265941e770230960255f1084d5b1b04def9af7f433e51f5cb3a0
+    name: glibc-langpack-en
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/glibc-minimal-langpack-2.34-125.el9_5.3.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 16969
+    checksum: sha256:12d6f54995345d418c1c94832b4bdf278357a2c6cf79554b43084f6d45bd1efb
+    name: glibc-minimal-langpack
+    evr: 2.34-125.el9_5.3
+    sourcerpm: glibc-2.34-125.el9_5.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/groff-base-1.22.4-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 1133828
