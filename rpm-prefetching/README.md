@@ -4,3 +4,4 @@ If you want to prefetch more RPMs in order to install them during the build, you
 You do not need to create a new activation-key, instead use [this one](https://console.redhat.com/insights/connector/activation-keys/assisted-installer).
 
 If you want to better understand the `rpms.in.yaml` file you can look at the project's README [here](https://github.com/konflux-ci/rpm-lockfile-prototype/blob/main/README.md).
+this is a test
