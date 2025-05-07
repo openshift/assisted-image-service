@@ -23,6 +23,7 @@ var _ = Context("with test files", func() {
 		filesDir           string
 		workDir            string
 		minimalISOPath     string
+		nmstatectlPath     string
 		volumeID           = "Assisted123"
 		ctrl               *gomock.Controller
 		mockNmstateHandler *MockNmstateHandler
@@ -50,12 +51,12 @@ var _ = Context("with test files", func() {
 		workDir, err = os.MkdirTemp("", "testisoeditor")
 		Expect(err).NotTo(HaveOccurred())
 		minimalISOPath = filepath.Join(workDir, "minimal.iso")
-
+		nmstatectlPath = filepath.Join(workDir, "nmstatectl-for-caching")
 		ctrl = gomock.NewController(GinkgoT())
 		mockNmstateHandler = NewMockNmstateHandler(ctrl)
 		mockExecuter = NewMockExecuter(ctrl)
 		mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("some string", nil).Times(3)
-		mockNmstateHandler.EXPECT().CreateNmstateRamDisk(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+		mockNmstateHandler.EXPECT().CreateNmstateRamDisk(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	})
 
 	AfterEach(func() {
@@ -67,13 +68,13 @@ var _ = Context("with test files", func() {
 	Describe("CreateMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath, "4.17")
+			err := editor.CreateMinimalISOTemplate(isoFile, testRootFSURL, "x86_64", minimalISOPath, "4.17", nmstatectlPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0")
+			err := editor.CreateMinimalISOTemplate("invalid", testRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0", nmstatectlPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -81,13 +82,13 @@ var _ = Context("with test files", func() {
 	Describe("CreateFCOSMinimalISOTemplate", func() {
 		It("iso created successfully", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath, "4.17")
+			err := editor.CreateMinimalISOTemplate(isoFile, testFCOSRootFSURL, "x86_64", minimalISOPath, "4.17", nmstatectlPath)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("missing iso file", func() {
 			editor := NewEditor(workDir, mockNmstateHandler)
-			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0")
+			err := editor.CreateMinimalISOTemplate("invalid", testFCOSRootFSURL, "x86_64", minimalISOPath, "4.18.0-ec.0", nmstatectlPath)
 			Expect(err).To(HaveOccurred())
 		})
 	})

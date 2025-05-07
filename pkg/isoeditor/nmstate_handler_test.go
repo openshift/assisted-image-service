@@ -34,25 +34,28 @@ var _ = Context("with test files", func() {
 
 	Describe("CreateNmstateRamDisk", func() {
 		var (
-			extractDir, ramDiskPath string
-			err                     error
-			nmstateHandler          NmstateHandler
-			ctrl                    *gomock.Controller
-			mockExecuter            *MockExecuter
+			extractDir, ramDiskPath, nmstatectlPath, nmstatectlPathForCaching string
+			err                                                               error
+			nmstateHandler                                                    NmstateHandler
+			ctrl                                                              *gomock.Controller
+			mockExecuter                                                      *MockExecuter
 		)
 
 		BeforeEach(func() {
 			extractDir = os.TempDir()
+
 			nmstateDir := filepath.Join(extractDir, "nmstate", "squashfs-root")
 			err = os.MkdirAll(nmstateDir, os.ModePerm)
 			Expect(err).ToNot(HaveOccurred())
 
-			nmstatectlPath := filepath.Join(nmstateDir, "nmstatectl")
+			nmstatectlPath = filepath.Join(nmstateDir, "nmstatectl")
 			_, err := os.Create(nmstatectlPath)
 			Expect(err).ToNot(HaveOccurred())
 
 			ramDisk, err := os.CreateTemp(extractDir, "nmstate.img")
 			Expect(err).ToNot(HaveOccurred())
+
+			nmstatectlPathForCaching = filepath.Join(workDir, "nmstatectl-openshiftVersion-version-arch")
 
 			ramDiskPath = ramDisk.Name()
 
@@ -64,10 +67,11 @@ var _ = Context("with test files", func() {
 
 		AfterEach(func() {
 			os.Remove(extractDir)
+			os.Remove(ramDiskPath)
 		})
 
 		It("ram disk created successfully", func() {
-			err := nmstateHandler.CreateNmstateRamDisk("", ramDiskPath)
+			err := nmstateHandler.CreateNmstateRamDisk("", ramDiskPath, nmstatectlPathForCaching)
 			Expect(err).ToNot(HaveOccurred())
 
 			exists, err := fileExists(ramDiskPath)
