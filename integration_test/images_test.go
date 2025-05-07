@@ -19,6 +19,7 @@ import (
 
 	"github.com/cavaliercoder/go-cpio"
 	diskfs "github.com/diskfs/go-diskfs"
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-image-service/internal/handlers"
@@ -82,6 +83,7 @@ var (
 	imageDir            string
 	imageStore          imagestore.ImageStore
 	imageServiceBaseURL = "http://images.example.com"
+	mockNmstateHandler  *isoeditor.MockNmstateHandler
 )
 
 var _ = Describe("Image integration tests", func() {
@@ -161,6 +163,11 @@ var _ = Describe("Image integration tests", func() {
 
 		Context(tc.name, func() {
 			BeforeEach(func() {
+				workDir, err := os.MkdirTemp("", "testisoeditor")
+				Expect(err).NotTo(HaveOccurred())
+				ctrl := gomock.NewController(GinkgoT())
+				mockNmstateHandler = isoeditor.NewMockNmstateHandler(ctrl)
+
 				imageID = uuid.New().String()
 
 				// Set up assisted service
@@ -193,7 +200,7 @@ var _ = Describe("Image integration tests", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				mdw := middleware.New(middleware.Config{})
-				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw))
+				imageServer = httptest.NewServer(handlers.NewImageHandler(imageStore, asc, 1, mdw, workDir, mockNmstateHandler))
 				imageClient = imageServer.Client()
 			})
 

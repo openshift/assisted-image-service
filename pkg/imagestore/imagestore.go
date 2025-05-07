@@ -77,6 +77,7 @@ type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
+	NmstatectlPathForParams(openshiftVersion, arch string) string
 }
 
 type rhcosStore struct {
@@ -297,7 +298,8 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				return fmt.Errorf("failed to build rootfs URL: %v", err)
 			}
 
-			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, arch, minimalPath, openshiftVersion)
+			nmstatectlPath := s.NmstatectlPathForParams(openshiftVersion, arch)
+			err = s.isoEditor.CreateMinimalISOTemplate(fullPath, rootfsURL, arch, minimalPath, openshiftVersion, nmstatectlPath)
 			if err != nil {
 				return fmt.Errorf("failed to create minimal iso template for version %s: %v", imageInfo, err)
 			}
@@ -375,4 +377,18 @@ func (s *rhcosStore) HaveVersion(version, arch string) bool {
 		}
 	}
 	return false
+}
+
+func (s *rhcosStore) NmstatectlPathForParams(openshiftVersion, arch string) string {
+	var version string
+	for _, entry := range s.versions {
+		if entry["openshift_version"] == openshiftVersion && entry["cpu_architecture"] == arch {
+			version = entry["version"]
+		}
+	}
+	return filepath.Join(s.dataDir, nmstatectlFileName(openshiftVersion, version, arch))
+}
+
+func nmstatectlFileName(openshiftVersion, version, arch string) string {
+	return fmt.Sprintf("nmstatectl-%s-%s-%s", openshiftVersion, version, arch)
 }
