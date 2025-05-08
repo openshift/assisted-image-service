@@ -20,7 +20,7 @@ const (
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
-	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion string) error
+	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion, nmstatectlPath string) error
 }
 
 type rhcosEditor struct {
@@ -71,7 +71,7 @@ func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath stri
 }
 
 // CreateMinimalISOTemplate Creates the template minimal iso by removing the rootfs and adding the url
-func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion string) error {
+func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion, nmstatectlPath string) error {
 	extractDir, err := os.MkdirTemp(e.workDir, "isoutil")
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 
 	if versionOK {
 		rootfsPath := filepath.Join(extractDir, "images/pxeboot/rootfs.img")
-		err = e.nmstateHandler.CreateNmstateRamDisk(rootfsPath, ramDiskPath)
+		err = e.nmstateHandler.CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath)
 		if err != nil {
 			return fmt.Errorf("failed to create nmstate ram disk for arch %s: %v", arch, err)
 		}
