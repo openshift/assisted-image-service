@@ -30,6 +30,9 @@ import (
 var (
 	imageServiceBaseURL = "http://images.example.com"
 	rootfsURL           = "http://images.example.com/boot-artifacts/rootfs?arch=x86_64&version=%s"
+
+
+
 )
 
 func TestImageStore(t *testing.T) {
