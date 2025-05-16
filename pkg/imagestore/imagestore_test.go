@@ -456,7 +456,7 @@ var _ = Context("with a data directory configured", func() {
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
-						ghttp.RespondWith(http.StatusOK, "someeeeeisocontenthere", http.Header{"Content-Length": []string{"1"}}),
+						ghttp.RespondWith(http.StatusOK, "someisocontenthere", http.Header{"Content-Length": []string{"1"}}),
 					),
 				)
 				version["url"] = ts.URL() + "/some.iso"
