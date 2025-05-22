@@ -48,6 +48,21 @@ func (mr *MockImageStoreMockRecorder) HaveVersion(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0, arg1)
 }
 
+// NmstatectlPathForParams mocks base method.
+func (m *MockImageStore) NmstatectlPathForParams(arg0, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NmstatectlPathForParams", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NmstatectlPathForParams indicates an expected call of NmstatectlPathForParams.
+func (mr *MockImageStoreMockRecorder) NmstatectlPathForParams(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NmstatectlPathForParams", reflect.TypeOf((*MockImageStore)(nil).NmstatectlPathForParams), arg0, arg1)
+}
+
 // PathForParams mocks base method.
 func (m *MockImageStore) PathForParams(arg0, arg1, arg2 string) string {
 	m.ctrl.T.Helper()

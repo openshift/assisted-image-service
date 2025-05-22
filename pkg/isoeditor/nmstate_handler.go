@@ -15,7 +15,7 @@ import (
 
 //go:generate mockgen -package=isoeditor -destination=mock_nmstate_handler.go . NmstateHandler
 type NmstateHandler interface {
-	CreateNmstateRamDisk(rootfsPath, ramDiskPath string) error
+	CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error
 }
 
 type nmstateHandler struct {
@@ -30,43 +30,35 @@ func NewNmstateHandler(workDir string, executer Executer) NmstateHandler {
 	}
 }
 
-func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath string) error {
-	// Extract nmstatectl binary
-	var err error
-	nmstateDir := filepath.Join(n.workDir, "nmstate")
-	err = os.MkdirAll(nmstateDir, os.ModePerm)
-	if err != nil {
-		return err
-	}
-	binaryPath, err := n.extractNmstatectl(rootfsPath, nmstateDir)
-	if err != nil {
-		return err
-	}
-	nmstatectlPath := filepath.Join(nmstateDir, "squashfs-root", binaryPath)
-
-	// Check if nmstatectl binary file exists
-	if _, err = os.Stat(nmstatectlPath); os.IsNotExist(err) {
-		return err
-	}
-
-	// Read binary
-	nmstateBinContent, err := os.ReadFile(nmstatectlPath)
+func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error {
+	compressedCpio, err := n.buildNmstateCpioArchive(rootfsPath)
 	if err != nil {
 		return err
 	}
 
-	// Create a compressed RAM disk image with the nmstatectl binary
-	compressedCpio, err := generateCompressedCPIO(nmstateBinContent, NmstatectlPathInRamdisk, 0o100_755)
-	if err != nil {
-		return err
-	}
-
-	// Write RAM disk file
+	// write for RAM disk
 	err = os.WriteFile(ramDiskPath, compressedCpio, 0755) //nolint:gosec
 	if err != nil {
 		return err
 	}
 
+	// write for caching
+	err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (n *nmstateHandler) buildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
+	// Extract nmstatectl binary
+	var err error
+	nmstateDir := filepath.Join(n.workDir, "nmstate")
+	err = os.MkdirAll(nmstateDir, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
 	// Remove temp dir
 	defer func() {
 		removeErr := os.RemoveAll(nmstateDir)
@@ -75,7 +67,30 @@ func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath string) er
 		}
 	}()
 
-	return err
+	binaryPath, err := n.extractNmstatectl(rootfsPath, nmstateDir)
+	if err != nil {
+		return nil, err
+	}
+	nmstatectlPath := filepath.Join(nmstateDir, "squashfs-root", binaryPath)
+
+	// Check if nmstatectl binary file exists
+	if _, err = os.Stat(nmstatectlPath); os.IsNotExist(err) {
+		return nil, err
+	}
+
+	// Read binary
+	nmstateBinContent, err := os.ReadFile(nmstatectlPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a compressed RAM disk image with the nmstatectl binary
+	compressedCpio, err := generateCompressedCPIO(nmstateBinContent, NmstatectlPathInRamdisk, 0o100_755)
+	if err != nil {
+		return nil, err
+	}
+
+	return compressedCpio, err
 }
 
 // TODO: Update the code to utilize go-diskfs's squashfs instead of unsquashfs once go-diskfs supports the zstd compression format used by CoreOS - MGMT-19227

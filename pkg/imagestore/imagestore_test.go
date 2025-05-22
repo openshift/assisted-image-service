@@ -171,7 +171,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
@@ -247,7 +249,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
@@ -274,7 +278,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
@@ -295,7 +301,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
@@ -347,7 +355,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(fmt.Errorf("minimal iso creation failed"))
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(fmt.Errorf("minimal iso creation failed"))
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 			})
 
@@ -365,7 +375,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
@@ -380,7 +392,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version["openshift_version"], nmstatectlPath).Return(nil)
 
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
@@ -398,7 +412,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8.1-48.84.202109241901-0-x86_64.iso"))
@@ -421,7 +437,9 @@ var _ = Context("with a data directory configured", func() {
 					Expect(err).NotTo(HaveOccurred())
 
 					rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
-					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"]).Return(nil)
+					nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
+					Expect(err).NotTo(HaveOccurred())
+					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
 					Expect(is.Populate(ctx)).To(Succeed())
 				}
 			})
@@ -442,7 +460,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"]).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				_, err = os.Stat(oldISOPath)
@@ -471,8 +491,9 @@ var _ = Context("with a data directory configured", func() {
 			It("fails when imageServiceBaseURL is not set", func() {
 				is, err := NewImageStore(mockEditor, dataDir, "", false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap)
 				Expect(err).NotTo(HaveOccurred())
-
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", "x86_64", gomock.Any(), gomock.Any()).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", "x86_64", gomock.Any(), gomock.Any(), nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 			})
 
@@ -490,7 +511,9 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), gomock.Any()).Return(nil)
+				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				Expect(err).NotTo(HaveOccurred())
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), gomock.Any(), nmstatectlPath).Return(nil)
 				err = is.Populate(ctx)
 				Expect(err).ToNot(Succeed())
 				Expect(err.Error()).To(Equal("failed to build rootfs URL: parse \":\": missing protocol scheme"))

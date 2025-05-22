@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -17,21 +18,34 @@ import (
 
 var _ = Describe("ServeHTTP", func() {
 	var (
-		ctrl            *gomock.Controller
-		mockImageStore  *imagestore.MockImageStore
-		imageFilename   string
-		imageID         = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
-		assistedServer  *ghttp.Server
-		ignitionContent = []byte("someignitioncontent")
-		initrdAddrsize  = []byte{
+		ctrl                 *gomock.Controller
+		mockImageStore       *imagestore.MockImageStore
+		imageFilename        string
+		imageID              = "bf25292a-dddd-49dc-ab9c-3fb4c1f07071"
+		assistedServer       *ghttp.Server
+		ignitionContent      = []byte("someignitioncontent")
+		minimalInitrdContent = []byte("someinitrdcontent")
+		nmstatectlContent    = []byte("nmstatectlContent")
+		initrdAddrsize       = []byte{
 			1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 122}
-		server       *httptest.Server
-		client       *http.Client
-		lastModified string
-		header       = http.Header{}
+		initrdAddrsizeWithNmstatectl = []byte{1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 156}
+		server                       *httptest.Server
+		client                       *http.Client
+		lastModified                 string
+		header                       = http.Header{}
+		workDir                      string
+		nmstatectlPathForCaching     string
 	)
 
 	BeforeEach(func() {
+		var err error
+		workDir, err = os.MkdirTemp("", "testisoeditor")
+		Expect(err).NotTo(HaveOccurred())
+
+		nmstatectlPathForCaching = filepath.Join(workDir, "nmstatectl-4.18--s390x")
+		err = os.WriteFile(nmstatectlPathForCaching, nmstatectlContent, 0600)
+		Expect(err).NotTo(HaveOccurred())
+
 		ctrl = gomock.NewController(GinkgoT())
 		mockImageStore = imagestore.NewMockImageStore(ctrl)
 		imageFilename = createTestISO()
@@ -66,6 +80,7 @@ var _ = Describe("ServeHTTP", func() {
 		assistedServer.Close()
 		server.Close()
 		os.Remove(imageFilename)
+		Expect(os.RemoveAll(workDir)).To(Succeed())
 	})
 
 	mockImage := func(version, arch string) {
@@ -83,7 +98,7 @@ var _ = Describe("ServeHTTP", func() {
 		}
 		respContent, err := io.ReadAll(resp.Body)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(respContent).To(Equal(content))
+		Expect(respContent).To(Equal(content), fmt.Sprintf("debug info: expected: %s, actual: %s", content, respContent))
 	}
 
 	withNoMinimalInitrd := func() {
@@ -110,5 +125,18 @@ var _ = Describe("ServeHTTP", func() {
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/s390x-initrd-addrsize?version=4.11", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, initrdAddrsize)
+	})
+	It("returns the correct content with minimal initrd and the OCP version supports nmstatectl", func() {
+		mockImage("4.18", "s390x")
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
+			),
+		)
+		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "s390x").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/s390x-initrd-addrsize?version=4.18", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		expectSuccessfulResponse(resp, initrdAddrsizeWithNmstatectl)
 	})
 })

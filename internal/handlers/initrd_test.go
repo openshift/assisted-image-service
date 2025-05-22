@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -24,6 +25,7 @@ var _ = Describe("ServeHTTP", func() {
 		assistedServer       *ghttp.Server
 		ignitionContent      = []byte("someignitioncontent")
 		minimalInitrdContent = []byte("someinitrdcontent")
+		nmstatectlContent    = []byte("nmstatectlContent")
 		// must match content in createTestISO
 		initrdContent        = []byte("this is initrd")
 		ignitionArchiveBytes = []byte{
@@ -34,13 +36,23 @@ var _ = Describe("ServeHTTP", func() {
 			114, 126, 94, 73, 106, 94, 9, 3, 138, 123, 8, 1, 98, 213, 225, 116,
 			79, 72, 144, 163, 167, 143, 107, 144, 162, 162, 34, 200, 61, 128, 0, 0,
 			0, 255, 255, 191, 236, 44, 242, 12, 1, 0, 0, 0}
-		server       *httptest.Server
-		client       *http.Client
-		lastModified string
-		header       = http.Header{}
+		server                   *httptest.Server
+		client                   *http.Client
+		lastModified             string
+		header                   = http.Header{}
+		workDir                  string
+		nmstatectlPathForCaching string
 	)
 
 	BeforeEach(func() {
+		var err error
+		workDir, err = os.MkdirTemp("", "testisoeditor")
+		Expect(err).NotTo(HaveOccurred())
+
+		nmstatectlPathForCaching = filepath.Join(workDir, "nmstatectl-4.18--x86_64")
+		err = os.WriteFile(nmstatectlPathForCaching, nmstatectlContent, 0600)
+		Expect(err).NotTo(HaveOccurred())
+
 		ctrl = gomock.NewController(GinkgoT())
 		mockImageStore = imagestore.NewMockImageStore(ctrl)
 		imageFilename = createTestISO()
@@ -75,6 +87,7 @@ var _ = Describe("ServeHTTP", func() {
 		assistedServer.Close()
 		server.Close()
 		os.Remove(imageFilename)
+		Expect(os.RemoveAll(workDir)).To(Succeed())
 	})
 
 	mockImage := func(version, arch string) {
@@ -180,5 +193,19 @@ var _ = Describe("ServeHTTP", func() {
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(initrdContent, ignitionArchiveBytes...))
+	})
+
+	It("returns the correct content with minimal initrd and the OCP version supports nmstatectl", func() {
+		mockImage("4.18", "x86_64")
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
+			),
+		)
+		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "x86_64").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.18&arch=x86_64", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		expectSuccessfulResponse(resp, append(append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...), nmstatectlContent...))
 	})
 })
