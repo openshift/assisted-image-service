@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"time"
 
 	"github.com/openshift/assisted-image-service/internal/common"
@@ -102,7 +103,7 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 			if err != nil {
 				return nil, "", http.StatusInternalServerError, err
 			}
-			nmstateImgContent, err := os.Open(nmstatectlPath)
+			nmstateImgContent, err := os.Open(path.Clean(nmstatectlPath))
 			if err != nil {
 				return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to read nmstate img: %v", err)
 			}
