@@ -383,7 +383,6 @@ func (s *rhcosStore) HaveVersion(version, arch string) bool {
 }
 
 func (s *rhcosStore) NmstatectlPathForParams(openshiftVersion, arch string) (string, error) {
-	// for a test. will be removed
 	var version string
 	for _, entry := range s.versions {
 		if entry["openshift_version"] == openshiftVersion && entry["cpu_architecture"] == arch {
