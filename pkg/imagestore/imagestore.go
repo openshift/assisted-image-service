@@ -265,7 +265,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 						log.WithError(err).Errorf("failed to remove invalid ISO %s", fullPath)
 					}
 					log.Error(message)
-					return fmt.Errorf(message)
+					return errors.New(message)
 				}
 			}
 
