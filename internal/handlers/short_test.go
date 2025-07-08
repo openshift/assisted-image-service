@@ -80,6 +80,18 @@ var _ = Describe("Parse short URLs", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(params.imageID).To(Equal(imageID))
+			Expect(params.imageType).To(Equal("full-iso"))
+			Expect(params.version).To(Equal("4.12"))
+			Expect(params.arch).To(Equal("x86_64"))
+		})
+		It("200 for disconnected.iso file", func() {
+			r := requestWithKeys(tokenInfraEnv, "", "4.12", "x86_64", "disconnected.iso")
+
+			params, _, err := parseShortURL(r)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(params.imageID).To(Equal(imageID))
+			Expect(params.imageType).To(Equal("disconnected-iso"))
 			Expect(params.version).To(Equal("4.12"))
 			Expect(params.arch).To(Equal("x86_64"))
 		})
