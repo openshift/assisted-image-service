@@ -70,7 +70,7 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 
 	isoPath := imageStore.PathForParams(imagestore.ImageTypeFull, version, arch)
 
-	ignition, lastModified, code, err := client.ignitionContent(r, imageID, "")
+	ignition, lastModified, code, err := client.ignitionContent(r, imageID, "", false)
 	if err != nil {
 		return nil, "", code, fmt.Errorf("error retrieving ignition content: %v", err)
 	}

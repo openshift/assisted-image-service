@@ -585,6 +585,63 @@ var _ = Describe("HaveVersion", func() {
 	})
 })
 
+var _ = Describe("IsOVEImage", func() {
+	It("should identify OVE images correctly", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.14",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/ove-4.14.iso",
+				"version":           "4.14.0",
+				"type":              "ove",
+			},
+			{
+				"openshift_version": "4.15",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/rhcos-4.15.iso",
+				"version":           "4.15.0",
+			},
+			{
+				"openshift_version": "4.16",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/rhcos-4.16.iso",
+				"version":           "4.16.0",
+			},
+		}
+		store, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Test OVE image
+		Expect(store.IsOVEImage("4.14", "x86_64")).To(BeTrue())
+		
+		// Test non-OVE images
+		Expect(store.IsOVEImage("4.15", "x86_64")).To(BeFalse())
+		Expect(store.IsOVEImage("4.16", "x86_64")).To(BeFalse())
+		
+		// Test non-existent version
+		Expect(store.IsOVEImage("4.17", "x86_64")).To(BeFalse())
+		
+		// Test wrong architecture
+		Expect(store.IsOVEImage("4.14", "arm64")).To(BeFalse())
+	})
+
+	It("should handle empty type field", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.14",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/rhcos-4.14.iso",
+				"version":           "4.14.0",
+				"type":              "",
+			},
+		}
+		store, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(store.IsOVEImage("4.14", "x86_64")).To(BeFalse())
+	})
+})
+
 var _ = Describe("NewImageStore", func() {
 	It("should not error with valid version", func() {
 		versions := []map[string]string{
@@ -653,5 +710,40 @@ var _ = Describe("NewImageStore", func() {
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("IsOVEImage", func() {
+	var (
+		store   ImageStore
+		dataDir string
+	)
+
+	BeforeEach(func() {
+		var err error
+		dataDir, err = os.MkdirTemp("", "imageStoreTest")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(dataDir)
+	})
+
+	It("should return false for non-existent version", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.19",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/ove-419.iso",
+				"version":           "9.6.20250402-0",
+				"type":              "ove",
+			},
+		}
+
+		var err error
+		store, err = NewImageStore(nil, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(store.IsOVEImage("4.20", "x86_64")).To(BeFalse())
 	})
 })

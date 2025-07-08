@@ -48,6 +48,20 @@ func (mr *MockImageStoreMockRecorder) HaveVersion(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0, arg1)
 }
 
+// IsOVEImage mocks base method.
+func (m *MockImageStore) IsOVEImage(arg0, arg1 string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsOVEImage", arg0, arg1)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsOVEImage indicates an expected call of IsOVEImage.
+func (mr *MockImageStoreMockRecorder) IsOVEImage(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsOVEImage", reflect.TypeOf((*MockImageStore)(nil).IsOVEImage), arg0, arg1)
+}
+
 // NmstatectlPathForParams mocks base method.
 func (m *MockImageStore) NmstatectlPathForParams(arg0, arg1 string) (string, error) {
 	m.ctrl.T.Helper()

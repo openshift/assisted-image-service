@@ -45,7 +45,8 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ignition, lastModified, statusCode, err := h.client.ignitionContent(r, params.imageID, params.imageType)
+	isOVE := h.ImageStore.IsOVEImage(params.version, params.arch)
+	ignition, lastModified, statusCode, err := h.client.ignitionContent(r, params.imageID, params.imageType, isOVE)
 	if err != nil {
 		log.Errorf("Error retrieving ignition content: %v\n", err)
 		w.WriteHeader(statusCode)

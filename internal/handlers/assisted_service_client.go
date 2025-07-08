@@ -95,7 +95,7 @@ func (c *AssistedServiceClient) ramdiskContent(imageServiceRequest *http.Request
 // ignitionContent returns the ignition data on success and the error and the corresponding http status code
 // The code is also returned to ensure issues with authentication from the assisted service request are communicated back to the image service user
 // The returned code should only be used if an error is also returned
-func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Request, imageID string, imageType string) (*isoeditor.IgnitionContent, string, int, error) {
+func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Request, imageID string, imageType string, isOVE bool) (*isoeditor.IgnitionContent, string, int, error) {
 
 	u := url.URL{
 		Scheme: c.assistedServiceScheme,
@@ -103,7 +103,13 @@ func (c *AssistedServiceClient) ignitionContent(imageServiceRequest *http.Reques
 		Path:   fmt.Sprintf(fileRouteFormat, imageID),
 	}
 	queryValues := url.Values{}
-	queryValues.Set("file_name", "discovery.ign")
+
+	if isOVE {
+		queryValues.Set("file_name", "ove.ign")
+	} else {
+		queryValues.Set("file_name", "discovery.ign")
+	}
+
 	if imageType != "" {
 		queryValues.Set("discovery_iso_type", imageType)
 	}

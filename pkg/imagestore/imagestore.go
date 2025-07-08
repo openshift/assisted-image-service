@@ -78,6 +78,7 @@ type ImageStore interface {
 	PathForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
 	NmstatectlPathForParams(openshiftVersion, arch string) (string, error)
+	IsOVEImage(version, arch string) bool
 }
 
 type rhcosStore struct {
@@ -401,4 +402,14 @@ func (s *rhcosStore) NmstatectlPathForParams(openshiftVersion, arch string) (str
 
 func nmstatectlFileName(openshiftVersion, version, arch string) string {
 	return fmt.Sprintf("nmstatectl-%s-%s-%s", openshiftVersion, version, arch)
+}
+
+func (s *rhcosStore) IsOVEImage(version, arch string) bool {
+	for _, entry := range s.versions {
+		if entry["openshift_version"] == version && entry["cpu_architecture"] == arch {
+			imageType, hasType := entry["type"]
+			return hasType && imageType == "ove"
+		}
+	}
+	return false
 }
