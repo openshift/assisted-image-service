@@ -51,6 +51,8 @@ func parseShortURL(r *http.Request) (*imageDownloadParams, int, error) {
 		params.imageType = "minimal-iso"
 	case "full.iso":
 		params.imageType = "full-iso"
+	case "disconnected-interactive.iso":
+		params.imageType = "disconnected-interactive-iso"
 	default:
 		return nil, http.StatusNotFound, fmt.Errorf("unrecognized file name %s", filename)
 	}
