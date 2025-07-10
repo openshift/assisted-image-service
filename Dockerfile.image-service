@@ -24,7 +24,7 @@ RUN cd /packages && ./build.sh
 
 
 # Used to build the service:
-FROM registry.access.redhat.com/ubi9/go-toolset:1.23 AS golang
+FROM registry.access.redhat.com/ubi9/go-toolset:1.24 AS golang
 
 USER 0
 
