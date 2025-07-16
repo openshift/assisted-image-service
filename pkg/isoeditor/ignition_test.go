@@ -1,8 +1,11 @@
 package isoeditor
 
 import (
+	"bytes"
+	"compress/gzip"
 	"io"
 
+	"github.com/cavaliercoder/go-cpio"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -20,8 +23,30 @@ var _ = Describe("IgnitionContent.Archive", func() {
 			0, 255, 255, 191, 236, 44, 242, 12, 1, 0, 0, 0}
 	)
 
+	extractCPIOFiles := func(archiveBytes []byte) map[string][]byte {
+		gzReader, err := gzip.NewReader(bytes.NewReader(archiveBytes))
+		Expect(err).NotTo(HaveOccurred())
+		defer gzReader.Close()
+
+		cpioReader := cpio.NewReader(gzReader)
+		files := make(map[string][]byte)
+
+		for {
+			header, err := cpioReader.Next()
+			if err == io.EOF {
+				break
+			}
+			Expect(err).NotTo(HaveOccurred())
+
+			content, err := io.ReadAll(cpioReader)
+			Expect(err).NotTo(HaveOccurred())
+			files[header.Name] = content
+		}
+		return files
+	}
+
 	It("converts the ignition to a compressed CPIO archive", func() {
-		content := IgnitionContent{ignitionContent}
+		content := IgnitionContent{Config: ignitionContent}
 
 		data, err := content.Archive()
 		Expect(err).NotTo(HaveOccurred())
@@ -30,5 +55,79 @@ var _ = Describe("IgnitionContent.Archive", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ignitionBytes).To(Equal(ignitionArchiveBytes))
 		Expect(len(ignitionBytes) % 4).To(Equal(0))
+	})
+
+	It("creates archive with system configs only", func() {
+		systemConfig1 := []byte(`{"ignition": {"version": "3.1.0"}}`)
+		systemConfig2 := []byte(`{"passwd": {"users": []}}`)
+
+		content := IgnitionContent{
+			SystemConfigs: map[string][]byte{
+				"10-network.ign": systemConfig1,
+				"20-users.ign":   systemConfig2,
+			},
+		}
+
+		data, err := content.Archive()
+		Expect(err).NotTo(HaveOccurred())
+
+		archiveBytes, err := io.ReadAll(data)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(archiveBytes) % 4).To(Equal(0))
+
+		files := extractCPIOFiles(archiveBytes)
+		Expect(files).To(HaveLen(2))
+		Expect(files["usr/lib/ignition/base.d/10-network.ign"]).To(Equal(systemConfig1))
+		Expect(files["usr/lib/ignition/base.d/20-users.ign"]).To(Equal(systemConfig2))
+	})
+
+	It("creates archive with both main config and system configs", func() {
+		systemConfig := []byte(`{"storage": {"files": []}}`)
+
+		content := IgnitionContent{
+			Config: ignitionContent,
+			SystemConfigs: map[string][]byte{
+				"30-storage.ign": systemConfig,
+			},
+		}
+
+		data, err := content.Archive()
+		Expect(err).NotTo(HaveOccurred())
+
+		archiveBytes, err := io.ReadAll(data)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(archiveBytes) % 4).To(Equal(0))
+
+		files := extractCPIOFiles(archiveBytes)
+		Expect(files).To(HaveLen(2))
+		Expect(files["config.ign"]).To(Equal(ignitionContent))
+		Expect(files["usr/lib/ignition/base.d/30-storage.ign"]).To(Equal(systemConfig))
+	})
+
+	It("returns error when system config filename contains path separator", func() {
+		content := IgnitionContent{
+			SystemConfigs: map[string][]byte{
+				"subdir/50-bad.ign": []byte("content"),
+			},
+		}
+
+		_, err := content.Archive()
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("contains path separators"))
+		Expect(err.Error()).To(ContainSubstring("subdir/50-bad.ign"))
+	})
+
+	It("creates empty archive when no configs provided", func() {
+		content := IgnitionContent{}
+
+		data, err := content.Archive()
+		Expect(err).NotTo(HaveOccurred())
+
+		archiveBytes, err := io.ReadAll(data)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(archiveBytes) % 4).To(Equal(0))
+
+		files := extractCPIOFiles(archiveBytes)
+		Expect(files).To(HaveLen(0))
 	})
 })
