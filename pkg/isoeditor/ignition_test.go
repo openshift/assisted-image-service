@@ -21,7 +21,7 @@ var _ = Describe("IgnitionContent.Archive", func() {
 	)
 
 	It("converts the ignition to a compressed CPIO archive", func() {
-		content := IgnitionContent{ignitionContent}
+		content := IgnitionContent{Config: ignitionContent}
 
 		data, err := content.Archive()
 		Expect(err).NotTo(HaveOccurred())
