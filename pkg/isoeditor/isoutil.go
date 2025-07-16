@@ -356,22 +356,32 @@ func GetISO9660FileSystem(d *disk.Disk) (filesystem.FileSystem, error) {
 	return iso9660.Read(d.File, d.Size, 0, 0)
 }
 
-func generateCompressedCPIO(fileContent []byte, filePath string, mode cpio.FileMode) ([]byte, error) {
+// fileEntry represents a single file to be added to a CPIO archive
+type fileEntry struct {
+	Content []byte
+	Path    string
+	Mode    cpio.FileMode
+}
+
+func generateCompressedCPIO(files []fileEntry) ([]byte, error) {
 	// Run gzip compression
 	compressedBuffer := new(bytes.Buffer)
 	gzipWriter := gzip.NewWriter(compressedBuffer)
 	// Create CPIO archive
 	cpioWriter := cpio.NewWriter(gzipWriter)
 
-	if err := cpioWriter.WriteHeader(&cpio.Header{
-		Name: filePath,
-		Mode: mode,
-		Size: int64(len(fileContent)),
-	}); err != nil {
-		return nil, errors.Wrap(err, "Failed to write CPIO header")
-	}
-	if _, err := cpioWriter.Write(fileContent); err != nil {
-		return nil, errors.Wrap(err, "Failed to write CPIO archive")
+	// Add each file to the archive
+	for _, file := range files {
+		if err := cpioWriter.WriteHeader(&cpio.Header{
+			Name: file.Path,
+			Mode: file.Mode,
+			Size: int64(len(file.Content)),
+		}); err != nil {
+			return nil, errors.Wrap(err, "Failed to write CPIO header")
+		}
+		if _, err := cpioWriter.Write(file.Content); err != nil {
+			return nil, errors.Wrap(err, "Failed to write CPIO archive")
+		}
 	}
 
 	if err := cpioWriter.Close(); err != nil {

@@ -85,7 +85,13 @@ func (n *nmstateHandler) buildNmstateCpioArchive(rootfsPath string) ([]byte, err
 	}
 
 	// Create a compressed RAM disk image with the nmstatectl binary
-	compressedCpio, err := generateCompressedCPIO(nmstateBinContent, NmstatectlPathInRamdisk, 0o100_755)
+	compressedCpio, err := generateCompressedCPIO([]fileEntry{
+		{
+			Content: nmstateBinContent,
+			Path:    NmstatectlPathInRamdisk,
+			Mode:    0o100_755,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}

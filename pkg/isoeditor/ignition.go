@@ -9,7 +9,13 @@ type IgnitionContent struct {
 }
 
 func (ic *IgnitionContent) Archive() (*bytes.Reader, error) {
-	compressedCpio, err := generateCompressedCPIO(ic.Config, "config.ign", 0o100_644)
+	compressedCpio, err := generateCompressedCPIO([]fileEntry{
+		{
+			Content: ic.Config,
+			Path:    "config.ign",
+			Mode:    0o100_644,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
