@@ -21,6 +21,7 @@ const (
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
 	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion, nmstatectlPath string) error
+	GetNmstateHandler() NmstateHandler
 }
 
 type rhcosEditor struct {
@@ -33,6 +34,10 @@ func NewEditor(dataDir string, nmstateHandler NmstateHandler) Editor {
 		workDir:        dataDir,
 		nmstateHandler: nmstateHandler,
 	}
+}
+
+func (e *rhcosEditor) GetNmstateHandler() NmstateHandler {
+	return e.nmstateHandler
 }
 
 // CreateMinimalISO Creates the minimal iso by removing the rootfs and adding the url

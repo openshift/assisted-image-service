@@ -16,6 +16,7 @@ import (
 //go:generate mockgen -package=isoeditor -destination=mock_nmstate_handler.go . NmstateHandler
 type NmstateHandler interface {
 	CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error
+	ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath string) error
 }
 
 type nmstateHandler struct {
@@ -31,9 +32,30 @@ func NewNmstateHandler(workDir string, executer Executer) NmstateHandler {
 }
 
 func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error {
-	compressedCpio, err := n.buildNmstateCpioArchive(rootfsPath)
-	if err != nil {
-		return err
+	var compressedCpio []byte
+	var err error
+
+	// Check if nmstatectl is already cached to avoid duplicate extraction
+	if _, err := os.Stat(nmstatectlPath); err == nil {
+		// Read from cache
+		log.Debugf("Using cached nmstatectl from %s", nmstatectlPath)
+		compressedCpio, err = os.ReadFile(nmstatectlPath)
+		if err != nil {
+			return fmt.Errorf("failed to read cached nmstatectl: %v", err)
+		}
+	} else {
+		// Extract from rootfs
+		log.Debugf("Extracting nmstatectl from rootfs %s", rootfsPath)
+		compressedCpio, err = n.buildNmstateCpioArchive(rootfsPath)
+		if err != nil {
+			return err
+		}
+
+		// write for caching
+		err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
+		if err != nil {
+			return err
+		}
 	}
 
 	// write for RAM disk
@@ -42,13 +64,30 @@ func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatect
 		return err
 	}
 
-	// write for caching
+	return nil
+}
+
+func (n *nmstateHandler) ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath string) error {
+	// Check if nmstatectl is already cached
+	if _, err := os.Stat(nmstatectlPath); err == nil {
+		log.Debugf("nmstatectl already cached at %s", nmstatectlPath)
+		return nil
+	}
+
+	log.Debugf("Extracting and caching nmstatectl from %s to %s", rootfsPath, nmstatectlPath)
+	
+	compressedCpio, err := n.buildNmstateCpioArchive(rootfsPath)
+	if err != nil {
+		return err
+	}
+
+	// write for caching only
 	err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
 	if err != nil {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func (n *nmstateHandler) buildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
