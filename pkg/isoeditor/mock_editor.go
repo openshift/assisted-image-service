@@ -46,3 +46,17 @@ func (mr *MockEditorMockRecorder) CreateMinimalISOTemplate(arg0, arg1, arg2, arg
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMinimalISOTemplate", reflect.TypeOf((*MockEditor)(nil).CreateMinimalISOTemplate), arg0, arg1, arg2, arg3, arg4, arg5)
 }
+
+// GetNmstateHandler mocks base method.
+func (m *MockEditor) GetNmstateHandler() NmstateHandler {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNmstateHandler")
+	ret0, _ := ret[0].(NmstateHandler)
+	return ret0
+}
+
+// GetNmstateHandler indicates an expected call of GetNmstateHandler.
+func (mr *MockEditorMockRecorder) GetNmstateHandler() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNmstateHandler", reflect.TypeOf((*MockEditor)(nil).GetNmstateHandler))
+}

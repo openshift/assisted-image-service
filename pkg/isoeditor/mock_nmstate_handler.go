@@ -46,3 +46,17 @@ func (mr *MockNmstateHandlerMockRecorder) CreateNmstateRamDisk(arg0, arg1, arg2 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNmstateRamDisk", reflect.TypeOf((*MockNmstateHandler)(nil).CreateNmstateRamDisk), arg0, arg1, arg2)
 }
+
+// ExtractAndCacheNmstatectl mocks base method.
+func (m *MockNmstateHandler) ExtractAndCacheNmstatectl(arg0, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExtractAndCacheNmstatectl", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExtractAndCacheNmstatectl indicates an expected call of ExtractAndCacheNmstatectl.
+func (mr *MockNmstateHandlerMockRecorder) ExtractAndCacheNmstatectl(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractAndCacheNmstatectl", reflect.TypeOf((*MockNmstateHandler)(nil).ExtractAndCacheNmstatectl), arg0, arg1)
+}
