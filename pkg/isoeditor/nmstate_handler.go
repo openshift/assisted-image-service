@@ -16,6 +16,7 @@ import (
 //go:generate mockgen -package=isoeditor -destination=mock_nmstate_handler.go . NmstateHandler
 type NmstateHandler interface {
 	CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error
+	ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath string) ([]byte, error)
 }
 
 type nmstateHandler struct {
@@ -31,7 +32,7 @@ func NewNmstateHandler(workDir string, executer Executer) NmstateHandler {
 }
 
 func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath string) error {
-	compressedCpio, err := n.buildNmstateCpioArchive(rootfsPath)
+	compressedCpio, err := n.ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath)
 	if err != nil {
 		return err
 	}
@@ -42,13 +43,35 @@ func (n *nmstateHandler) CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatect
 		return err
 	}
 
-	// write for caching
-	err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
-	if err != nil {
-		return err
+	return nil
+}
+
+func (n *nmstateHandler) ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath string) ([]byte, error) {
+	// Check if nmstatectl is already cached
+	if _, err := os.Stat(nmstatectlPath); err == nil {
+		log.Debugf("nmstatectl already cached at %s", nmstatectlPath)
+		// Read and return the cached content
+		cachedContent, readErr := os.ReadFile(nmstatectlPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read cached nmstatectl: %v", readErr)
+		}
+		return cachedContent, nil
 	}
 
-	return err
+	log.Debugf("Extracting and caching nmstatectl from %s to %s", rootfsPath, nmstatectlPath)
+
+	compressedCpio, err := n.buildNmstateCpioArchive(rootfsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write to cache
+	err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
+	if err != nil {
+		return nil, err
+	}
+
+	return compressedCpio, nil
 }
 
 func (n *nmstateHandler) buildNmstateCpioArchive(rootfsPath string) ([]byte, error) {

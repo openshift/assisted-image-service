@@ -281,7 +281,8 @@ var _ = BeforeSuite(func() {
 	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{})), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{})
+	nmstateHandler := isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{})
+	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstateHandler), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nmstateHandler)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = imageStore.Populate(context.Background())

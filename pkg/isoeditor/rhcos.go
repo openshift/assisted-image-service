@@ -16,6 +16,7 @@ const (
 	ramDiskImagePath            = "/images/assisted_installer_custom.img"
 	nmstateDiskImagePath        = "/images/nmstate.img"
 	MinimalVersionForNmstatectl = "4.18.0-ec.0"
+	RootfsImagePath             = "images/pxeboot/rootfs.img"
 )
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
@@ -37,7 +38,7 @@ func NewEditor(dataDir string, nmstateHandler NmstateHandler) Editor {
 
 // CreateMinimalISO Creates the minimal iso by removing the rootfs and adding the url
 func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath string) error {
-	if err := os.Remove(filepath.Join(extractDir, "images/pxeboot/rootfs.img")); err != nil {
+	if err := os.Remove(filepath.Join(extractDir, RootfsImagePath)); err != nil {
 		return err
 	}
 
@@ -94,7 +95,7 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 	}
 
 	if versionOK {
-		rootfsPath := filepath.Join(extractDir, "images/pxeboot/rootfs.img")
+		rootfsPath := filepath.Join(extractDir, RootfsImagePath)
 		err = e.nmstateHandler.CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath)
 		if err != nil {
 			return fmt.Errorf("failed to create nmstate ram disk for arch %s: %v", arch, err)
