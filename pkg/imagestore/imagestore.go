@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/google/renameio"
+	"github.com/openshift/assisted-image-service/internal/common"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -88,6 +89,7 @@ type rhcosStore struct {
 	imageServiceBaseURL           string
 	osImageDownloadHeadersMap     map[string]string
 	osImageDownloadQueryParamsMap map[string]string
+	nmstateHandler                isoeditor.NmstateHandler
 }
 
 const (
@@ -96,7 +98,7 @@ const (
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string,
-	osImageDownloadTrustedCAFile string, osImageDownloadHeadersMap map[string]string, osImageDownloadQueryParamsMap map[string]string) (ImageStore, error) {
+	osImageDownloadTrustedCAFile string, osImageDownloadHeadersMap map[string]string, osImageDownloadQueryParamsMap map[string]string, nmstateHandler isoeditor.NmstateHandler) (ImageStore, error) {
 	if err := validateVersions(versions); err != nil {
 		return nil, err
 	}
@@ -138,6 +140,7 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 		imageServiceBaseURL:           imageServiceBaseURL,
 		osImageDownloadHeadersMap:     osImageDownloadHeadersMap,
 		osImageDownloadQueryParamsMap: osImageDownloadQueryParamsMap,
+		nmstateHandler:                nmstateHandler,
 	}, nil
 }
 
@@ -283,6 +286,11 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		imageVersion := imageInfo["version"]
 		arch := imageInfo["cpu_architecture"]
 
+		// Extract and cache nmstatectl for all architectures
+		if err := s.extractAndCacheNmstatectl(openshiftVersion, arch); err != nil {
+			return fmt.Errorf("failed to extract and cache nmstatectl for %s-%s: %v", openshiftVersion, arch, err)
+		}
+
 		// Don't attempt to create a minimal ISO for s390x because there's no easy way to edit the kernel parameters
 		// This means that the rootfs URL can't be added which makes it impossible for us to create a minimal ISO
 		if arch == "s390x" {
@@ -311,6 +319,63 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		}
 	}
 
+	return nil
+}
+
+// extractAndCacheNmstatectl extracts nmstatectl from the rootfs and caches it for later use
+// This ensures nmstatectl is available for both minimal ISO creation and PXE provisioning
+func (s *rhcosStore) extractAndCacheNmstatectl(openshiftVersion, arch string) error {
+	// Check if version supports nmstatectl
+	versionOK, err := common.VersionGreaterOrEqual(openshiftVersion, isoeditor.MinimalVersionForNmstatectl)
+	if err != nil {
+		return err
+	}
+	if !versionOK {
+		log.Debugf("Skipping nmstatectl extraction for %s-%s (version does not support nmstatectl)", openshiftVersion, arch)
+		return nil
+	}
+
+	nmstatectlPath, err := s.NmstatectlPathForParams(openshiftVersion, arch)
+	if err != nil {
+		return err
+	}
+
+	// Check if nmstatectl is already cached
+	if _, err = os.Stat(nmstatectlPath); err == nil {
+		log.Debugf("nmstatectl already cached for %s-%s", openshiftVersion, arch)
+		return nil
+	}
+
+	log.Infof("Extracting and caching nmstatectl for %s-%s", openshiftVersion, arch)
+
+	// Create a temporary working directory for extraction
+	tempDir, err := os.MkdirTemp(s.dataDir, "nmstate-extract")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %v", err)
+	}
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			log.WithError(removeErr).Errorf("Failed to remove temp directory %s", tempDir)
+		}
+	}()
+
+	// Get the path to the full ISO
+	fullPath := s.PathForParams(ImageTypeFull, openshiftVersion, arch)
+
+	// Extract ISO to temp directory
+	if err = isoeditor.Extract(fullPath, tempDir); err != nil {
+		return fmt.Errorf("failed to extract ISO: %v", err)
+	}
+
+	// Extract nmstatectl from rootfs and cache it
+	rootfsPath := filepath.Join(tempDir, isoeditor.RootfsImagePath)
+
+	_, err = s.nmstateHandler.ExtractAndCacheNmstatectl(rootfsPath, nmstatectlPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract nmstatectl: %v", err)
+	}
+
+	log.Infof("Successfully cached nmstatectl for %s-%s", openshiftVersion, arch)
 	return nil
 }
 
@@ -351,6 +416,8 @@ func (s *rhcosStore) cleanDataDir() error {
 	for _, version := range s.versions {
 		// Only add full isos here as we want to regenerate the minimal image on each deploy
 		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version["openshift_version"], version["version"], version["cpu_architecture"]))
+		// Keep nmstatectl cached files for all architectures (including s390x)
+		expectedFiles = append(expectedFiles, nmstatectlFileName(version["openshift_version"], version["version"], version["cpu_architecture"]))
 	}
 
 	dataDirFiles, err := os.ReadDir(s.dataDir)
