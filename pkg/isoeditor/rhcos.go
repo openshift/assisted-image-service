@@ -60,9 +60,9 @@ func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath stri
 	// ignore isolinux.cfg for ppc64le because it doesn't exist
 	if arch != "ppc64le" {
 		if err := fixIsolinuxConfig(rootFSURL, extractDir, includeNmstateRamDisk); err != nil {
-			log.WithError(err).Warnf("Failed to edit isolinux config")
-			return err
-		}
+ 			log.WithError(err).Warnf("Failed to edit isolinux config")
+ 			return err
+ 		}
 	}
 
 	if err := Create(minimalISOPath, extractDir, volumeID); err != nil {
@@ -164,64 +164,93 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 
 	// Add the rootfs url
 	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
-	if err := editFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
+	grubFileContent, err := replacePatternInFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement)
+	if err != nil {
+		return err
+	}
+	if err := saveFile(foundGrubPath, grubFileContent); err != nil {
 		return err
 	}
 
 	// Remove the coreos.liveiso parameter
-	if err := editFile(foundGrubPath, ` coreos.liveiso=\S+`, ""); err != nil {
+	replacement= ""
+	grubFileContent, err = replacePatternInFile(foundGrubPath, ` coreos.liveiso=\S+`, replacement)
+	if err != nil {
+		return err
+	}
+	if err := saveFile(foundGrubPath, grubFileContent); err != nil {
 		return err
 	}
 
 	// Edit config to add custom ramdisk image to initrd
+	replacement = fmt.Sprintf("$1 $2 %s", ramDiskImagePath)
 	if includeNmstateRamDisk {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
-			return err
-		}
-	} else {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
-			return err
-		}
+		replacement = fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)
+	}
+	contentWithRamDiskPath, err := replacePatternInFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, replacement)
+	if err != nil {
+		return err
+	}
+	if err := saveFile(foundGrubPath, contentWithRamDiskPath); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+	isolinuxFile := filepath.Join(extractDir, "isolinux/isolinux.cfg")
 	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
-		return err
-	}
 
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
-		return err
-	}
-
-	if includeNmstateRamDisk {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
-			return err
-		}
-	} else {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func editFile(fileName string, reString string, replacement string) error {
-	content, err := os.ReadFile(fileName)
+	isolinuxFileContent, err := replacePatternInFile(isolinuxFile, `(?m)^(\s+append) (.+| )+$`, replacement)
 	if err != nil {
 		return err
 	}
-
-	re := regexp.MustCompile(reString)
-	newContent := re.ReplaceAllString(string(content), replacement)
-
-	if err := os.WriteFile(fileName, []byte(newContent), 0600); err != nil {
+	if err := saveFile(isolinuxFile, isolinuxFileContent); err != nil {
 		return err
 	}
 
+	// Remove the coreos.liveiso parameter
+	replacement= ""
+	isolinuxFileContent, err = replacePatternInFile(isolinuxFile, ` coreos.liveiso=\S+`, replacement)
+	if err != nil {
+		return err
+	}
+	if err := saveFile(isolinuxFile, isolinuxFileContent); err != nil {
+		return err
+	}
+
+	replacement = fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)
+	if includeNmstateRamDisk {
+		replacement = fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)
+	}
+	contentWithRamDiskPath, err := replacePatternInFile(isolinuxFile, `(?m)^(\s+append.*initrd=\S+) (.*)$`, replacement)
+	if err != nil {
+		return err
+	}
+	if err := saveFile(isolinuxFile, contentWithRamDiskPath); err != nil {
+		return err
+ 	}
+
 	return nil
 }
+
+// replacePatternInFile reads the file, applies a regex substitution, and returns the modified content.
+func replacePatternInFile(fileName, reString, replacement string) (string, error) {
+	data, err := os.ReadFile(fileName)
+ 	if err != nil {
+		return "", err
+ 	}
+ 
+ 	re := regexp.MustCompile(reString)
+	content := re.ReplaceAllString(string(data), replacement)
+	return content, nil 
+}
+
+// saveFile writes the given content to the specified file with 0600 permissions.
+func saveFile(fileName, content string) error {
+	if err := os.WriteFile(fileName, []byte(content), 0600); err != nil {
+ 		return err
+ 	}
+ 	return nil
+ }
