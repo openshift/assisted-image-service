@@ -1,10 +1,12 @@
 package isoeditor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/openshift/assisted-image-service/internal/common"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +20,18 @@ const (
 	MinimalVersionForNmstatectl = "4.18.0-ec.0"
 	RootfsImagePath             = "images/pxeboot/rootfs.img"
 )
+
+type FileEntry struct {
+	Offset int    `json:"offset"`
+	Path   string `json:"path"`
+	End    int    `json:"end"`
+	Pad    int    `json:"pad"`
+}
+
+type KargsConfig struct {
+	Default string      `json:"default"`
+	Files   []FileEntry `json:"files"`
+}
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
@@ -59,10 +73,15 @@ func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath stri
 
 	// ignore isolinux.cfg for ppc64le because it doesn't exist
 	if arch != "ppc64le" {
-		if err := fixIsolinuxConfig(rootFSURL, extractDir, includeNmstateRamDisk); err != nil {
- 			log.WithError(err).Warnf("Failed to edit isolinux config")
- 			return err
- 		}
+		contentWithRamDiskPath, err := fixIsolinuxConfig(rootFSURL, extractDir, includeNmstateRamDisk)
+		if err != nil {
+			log.WithError(err).Warnf("Failed to edit isolinux config")
+			return err
+		}
+		if err := fixKargsConfig(extractDir, contentWithRamDiskPath, includeNmstateRamDisk); err != nil {
+			log.WithError(err).Warnf("Failed to edit kargs config")
+			return err
+		}
 	}
 
 	if err := Create(minimalISOPath, extractDir, volumeID); err != nil {
@@ -162,23 +181,23 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 		return fmt.Errorf("no grub.cfg found, possible paths are %v", availableGrubPaths)
 	}
 
-	// Add the rootfs url
-	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
-	grubFileContent, err := replacePatternInFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement)
+	data, err := os.ReadFile(foundGrubPath)
 	if err != nil {
 		return err
 	}
-	if err := saveFile(foundGrubPath, grubFileContent); err != nil {
+	content := string(data)
+
+	// Add the rootfs url
+	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
+	content, err = replace(content, `(?m)^(\s+linux) (.+| )+$`, replacement)
+	if err != nil {
 		return err
 	}
 
 	// Remove the coreos.liveiso parameter
-	replacement= ""
-	grubFileContent, err = replacePatternInFile(foundGrubPath, ` coreos.liveiso=\S+`, replacement)
+	replacement = ""
+	content, err = replace(content, ` coreos.liveiso=\S+`, replacement)
 	if err != nil {
-		return err
-	}
-	if err := saveFile(foundGrubPath, grubFileContent); err != nil {
 		return err
 	}
 
@@ -187,70 +206,141 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 	if includeNmstateRamDisk {
 		replacement = fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)
 	}
-	contentWithRamDiskPath, err := replacePatternInFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, replacement)
+	content, err = replace(content, `(?m)^(\s+initrd) (.+| )+$`, replacement)
 	if err != nil {
 		return err
 	}
-	if err := saveFile(foundGrubPath, contentWithRamDiskPath); err != nil {
+	if err := saveFile(foundGrubPath, content); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) (string, error) {
 	isolinuxFile := filepath.Join(extractDir, "isolinux/isolinux.cfg")
+	data, err := os.ReadFile(isolinuxFile)
+	if err != nil {
+		return "", err
+	}
+	content := string(data)
 	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
 
-	isolinuxFileContent, err := replacePatternInFile(isolinuxFile, `(?m)^(\s+append) (.+| )+$`, replacement)
+	content, err = replace(content, `(?m)^(\s+append) (.+| )+$`, replacement)
 	if err != nil {
-		return err
-	}
-	if err := saveFile(isolinuxFile, isolinuxFileContent); err != nil {
-		return err
+		return "", err
 	}
 
 	// Remove the coreos.liveiso parameter
-	replacement= ""
-	isolinuxFileContent, err = replacePatternInFile(isolinuxFile, ` coreos.liveiso=\S+`, replacement)
+	replacement = ""
+	content, err = replace(content, ` coreos.liveiso=\S+`, replacement)
 	if err != nil {
-		return err
-	}
-	if err := saveFile(isolinuxFile, isolinuxFileContent); err != nil {
-		return err
+		return "", err
 	}
 
 	replacement = fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)
 	if includeNmstateRamDisk {
 		replacement = fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)
 	}
-	contentWithRamDiskPath, err := replacePatternInFile(isolinuxFile, `(?m)^(\s+append.*initrd=\S+) (.*)$`, replacement)
+	content, err = replace(content, `(?m)^(\s+append.*initrd=\S+) (.*)$`, replacement)
+	if err != nil {
+		return "", err
+	}
+	if err := saveFile(isolinuxFile, content); err != nil {
+		return "", err
+	}
+
+	return content, nil
+}
+
+func fixKargsConfig(extractDir, contentWithRamDiskPath string, includeNmstateRamDisk bool) error {
+	kernelArgs, err := extractBootArgs(contentWithRamDiskPath)
 	if err != nil {
 		return err
 	}
-	if err := saveFile(isolinuxFile, contentWithRamDiskPath); err != nil {
-		return err
- 	}
+	offset := 1903
+	if includeNmstateRamDisk {
+		offset = 1923
+	}
 
+	kargsFile := filepath.Join(extractDir, "/coreos/kargs.jso")
+	kargsContent, err := buildKargsContent(kargsFile, kernelArgs, offset)
+	if err != nil {
+		return err
+	}
+
+	if err := saveFile(kargsFile, kargsContent); err != nil {
+		return err
+	}
 	return nil
 }
 
-// replacePatternInFile reads the file, applies a regex substitution, and returns the modified content.
-func replacePatternInFile(fileName, reString, replacement string) (string, error) {
-	data, err := os.ReadFile(fileName)
- 	if err != nil {
-		return "", err
- 	}
- 
- 	re := regexp.MustCompile(reString)
-	content := re.ReplaceAllString(string(data), replacement)
-	return content, nil 
+func replace(data, reString, replacement string) (string, error) {
+	re := regexp.MustCompile(reString)
+	content := re.ReplaceAllString(data, replacement)
+	return content, nil
 }
 
 // saveFile writes the given content to the specified file with 0600 permissions.
 func saveFile(fileName, content string) error {
 	if err := os.WriteFile(fileName, []byte(content), 0600); err != nil {
- 		return err
- 	}
- 	return nil
- }
+		return err
+	}
+	return nil
+}
+
+// extractBootArgs parses isolinux.cfg content to
+// extract kernel arguments starting from 'rw'.
+// It skips lines after the COREOS_KARG_EMBED_AREA marker and
+// returns the args from the first 'append' line found.
+func extractBootArgs(isolinuxFileContent string) (string, error) {
+	lines := strings.Split(isolinuxFileContent, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "COREOS_KARG_EMBED_AREA") {
+			break
+		}
+
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "append ") {
+			// Extract the line content after "append "
+			kernelArgs := strings.TrimPrefix(trimmed, "append ")
+			// Find " rw " (with spaces to avoid partial matches)
+			index := strings.Index(kernelArgs, " rw ")
+			if index == -1 {
+				index = strings.Index(kernelArgs, " rw") // fallback if it's at end
+			}
+			if index != -1 {
+				return kernelArgs[index+1:], nil // return starting from "rw ..."
+			}
+		}
+	}
+	return "", fmt.Errorf("could not find line starting with 'append' and containing 'rw'")
+}
+
+// buildKargsContent reads the kargs.jso file, updates the "default" kernel args
+// , offset, and returns the modified JSON as a string.
+func buildKargsContent(kargsFile, content string, offset int) (string, error) {
+	var cfg KargsConfig
+
+	data, err := os.ReadFile(kargsFile)
+	if err != nil {
+		return "", err
+	}
+	if err = json.Unmarshal(data, &cfg); err != nil {
+		return "", err
+	}
+
+	cfg.Default = content
+	for i := range cfg.Files {
+		if cfg.Files[i].Path == "isolinux/isolinux.cfg" {
+			cfg.Files[i].Offset = offset
+		}
+	}
+
+	updatedJSON, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(updatedJSON), nil
+}
