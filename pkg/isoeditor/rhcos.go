@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/openshift/assisted-image-service/internal/common"
 	log "github.com/sirupsen/logrus"
@@ -149,6 +150,9 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+	if err := validateRootFSURL(rootFSURL); err != nil {
+		return err
+	}
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
@@ -163,7 +167,7 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 	}
 
 	// Add the rootfs url
-	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
+	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=\"%s\"", rootFSURL)
 	if err := editFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
 		return err
 	}
@@ -187,8 +191,21 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 	return nil
 }
 
+func validateRootFSURL(rootFSURL string) error {
+	if strings.Contains(rootFSURL, "$") {
+		return fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
+	}
+	if strings.Contains(rootFSURL, "\\") {
+		return fmt.Errorf("invalid rootfs URL: contains invalid character '\\'")
+	}
+	return nil
+}
+
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
-	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
+	if err := validateRootFSURL(rootFSURL); err != nil {
+		return err
+	}
+	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=\"%s\"", rootFSURL)
 	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
 		return err
 	}
