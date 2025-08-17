@@ -1,5 +1,5 @@
 # Used to build external packages:
-FROM registry.access.redhat.com/ubi9:latest AS packages
+FROM quay.io/centos/centos:stream9 AS packages
 
 # Install the build tools and the required libraries:
 RUN \
@@ -45,7 +45,7 @@ RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 RUN cd /app && git rev-parse --short HEAD > /commit-reference.txt
 
 ## Runtime
-FROM registry.access.redhat.com/ubi9:latest
+FROM quay.io/centos/centos:stream9
 
 ARG release=main
 ARG version=latest
