@@ -142,9 +142,12 @@ func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, ins
 }
 
 func validateVersions(versions []map[string]string) error {
+	// Allow empty versions array - this means no OS images to download/manage
+	// This is useful when using qcow2 images for bootstrap instead of ISO images
 	if len(versions) == 0 {
-		return fmt.Errorf("invalid versions: must not be empty")
+		return nil
 	}
+
 	for _, entry := range versions {
 		missingKeyFmt := "invalid version entry %+v: missing %s key"
 		if _, ok := entry["openshift_version"]; !ok {
