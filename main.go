@@ -110,15 +110,17 @@ func main() {
 		log.Fatalf("Failed to unmarshal OSImageDownloadQueryParams: %v\n", err)
 	}
 
+	nmstateHandler := isoeditor.NewNmstateHandler(Options.DataDir, &isoeditor.CommonExecuter{})
 	is, err := imagestore.NewImageStore(
-		isoeditor.NewEditor(Options.DataDir, isoeditor.NewNmstateHandler(Options.DataDir, &isoeditor.CommonExecuter{})),
+		isoeditor.NewEditor(Options.DataDir, nmstateHandler),
 		Options.DataDir,
 		Options.ImageServiceBaseURL,
 		Options.InsecureSkipVerify,
 		versions,
 		Options.OSImageDownloadTrustedCAFile,
 		osImageDownloadHeadersMap,
-		osImageDownloadQueryParamsMap)
+		osImageDownloadQueryParamsMap,
+		nmstateHandler)
 
 	if err != nil {
 		log.Fatalf("Failed to create image store: %v\n", err)

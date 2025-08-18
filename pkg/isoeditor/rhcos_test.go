@@ -56,7 +56,6 @@ var _ = Context("with test files", func() {
 		mockNmstateHandler = NewMockNmstateHandler(ctrl)
 		mockExecuter = NewMockExecuter(ctrl)
 		mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("some string", nil).Times(3)
-		mockNmstateHandler.EXPECT().CreateNmstateRamDisk(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	})
 
 	AfterEach(func() {
