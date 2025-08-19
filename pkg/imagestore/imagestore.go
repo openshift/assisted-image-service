@@ -231,11 +231,21 @@ func validateISOID(path string) error {
 		return err
 	}
 
-	if !strings.HasPrefix(volumeID, "rhcos-") && !strings.HasPrefix(volumeID, "fedora-coreos-") && !strings.HasPrefix(volumeID, "scos-") {
+	if !isoIDHasValidPrefix(volumeID) {
 		return fmt.Errorf("ISO volume identifier (%s) is invalid", volumeID)
 	}
 
 	return nil
+}
+
+func isoIDHasValidPrefix(volumeID string) bool {
+	validPrefixes := []string{"rhcos-", "rhel-coreos-", "fedora-coreos-", "scos-"}
+	for _, prefix := range validPrefixes {
+		if strings.HasPrefix(volumeID, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *rhcosStore) Populate(ctx context.Context) error {
