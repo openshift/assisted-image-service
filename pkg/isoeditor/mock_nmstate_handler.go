@@ -33,16 +33,17 @@ func (m *MockNmstateHandler) EXPECT() *MockNmstateHandlerMockRecorder {
 	return m.recorder
 }
 
-// CreateNmstateRamDisk mocks base method.
-func (m *MockNmstateHandler) CreateNmstateRamDisk(arg0, arg1, arg2 string) error {
+// BuildNmstateCpioArchive mocks base method.
+func (m *MockNmstateHandler) BuildNmstateCpioArchive(arg0 string) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateNmstateRamDisk", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "BuildNmstateCpioArchive", arg0)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// CreateNmstateRamDisk indicates an expected call of CreateNmstateRamDisk.
-func (mr *MockNmstateHandlerMockRecorder) CreateNmstateRamDisk(arg0, arg1, arg2 interface{}) *gomock.Call {
+// BuildNmstateCpioArchive indicates an expected call of BuildNmstateCpioArchive.
+func (mr *MockNmstateHandlerMockRecorder) BuildNmstateCpioArchive(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNmstateRamDisk", reflect.TypeOf((*MockNmstateHandler)(nil).CreateNmstateRamDisk), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildNmstateCpioArchive", reflect.TypeOf((*MockNmstateHandler)(nil).BuildNmstateCpioArchive), arg0)
 }

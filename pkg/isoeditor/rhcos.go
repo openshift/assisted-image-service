@@ -16,6 +16,7 @@ const (
 	ramDiskImagePath            = "/images/assisted_installer_custom.img"
 	nmstateDiskImagePath        = "/images/nmstate.img"
 	MinimalVersionForNmstatectl = "4.18.0-ec.0"
+	RootfsImagePath             = "images/pxeboot/rootfs.img"
 )
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
@@ -37,7 +38,7 @@ func NewEditor(dataDir string, nmstateHandler NmstateHandler) Editor {
 
 // CreateMinimalISO Creates the minimal iso by removing the rootfs and adding the url
 func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath string) error {
-	if err := os.Remove(filepath.Join(extractDir, "images/pxeboot/rootfs.img")); err != nil {
+	if err := os.Remove(filepath.Join(extractDir, RootfsImagePath)); err != nil {
 		return err
 	}
 
@@ -94,10 +95,26 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 	}
 
 	if versionOK {
-		rootfsPath := filepath.Join(extractDir, "images/pxeboot/rootfs.img")
-		err = e.nmstateHandler.CreateNmstateRamDisk(rootfsPath, ramDiskPath, nmstatectlPath)
+		var compressedCpio []byte
+		var readErr error
+
+		if _, err = os.Stat(nmstatectlPath); err == nil {
+			// Read and return the cached content
+			compressedCpio, readErr = os.ReadFile(nmstatectlPath)
+			if readErr != nil {
+				return fmt.Errorf("failed to read cached nmstatectl: %v", readErr)
+			}
+		} else if os.IsNotExist(err) {
+			// File doesn't exist - this should be an error condition
+			return fmt.Errorf("nmstatectl cache file not found: %s", nmstatectlPath)
+		} else {
+			// Some other error occurred
+			return fmt.Errorf("failed to stat nmstatectl cache file: %v", err)
+		}
+
+		err = os.WriteFile(ramDiskPath, compressedCpio, 0755) //nolint:gosec
 		if err != nil {
-			return fmt.Errorf("failed to create nmstate ram disk for arch %s: %v", arch, err)
+			return err
 		}
 	}
 
