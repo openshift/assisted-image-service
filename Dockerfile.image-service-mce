@@ -55,4 +55,5 @@ LABEL com.redhat.component="multicluster-engine-assisted-image-service-container
       io.openshift.tags="OpenShift 4" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
-      org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service"
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.8::el9"
