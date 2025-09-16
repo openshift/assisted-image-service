@@ -1,0 +1,12 @@
+contentOrigin:
+  repofiles: ["./redhat.repo"]
+packages:
+  - nmstate
+  - nmstate-devel
+  - nmstate-libs
+arches:
+  - aarch64
+  - x86_64
+  - ppc64le
+  - s390x
+
