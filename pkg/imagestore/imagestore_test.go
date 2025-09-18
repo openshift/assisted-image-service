@@ -874,3 +874,94 @@ var _ = Context("cleanDataDir", func() {
 		Expect(os.IsNotExist(err)).To(BeTrue())
 	})
 })
+
+var _ = Describe("Populate with disconnected ISO", func() {
+	var (
+		dataDir                       string
+		ctx                           = context.Background()
+		ctrl                          *gomock.Controller
+		mockEditor                    *isoeditor.MockEditor
+		mockNmstateHandler            *isoeditor.MockNmstateHandler
+		osImageDownloadHeadersMap     map[string]string
+		osImageDownloadQueryParamsMap map[string]string
+	)
+
+	BeforeEach(func() {
+		var err error
+		dataDir, err = os.MkdirTemp("", "imageStoreTestDisconnected")
+		Expect(err).NotTo(HaveOccurred())
+		ctrl = gomock.NewController(GinkgoT())
+		mockEditor = isoeditor.NewMockEditor(ctrl)
+		mockNmstateHandler = isoeditor.NewMockNmstateHandler(ctrl)
+		osImageDownloadHeadersMap = map[string]string{}
+		osImageDownloadQueryParamsMap = map[string]string{}
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(dataDir)
+		ctrl.Finish()
+	})
+
+	Context("with disconnected ISO type", func() {
+		var ts *ghttp.Server
+
+		BeforeEach(func() {
+			ts = ghttp.NewServer()
+		})
+
+		AfterEach(func() {
+			ts.Close()
+		})
+
+		It("downloads disconnected ISO without creating minimal ISO", func() {
+			disconnectedVersion := map[string]string{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"url":               ts.URL() + "/disconnected.iso",
+				"version":           "48.84.202109241901-0",
+				"type":              ImageTypeDisconnectedIso,
+			}
+
+			validVolumeID := "rhcos-48.84.202109241901-0"
+			isoContent := make([]byte, 32840)
+			copy(isoContent[32808:], validVolumeID)
+
+			header := http.Header{}
+			header.Add("Content-Length", strconv.Itoa(len(isoContent)))
+
+			ts.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/disconnected.iso"),
+					ghttp.RespondWith(http.StatusOK, isoContent, header),
+				),
+			)
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = is.Populate(ctx)
+			Expect(err).To(Succeed())
+
+			content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-disconnected-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(isoContent))
+		})
+
+		It("fails when invalid image type is specified", func() {
+			invalidVersion := map[string]string{
+				"openshift_version": "4.8",
+				"cpu_architecture":  "x86_64",
+				"url":               ts.URL() + "/invalid.iso",
+				"version":           "48.84.202109241901-0",
+				"type":              "invalid-type",
+			}
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{invalidVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = is.Populate(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid image type: invalid-type"))
+		})
+	})
+})

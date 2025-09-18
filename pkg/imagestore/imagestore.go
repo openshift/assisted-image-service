@@ -93,8 +93,9 @@ type rhcosStore struct {
 }
 
 const (
-	ImageTypeFull    = "full-iso"
-	ImageTypeMinimal = "minimal-iso"
+	ImageTypeFull            = "full-iso"
+	ImageTypeMinimal         = "minimal-iso"
+	ImageTypeDisconnectedIso = "disconnected-iso"
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string,
@@ -252,7 +253,12 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 			imageVersion := imageInfo["version"]
 			arch := imageInfo["cpu_architecture"]
 
-			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, openshiftVersion, imageVersion, arch))
+			imageType, err := s.getImageType(imageInfo)
+			if err != nil {
+				return fmt.Errorf("failed to get image type: %v", err)
+			}
+
+			fullPath := filepath.Join(s.dataDir, isoFileName(imageType, openshiftVersion, imageVersion, arch))
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				url := imageInfo["url"]
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
@@ -285,6 +291,16 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		openshiftVersion := imageInfo["openshift_version"]
 		imageVersion := imageInfo["version"]
 		arch := imageInfo["cpu_architecture"]
+
+		// Don't attempt to create a minimal ISO for disconnected-interactive-iso
+		// It's meant to be a full ISO with embedded ignition
+		imageType, err := s.getImageType(imageInfo)
+		if err != nil {
+			return fmt.Errorf("failed to get image type: %v", err)
+		}
+		if imageType == ImageTypeDisconnectedIso {
+			continue
+		}
 
 		// Extract and cache nmstatectl for all architectures
 		if err := s.extractAndCacheNmstatectl(openshiftVersion, arch); err != nil {
@@ -320,6 +336,24 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (*rhcosStore) getImageType(imageInfo map[string]string) (string, error) {
+	validTypes := map[string]bool{
+		ImageTypeFull:            true,
+		ImageTypeDisconnectedIso: true,
+	}
+
+	imageType, ok := imageInfo["type"]
+	if !ok {
+		return ImageTypeFull, nil
+	}
+
+	if !validTypes[imageType] {
+		return "", fmt.Errorf("invalid image type: %s", imageType)
+	}
+
+	return imageType, nil
 }
 
 // extractAndCacheNmstatectl extracts nmstatectl from the rootfs and caches it for later use
