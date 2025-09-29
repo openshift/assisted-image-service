@@ -28,7 +28,7 @@ func parseLongURL(r *http.Request) (*imageDownloadParams, int, error) {
 	imageType := values.Get("type")
 	if imageType == "" {
 		return nil, http.StatusBadRequest, fmt.Errorf("'type' parameter required")
-	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal {
+	} else if imageType != imagestore.ImageTypeFull && imageType != imagestore.ImageTypeMinimal && imageType != imagestore.ImageTypeDisconnectedIso {
 		return nil, http.StatusBadRequest, fmt.Errorf("invalid value '%s' for parameter 'type'", imageType)
 	}
 
