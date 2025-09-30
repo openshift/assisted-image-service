@@ -235,7 +235,7 @@ func cdbootLoadSectors(workDir string) (result uint16, err error) {
 	if sectors > math.MaxUint16 {
 		sectors = math.MaxUint16
 	}
-	result = uint16(sectors)
+	result = uint16(sectors) // #nosec G115 - sectors capped at MaxUint16
 	return
 }
 
