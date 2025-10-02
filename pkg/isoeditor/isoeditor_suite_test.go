@@ -31,8 +31,29 @@ label linux
   menu label ^RHEL CoreOS (Live)
   menu default
   kernel /images/pxeboot/vmlinuz
-  append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 ignition.firstboot ignition.platform.id=metal
+  append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard coreos.liveiso=rhcos-46.82.202010091720-0 rw ignition.firstboot ignition.platform.id=metal
 ###################### COREOS_KARG_EMBED_AREA
+`
+
+const testKargsConfig = `
+{
+  "default": "rw  coreos.liveiso=rhcos-9.6.20250701-0 ignition.firstboot ignition.platform.id=metal",
+  "files": [
+    {
+      "end": 0,
+      "offset": 968,
+      "pad": 0,
+      "path": "EFI/redhat/grub.cfg"
+    },
+    {
+      "end": 0,
+      "offset": 1865,
+      "pad": 0,
+      "path": "isolinux/isolinux.cfg"
+    }
+  ],
+  "size": 1109
+}
 `
 
 const testIgnitionInfo = `
@@ -72,6 +93,7 @@ func createTestFiles(volumeID string) (string, string) {
 	Expect(os.WriteFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), []byte("this is rootfs"), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "EFI/redhat/grub.cfg"), []byte(testGrubConfig), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "isolinux/isolinux.cfg"), []byte(testISOLinuxConfig), 0600)).To(Succeed())
+	Expect(os.WriteFile(filepath.Join(filesDir, "coreos/kargs.jso"), []byte(testKargsConfig), 0600)).To(Succeed())
 	Expect(os.WriteFile(filepath.Join(filesDir, "isolinux/boot.cat"), []byte(""), 0600)).To(Succeed())
 
 	cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", volumeID, "-o", isoFile, filesDir)
