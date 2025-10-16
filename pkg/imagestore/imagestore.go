@@ -259,12 +259,13 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				}
 				log.Infof("Finished downloading for %s-%s (%s)", openshiftVersion, arch, imageVersion)
 				if err := validateISOID(fullPath); err != nil {
-					message := fmt.Sprintf("failed to validate %s: %v", fullPath, err)
-					if err = os.Remove(fullPath); err != nil {
-						log.WithError(err).Errorf("failed to remove invalid ISO %s", fullPath)
+					validationErr := err
+					message := fmt.Sprintf("failed to validate %s: %v", fullPath, validationErr)
+					if removeErr := os.Remove(fullPath); removeErr != nil {
+						log.WithError(removeErr).Errorf("failed to remove invalid ISO %s", fullPath)
 					}
 					log.Error(message)
-					return fmt.Errorf(message)
+					return fmt.Errorf("failed to validate %s: %w", fullPath, validationErr)
 				}
 			}
 
