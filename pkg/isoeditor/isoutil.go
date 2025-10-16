@@ -213,11 +213,11 @@ func efiLoadSectors(workDir string) (uint16, error) {
 	return uint16(math.Ceil(float64(efiStat.Size()) / 2048)), nil
 }
 
-func cdbootLoadSectors(workDir string) (result uint16, err error) {
+func cdbootLoadSectors(workDir string) (uint16, error) {
 	// Calculate the number of 512 sectors that would be needed for the boot image:
 	info, err := os.Stat(filepath.Join(workDir, "images/cdboot.img"))
 	if err != nil {
-		return
+		return 0, err
 	}
 	size := info.Size()
 	sectors := size / 512
@@ -243,10 +243,10 @@ func cdbootLoadSectors(workDir string) (result uint16, err error) {
 	// field to 65535, the maximum value for a 16 bits unsigned integer. That is incorrect,
 	// but seems to work, so we do the same.
 	if sectors > math.MaxUint16 {
-		sectors = math.MaxUint16
+		return math.MaxUint16, nil
 	}
-	result = uint16(sectors)
-	return
+	// #nosec G115 -- value is guaranteed to fit in uint16 by the check above
+	return uint16(sectors), nil
 }
 
 func haveBootFiles(workDir string) (bool, error) {
