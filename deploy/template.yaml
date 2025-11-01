@@ -216,6 +216,8 @@ objects:
         containers:
         - image: ${IMAGE_SERVICE_IMAGE}:${IMAGE_TAG}
           name: assisted-image-service
+          securityContext:
+            readOnlyRootFilesystem: true
           env:
           - name: LISTEN_PORT
             value: "8080"
