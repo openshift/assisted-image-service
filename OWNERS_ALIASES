@@ -2,6 +2,7 @@
 
 aliases:
   approvers:
+    - cve-automation
     - romfreiman
     - oourfali
     - gamli75
