@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("ServeHTTP", func() {
