@@ -80,6 +80,7 @@ LABEL com.redhat.component="multicluster-engine-assisted-image-service-container
       version="${version}" \
       upstream-ref="${version}" \
       upstream-url="https://github.com/openshift/assisted-image-service" \
+      url="https://github.com/openshift/assisted-image-service" \
       summary="OpenShift Assisted Image Service" \
       io.k8s.display-name="OpenShift Assisted Image Service" \
       maintainer="Liat Gamliel <lgamliel@redhat.com>" \
