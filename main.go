@@ -9,16 +9,17 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/openshift/assisted-image-service/internal/handlers"
-	"github.com/openshift/assisted-image-service/pkg/imagestore"
-	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	"github.com/openshift/assisted-image-service/pkg/servers"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	stdmiddleware "github.com/slok/go-http-metrics/middleware/std"
+
+	"github.com/openshift/assisted-image-service/internal/handlers"
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/servers"
 )
 
 var Options struct {
@@ -111,7 +112,9 @@ func main() {
 		log.Fatalf("Failed to unmarshal OSImageDownloadQueryParams: %v\n", err)
 	}
 
-	nmstateHandler := isoeditor.NewNmstateHandler(Options.DataTempDir, &isoeditor.CommonExecuter{})
+	executer := &isoeditor.CommonExecuter{}
+	nmstatectlExtractorFactory := isoeditor.NewNmstatectlExtractorFactory(executer)
+	nmstateHandler := isoeditor.NewNmstateHandler(Options.DataTempDir, executer, nmstatectlExtractorFactory)
 	is, err := imagestore.NewImageStore(
 		isoeditor.NewEditor(Options.DataTempDir, nmstateHandler),
 		Options.DataDir,
