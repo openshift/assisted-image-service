@@ -1,10 +1,13 @@
 module github.com/openshift/assisted-image-service
 
-go 1.21
+go 1.23
+
+toolchain go1.24.11
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
 	github.com/diskfs/go-diskfs v1.4.1
+	github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/golang/mock v1.6.0
 	github.com/google/renameio v1.0.1

@@ -22,11 +22,12 @@ import (
 	"github.com/diskfs/go-diskfs/filesystem"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega/ghttp"
+	"github.com/slok/go-http-metrics/middleware"
+
 	"github.com/openshift/assisted-image-service/internal/common"
 	"github.com/openshift/assisted-image-service/internal/handlers"
 	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
-	"github.com/slok/go-http-metrics/middleware"
 )
 
 var (
@@ -366,7 +367,9 @@ var _ = BeforeSuite(func() {
 	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	nmstateHandler := isoeditor.NewNmstateHandler(imageDir, &isoeditor.CommonExecuter{})
+	executer := &isoeditor.CommonExecuter{}
+	nmstatectlExtractorFactory := isoeditor.NewNmstatectlExtractorFactory(executer)
+	nmstateHandler := isoeditor.NewNmstateHandler(imageDir, executer, nmstatectlExtractorFactory)
 	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstateHandler), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nmstateHandler)
 	Expect(err).NotTo(HaveOccurred())
 
