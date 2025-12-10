@@ -1,6 +1,7 @@
 package isoeditor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -83,17 +84,9 @@ func CreateMinimalISO(extractDir, volumeID, rootFSURL, arch, minimalISOPath stri
 		includeNmstateRamDisk = true
 	}
 
-	if err := fixGrubConfig(rootFSURL, extractDir, includeNmstateRamDisk); err != nil {
-		log.WithError(err).Warnf("Failed to edit grub config")
+	if err := updateKargs(extractDir, rootFSURL, includeNmstateRamDisk, arch); err != nil {
+		log.WithError(err).Warnf("Failed to update kargs offsets and sizes")
 		return err
-	}
-
-	// ignore isolinux.cfg for ppc64le because it doesn't exist
-	if arch != "ppc64le" {
-		if err := fixIsolinuxConfig(rootFSURL, extractDir, includeNmstateRamDisk); err != nil {
-			log.WithError(err).Warnf("Failed to edit isolinux config")
-			return err
-		}
 	}
 
 	if err := Create(minimalISOPath, extractDir, volumeID); err != nil {
@@ -179,7 +172,8 @@ func embedInitrdPlaceholders(extractDir string) error {
 	return nil
 }
 
-func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+// fixGrubConfig modifies grub.cfg
+func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
@@ -227,8 +221,10 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 	return os.WriteFile(foundGrubPath, []byte(contentStr), 0600)
 }
 
-func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
-	isolinuxPath := filepath.Join(extractDir, "isolinux/isolinux.cfg")
+// fixIsolinuxConfig modifies isolinux.cfg
+func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
+	relativeIsolinuxPath := strings.TrimPrefix(defaultIsolinuxFilePath, "/")
+	isolinuxPath := filepath.Join(extractDir, relativeIsolinuxPath)
 
 	// Read the file content
 	content, err := os.ReadFile(isolinuxPath)
@@ -294,3 +290,87 @@ func editString(content string, reString string, replacement string) (string, er
 
 	return newContent, nil
 }
+
+type kargsFileEntry struct {
+	End    *string `json:"end"`
+	Offset *int64  `json:"offset"`
+	Pad    *string `json:"pad"`
+	Path   *string `json:"path"`
+}
+
+type kargsConfig struct {
+	Default string           `json:"default"`
+	Files   []kargsFileEntry `json:"files"`
+	Size    int64            `json:"size"`
+}
+
+// updateDefaultKargs modifies the default kernel arguments to match bootloader modifications
+// and applies the embed area size change directly to config.Size
+func updateDefaultKargs(config *kargsConfig, rootFSURL string) error {
+	originalDefault := config.Default
+
+	// Apply the same transformations we make to bootloader configs
+	// For default kargs, we append at the end (using $ insertion pattern)
+	var err error
+	config.Default, err = transformKernelArgs(config.Default, `(?P<replace>$)`, rootFSURL)
+	if err != nil {
+		return err
+	}
+
+	// Calculate and apply the embed area size change from the default kargs transformation
+	embedSizeChange := int64(len(config.Default)) - int64(len(originalDefault))
+	config.Size += embedSizeChange
+
+	return nil
+}
+
+// updateKargs reads kargs.json, applies bootloader config fixes, and updates kargs.json
+func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch string) error {
+	kargsPath := filepath.Join(extractDir, "coreos/kargs.json")
+
+	var config *kargsConfig
+
+	if _, err := os.Stat(kargsPath); !os.IsNotExist(err) {
+		kargsData, err := os.ReadFile(kargsPath)
+		if err != nil {
+			return fmt.Errorf("failed to read kargs.json: %v", err)
+		}
+
+		var kargsStruct kargsConfig
+		if err := json.Unmarshal(kargsData, &kargsStruct); err != nil {
+			return fmt.Errorf("failed to unmarshal kargs.json: %v", err)
+		}
+		config = &kargsStruct
+	}
+
+	// Apply bootloader config changes
+	if err := fixGrubConfig(rootFSURL, extractDir, includeNmstateRamDisk, config); err != nil {
+		return fmt.Errorf("failed to fix grub config: %v", err)
+	}
+
+	// ignore isolinux.cfg for ppc64le because it doesn't exist
+	if arch != "ppc64le" {
+		if err := fixIsolinuxConfig(rootFSURL, extractDir, includeNmstateRamDisk, config); err != nil {
+			return fmt.Errorf("failed to fix isolinux config: %v", err)
+		}
+	}
+
+	if config != nil {
+		// Update the default kernel arguments and apply embed area size change
+		if err := updateDefaultKargs(config, rootFSURL); err != nil {
+			return fmt.Errorf("failed to update default kargs: %v", err)
+		}
+
+		updatedData, err := json.MarshalIndent(*config, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal updated kargs.json: %v", err)
+		}
+
+		if err := os.WriteFile(kargsPath, updatedData, 0600); err != nil {
+			return fmt.Errorf("failed to write updated kargs.json: %v", err)
+		}
+	}
+
+	return nil
+}
+
