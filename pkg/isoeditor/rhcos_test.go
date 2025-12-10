@@ -271,9 +271,9 @@ var _ = Context("with test files", func() {
 			})
 		})
 
-		Context("kargs.json handling", func() {
-			It("successfully round-trips kargs.json", func() {
-				// Create a temporary directory with a kargs.json file
+		Context("kargs.jso handling", func() {
+			It("successfully round-trips kargs.jso", func() {
+				// Create a temporary directory with a kargs.jso file
 				tmpDir, err := os.MkdirTemp("", "kargs-test")
 				Expect(err).ToNot(HaveOccurred())
 				defer os.RemoveAll(tmpDir)
@@ -298,7 +298,7 @@ var _ = Context("with test files", func() {
 				err = os.WriteFile(filepath.Join(tmpDir, "isolinux/isolinux.cfg"), []byte(isolinuxConfig), 0600)
 				Expect(err).ToNot(HaveOccurred())
 
-				kargsPath := filepath.Join(kargsDir, "kargs.json")
+				kargsPath := filepath.Join(kargsDir, "kargs.jso")
 				originalJSON := `{
   "default": "random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.liveiso=rhcos-416.94.202404301731-0",
   "files": [

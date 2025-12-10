@@ -23,7 +23,46 @@ const (
 	X86CPUArchitecture     = "x86_64"
 	ARM64CPUArchitecture   = "arm64"
 	AARCH64CPUArchitecture = "aarch64"
+	// ISO 9660 Level 1 allows 3-character extensions (plus the dot)
+	iso9660Level1ExtLen = 3
 )
+
+// normalizeFilesExtension truncates file extensions longer than 3 characters to ensure
+// ISO 9660 Level 1 compatibility. When the diskfs library creates an ISO, it generates ISO 9660
+// short filenames by uppercasing the long filenames (e.g., kargs.json -> KARGS.JSON).
+// However, ISO 9660 Level 1 requires the 8.3 filename format (8-character basename, 3-character
+// extension), so KARGS.JSON is invalid.
+//
+// This is a workaround for https://github.com/diskfs/go-diskfs/pull/315 - diskfs does not
+// properly truncate extensions to 3 characters when creating ISO 9660 short names.
+//
+// Tools like coreos-installer access files using their ISO 9660 short names and expect Level 1
+// format (e.g., KARGS.JSO). By normalizing extensions to 3 characters before creating the ISO,
+// we ensure diskfs generates valid ISO 9660 short names that match what tools expect
+// (kargs.jso -> KARGS.JSO).
+func normalizeFilesExtension(workDir string) error {
+	return filepath.WalkDir(workDir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		ext := filepath.Ext(p)
+		// Truncate file extensions longer than three chars (plus the dot)
+		if len(ext) > iso9660Level1ExtLen+1 {
+			np := p[:len(p)-len(ext)] + ext[:iso9660Level1ExtLen+1]
+			err = os.Rename(p, np)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
 
 // Extract unpacks the iso contents into the working directory
 func Extract(isoPath string, workDir string) error {
@@ -42,6 +81,12 @@ func Extract(isoPath string, workDir string) error {
 		return err
 	}
 	err = copyAll(fs, "/", files, workDir)
+	if err != nil {
+		return err
+	}
+
+	// Normalize file extensions to 3 characters for ISO 9660 compatibility
+	err = normalizeFilesExtension(workDir)
 	if err != nil {
 		return err
 	}
@@ -162,11 +207,11 @@ func Create(outPath string, workDir string, volumeLabel string) error {
 		if err != nil {
 			return err
 		}
-		if exists, _ := fileExists(filepath.Join(workDir, "boot.catalog")); !exists {
-			return fmt.Errorf("missing boot.catalog file")
+		if exists, _ := fileExists(filepath.Join(workDir, "boot.cat")); !exists {
+			return fmt.Errorf("missing boot.cat file")
 		}
 		options.ElTorito = &iso9660.ElTorito{
-			BootCatalog:     "boot.catalog",
+			BootCatalog:     "boot.cat",
 			HideBootCatalog: true,
 			Entries: []*iso9660.ElToritoEntry{
 				{
@@ -183,11 +228,11 @@ func Create(outPath string, workDir string, volumeLabel string) error {
 		if err != nil {
 			return err
 		}
-		if exists, _ := fileExists(filepath.Join(workDir, "boot.catalog")); !exists {
-			return fmt.Errorf("missing boot.catalog file")
+		if exists, _ := fileExists(filepath.Join(workDir, "boot.cat")); !exists {
+			return fmt.Errorf("missing boot.cat file")
 		}
 		options.ElTorito = &iso9660.ElTorito{
-			BootCatalog:     "boot.catalog",
+			BootCatalog:     "boot.cat",
 			HideBootCatalog: true,
 			Entries: []*iso9660.ElToritoEntry{
 				{

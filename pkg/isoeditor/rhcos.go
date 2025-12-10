@@ -368,21 +368,21 @@ func updateDefaultKargs(config *kargsConfig, rootFSURL string) error {
 	return nil
 }
 
-// updateKargs reads kargs.json, applies fixes with embed area awareness, and updates kargs.json
+// updateKargs reads kargs.jso, applies fixes with embed area awareness, and updates kargs.jso
 func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch string) error {
-	kargsPath := filepath.Join(extractDir, "coreos/kargs.json")
+	kargsPath := filepath.Join(extractDir, "coreos/kargs.jso")
 
 	var config *kargsConfig
 
 	if _, err := os.Stat(kargsPath); !os.IsNotExist(err) {
 		kargsData, err := os.ReadFile(kargsPath)
 		if err != nil {
-			return fmt.Errorf("failed to read kargs.json: %v", err)
+			return fmt.Errorf("failed to read kargs.jso: %v", err)
 		}
 
 		var kargsStruct kargsConfig
 		if err := json.Unmarshal(kargsData, &kargsStruct); err != nil {
-			return fmt.Errorf("failed to unmarshal kargs.json: %v", err)
+			return fmt.Errorf("failed to unmarshal kargs.jso: %v", err)
 		}
 		config = &kargsStruct
 	}
@@ -407,11 +407,11 @@ func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch 
 
 		updatedData, err := json.MarshalIndent(*config, "", "  ")
 		if err != nil {
-			return fmt.Errorf("failed to marshal updated kargs.json: %v", err)
+			return fmt.Errorf("failed to marshal updated kargs.jso: %v", err)
 		}
 
 		if err := os.WriteFile(kargsPath, updatedData, 0600); err != nil {
-			return fmt.Errorf("failed to write updated kargs.json: %v", err)
+			return fmt.Errorf("failed to write updated kargs.jso: %v", err)
 		}
 	}
 

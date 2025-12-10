@@ -167,7 +167,7 @@ var _ = Context("with test files", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(haveBootFiles).To(BeFalse())
 
-			Expect(os.WriteFile(filepath.Join(filesDir, "boot.catalog"), []byte(""), 0600)).To(Succeed())
+			Expect(os.WriteFile(filepath.Join(filesDir, "boot.cat"), []byte(""), 0600)).To(Succeed())
 			Expect(Create(isoPath, filesDir, "my-vol")).To(Succeed())
 		})
 
@@ -184,7 +184,7 @@ var _ = Context("with test files", func() {
 
 			err = Create(isoPath, filesDir, "my-vol")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("missing boot.catalog file"))
+			Expect(err.Error()).Should(ContainSubstring("missing boot.cat file"))
 		})
 
 		It("generates an iso - no boot files", func() {
