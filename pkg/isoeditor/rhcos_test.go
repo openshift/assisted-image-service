@@ -166,7 +166,7 @@ var _ = Context("with test files", func() {
 
 			It("accepts valid URLs", func() {
 				validURL := "https://example.com/valid/rootfs.img"
-				err := validateRootFSURL(validURL)
+				err := fixGrubConfig(validURL, filesDir, false)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
