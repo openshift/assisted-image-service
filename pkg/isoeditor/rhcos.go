@@ -20,6 +20,32 @@ const (
 	RootfsImagePath             = "images/pxeboot/rootfs.img"
 )
 
+// transformKernelArgs applies the standard kernel argument transformations:
+// 1. Remove coreos.liveiso parameter
+// 2. Add coreos.live.rootfs_url parameter at the specified insertion point
+func transformKernelArgs(filePath string, linePattern string, rootFSURL string) error {
+	// Validate rootfs URL
+	if strings.Contains(rootFSURL, "$") {
+		return fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
+	}
+	if strings.Contains(rootFSURL, "\\") {
+		return fmt.Errorf("invalid rootfs URL: contains invalid character '\\'")
+	}
+
+	// Add the rootfs_url parameter
+	replacement := "$1 $2 coreos.live.rootfs_url=\"" + rootFSURL + "\""
+	if err := editFile(filePath, linePattern, replacement); err != nil {
+		return err
+	}
+
+	// Remove the coreos.liveiso parameter
+	if err := editFile(filePath, ` coreos\.liveiso=\S+`, ""); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
 type Editor interface {
 	CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, minimalISOPath, openshiftVersion, nmstatectlPath string) error
@@ -150,9 +176,6 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
-	if err := validateRootFSURL(rootFSURL); err != nil {
-		return err
-	}
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
@@ -166,14 +189,13 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 		return fmt.Errorf("no grub.cfg found, possible paths are %v", availableGrubPaths)
 	}
 
-	// Add the rootfs url
-	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=\"%s\"", rootFSURL)
-	if err := editFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
-		return err
-	}
+	// Typical grub.cfg lines we're modifying:
+	//
+	//	linux /images/pxeboot/vmlinuz rw  coreos.liveiso=rhcos-9.6.20250523-0 ignition.firstboot ignition.platform.id=metal
+	//	initrd /images/pxeboot/initrd.img /images/ignition.img
 
-	// Remove the coreos.liveiso parameter
-	if err := editFile(foundGrubPath, ` coreos.liveiso=\S+`, ""); err != nil {
+	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
+	if err := transformKernelArgs(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, rootFSURL); err != nil {
 		return err
 	}
 
@@ -191,26 +213,15 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 	return nil
 }
 
-func validateRootFSURL(rootFSURL string) error {
-	if strings.Contains(rootFSURL, "$") {
-		return fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
-	}
-	if strings.Contains(rootFSURL, "\\") {
-		return fmt.Errorf("invalid rootfs URL: contains invalid character '\\'")
-	}
-	return nil
-}
-
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
-	if err := validateRootFSURL(rootFSURL); err != nil {
-		return err
-	}
-	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=\"%s\"", rootFSURL)
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
-		return err
-	}
+	isolinuxPath := filepath.Join(extractDir, "isolinux/isolinux.cfg")
 
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+	// Typical isolinux.cfg line we're modifying:
+	//
+	//	append initrd=/images/pxeboot/initrd.img,/images/ignition.img rw  coreos.liveiso=rhcos-9.6.20250523-0 ignition.firstboot ignition.platform.id=metal
+
+	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
+	if err := transformKernelArgs(isolinuxPath, `(?m)^(\s+append) (.+| )+$`, rootFSURL); err != nil {
 		return err
 	}
 
@@ -226,7 +237,6 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool)
 
 	return nil
 }
-
 func editFile(fileName string, reString string, replacement string) error {
 	content, err := os.ReadFile(fileName)
 	if err != nil {
