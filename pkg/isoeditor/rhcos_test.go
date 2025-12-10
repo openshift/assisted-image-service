@@ -1,6 +1,7 @@
 package isoeditor
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -95,7 +96,8 @@ var _ = Context("with test files", func() {
 	Describe("Fix Config", func() {
 		Context("with including nmstate disk image", func() {
 			It("fixGrubConfig alters the kernel parameters correctly", func() {
-				err := fixGrubConfig(testRootFSURL, filesDir, true)
+				// Pass nil for kargs since we're just testing file changes
+				err := fixGrubConfig(testRootFSURL, filesDir, true, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=\"%s\""
@@ -108,7 +110,8 @@ var _ = Context("with test files", func() {
 			})
 
 			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
-				err := fixIsolinuxConfig(testRootFSURL, filesDir, true)
+				// Pass nil for kargs since we're just testing file changes
+				err := fixIsolinuxConfig(testRootFSURL, filesDir, true, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=\"%s\""
@@ -119,7 +122,8 @@ var _ = Context("with test files", func() {
 
 		Context("without including nmstate disk image", func() {
 			It("fixGrubConfig alters the kernel parameters correctly", func() {
-				err := fixGrubConfig(testRootFSURL, filesDir, false)
+				// Pass nil for kargs since we're just testing file changes
+				err := fixGrubConfig(testRootFSURL, filesDir, false, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				newLine := "	linux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=\"%s\""
@@ -132,7 +136,8 @@ var _ = Context("with test files", func() {
 			})
 
 			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
-				err := fixIsolinuxConfig(testRootFSURL, filesDir, false)
+				// Pass nil for kargs since we're just testing file changes
+				err := fixIsolinuxConfig(testRootFSURL, filesDir, false, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=\"%s\""
@@ -144,30 +149,129 @@ var _ = Context("with test files", func() {
 		Context("URL validation", func() {
 			It("rejects URLs containing $ character", func() {
 				invalidURL := "https://example.com/test$invalid/rootfs.img"
-				err := fixGrubConfig(invalidURL, filesDir, false)
+				err := fixGrubConfig(invalidURL, filesDir, false, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid rootfs URL: contains invalid character '$'"))
 
-				err = fixIsolinuxConfig(invalidURL, filesDir, false)
+				err = fixIsolinuxConfig(invalidURL, filesDir, false, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid rootfs URL: contains invalid character '$'"))
 			})
 
 			It("rejects URLs containing \\ character", func() {
 				invalidURL := "https://example.com/test\\invalid/rootfs.img"
-				err := fixGrubConfig(invalidURL, filesDir, false)
+				err := fixGrubConfig(invalidURL, filesDir, false, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid rootfs URL: contains invalid character '\\'"))
 
-				err = fixIsolinuxConfig(invalidURL, filesDir, false)
+				err = fixIsolinuxConfig(invalidURL, filesDir, false, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid rootfs URL: contains invalid character '\\'"))
 			})
 
 			It("accepts valid URLs", func() {
 				validURL := "https://example.com/valid/rootfs.img"
-				err := fixGrubConfig(validURL, filesDir, false)
+				err := fixGrubConfig(validURL, filesDir, false, nil)
 				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+		Context("editString function", func() {
+			It("replaces content in named capture group", func() {
+				content := "line1\nline2\nline3"
+				newContent, err := editString(content, `(?P<replace>line2)`, "modified")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal("line1\nmodified\nline3"))
+			})
+
+			It("appends content when replace group is at end", func() {
+				content := "some text"
+				newContent, err := editString(content, `(some text)(?P<replace>$)`, " more")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal("some text more"))
+			})
+
+			It("returns error if no replace group", func() {
+				content := "some text"
+				_, err := editString(content, `some text`, "replacement")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must have a named capture group called 'replace'"))
+			})
+
+			It("returns original content if no match", func() {
+				content := "some text"
+				newContent, err := editString(content, `(?P<replace>nomatch)`, "replacement")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal(content))
+			})
+		})
+
+		Context("kargs.json handling", func() {
+			It("successfully round-trips kargs.json", func() {
+				// Create a temporary directory with a kargs.json file
+				tmpDir, err := os.MkdirTemp("", "kargs-test")
+				Expect(err).ToNot(HaveOccurred())
+				defer os.RemoveAll(tmpDir)
+
+				kargsDir := filepath.Join(tmpDir, "coreos")
+				err = os.MkdirAll(kargsDir, 0755)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Create EFI/fedora and isolinux directories
+				err = os.MkdirAll(filepath.Join(tmpDir, "EFI/fedora"), 0755)
+				Expect(err).ToNot(HaveOccurred())
+				err = os.MkdirAll(filepath.Join(tmpDir, "isolinux"), 0755)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Create grub.cfg
+				grubConfig := "\tlinux /images/pxeboot/vmlinuz random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.liveiso=rhcos-416.94.202404301731-0\n\tinitrd /images/pxeboot/initrd.img /images/ignition.img\n"
+				err = os.WriteFile(filepath.Join(tmpDir, "EFI/fedora/grub.cfg"), []byte(grubConfig), 0600)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Create isolinux.cfg
+				isolinuxConfig := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.liveiso=rhcos-416.94.202404301731-0\n"
+				err = os.WriteFile(filepath.Join(tmpDir, "isolinux/isolinux.cfg"), []byte(isolinuxConfig), 0600)
+				Expect(err).ToNot(HaveOccurred())
+
+				kargsPath := filepath.Join(kargsDir, "kargs.json")
+				originalJSON := `{
+  "default": "random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.liveiso=rhcos-416.94.202404301731-0",
+  "files": [
+    {
+      "path": "EFI/fedora/grub.cfg",
+      "offset": 1000,
+      "size": 2000
+    }
+  ],
+  "size": 1024
+}`
+				err = os.WriteFile(kargsPath, []byte(originalJSON), 0600)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Call updateKargs with a rootFS URL (no nmstate, x86_64 arch)
+				err = updateKargs(tmpDir, testRootFSURL, false, "x86_64")
+				Expect(err).ToNot(HaveOccurred())
+
+				// Read the file back and verify it's valid JSON
+				updatedData, err := os.ReadFile(kargsPath)
+				Expect(err).ToNot(HaveOccurred())
+
+				var config kargsConfig
+				err = json.Unmarshal(updatedData, &config)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Verify the default kargs were updated:
+				// - coreos.liveiso parameter should be removed
+				// - coreos.live.rootfs_url should be added
+				Expect(config.Default).To(ContainSubstring("coreos.live.rootfs_url"))
+				Expect(config.Default).To(ContainSubstring(testRootFSURL))
+				Expect(config.Default).ToNot(ContainSubstring("coreos.liveiso"))
+
+				// Verify size was updated to reflect the change in default kargs length
+				// Removed: "coreos.liveiso=rhcos-416.94.202404301731-0 " (43 chars)
+				// Added: " coreos.live.rootfs_url=\"https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img\"" (121 chars)
+				// Net change: 121 - 43 = 78 chars
+				Expect(config.Size).To(Equal(int64(1024 + 78)))
 			})
 		})
 	})
