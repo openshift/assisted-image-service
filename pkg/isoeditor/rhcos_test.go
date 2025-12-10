@@ -179,30 +179,95 @@ var _ = Context("with test files", func() {
 		Context("editString function", func() {
 			It("replaces content in named capture group", func() {
 				content := "line1\nline2\nline3"
-				newContent, err := editString(content, `(?P<replace>line2)`, "modified")
+				newContent, err := editString(content, `(?P<replace>line2)`, "modified", nil)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(newContent).To(Equal("line1\nmodified\nline3"))
 			})
 
 			It("appends content when replace group is at end", func() {
 				content := "some text"
-				newContent, err := editString(content, `(some text)(?P<replace>$)`, " more")
+				newContent, err := editString(content, `(some text)(?P<replace>$)`, " more", nil)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(newContent).To(Equal("some text more"))
 			})
 
 			It("returns error if no replace group", func() {
 				content := "some text"
-				_, err := editString(content, `some text`, "replacement")
+				_, err := editString(content, `some text`, "replacement", nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("must have a named capture group called 'replace'"))
 			})
 
 			It("returns original content if no match", func() {
 				content := "some text"
-				newContent, err := editString(content, `(?P<replace>nomatch)`, "replacement")
+				newContent, err := editString(content, `(?P<replace>nomatch)`, "replacement", nil)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(newContent).To(Equal(content))
+			})
+		})
+
+		Context("editString offset tracking", func() {
+			It("updates offset when replacement is before embed area", func() {
+				content := "prefix some text suffix"
+				offset := int64(13) // Points to "suffix"
+				fileEntry := &kargsFileEntry{Offset: &offset}
+
+				// Replace "some" (before offset) with "LONGER"
+				newContent, err := editString(content, `(?P<replace>some)`, "LONGER", fileEntry)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal("prefix LONGER text suffix"))
+				// Offset should increase by 2 (6 - 4 = 2)
+				Expect(*fileEntry.Offset).To(Equal(int64(15)))
+			})
+
+			It("does not update offset when replacement is after embed area", func() {
+				content := "prefix some text suffix"
+				offset := int64(7) // Points to "some"
+				fileEntry := &kargsFileEntry{Offset: &offset}
+
+				// Replace "suffix" (after offset) with "END"
+				newContent, err := editString(content, `(?P<replace>suffix)`, "END", fileEntry)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal("prefix some text END"))
+				// Offset should not change
+				Expect(*fileEntry.Offset).To(Equal(int64(7)))
+			})
+
+			It("updates offset when shrinking content before embed area", func() {
+				content := "prefix LONGER text suffix"
+				offset := int64(14) // Points to "text"
+				fileEntry := &kargsFileEntry{Offset: &offset}
+
+				// Replace "LONGER" with "some"
+				newContent, err := editString(content, `(?P<replace>LONGER)`, "some", fileEntry)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal("prefix some text suffix"))
+				// Offset should decrease by 2 (4 - 6 = -2)
+				Expect(*fileEntry.Offset).To(Equal(int64(12)))
+			})
+
+			It("returns error when replacement spans embed area boundary", func() {
+				content := "prefix some text suffix"
+				offset := int64(10) // Points to middle of "some text"
+				fileEntry := &kargsFileEntry{Offset: &offset}
+
+				// Try to replace "some text" which spans across the offset
+				_, err := editString(content, `(?P<replace>some text)`, "REPLACEMENT", fileEntry)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("replacement spans across embed area boundary"))
+			})
+
+			It("handles no change gracefully", func() {
+				content := "some text"
+				offset := int64(5)
+				fileEntry := &kargsFileEntry{Offset: &offset}
+
+				// Replace with same content
+				newContent, err := editString(content, `(?P<replace>some)`, "some", fileEntry)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(newContent).To(Equal(content))
+				// Offset should not change
+				Expect(*fileEntry.Offset).To(Equal(int64(5)))
 			})
 		})
 
