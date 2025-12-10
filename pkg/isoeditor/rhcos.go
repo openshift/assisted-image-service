@@ -23,27 +23,31 @@ const (
 // transformKernelArgs applies the standard kernel argument transformations:
 // 1. Remove coreos.liveiso parameter
 // 2. Add coreos.live.rootfs_url parameter at the specified insertion point
-func transformKernelArgs(filePath string, linePattern string, rootFSURL string) error {
+func transformKernelArgs(content string, insertionPattern string, rootFSURL string) (string, error) {
 	// Validate rootfs URL
 	if strings.Contains(rootFSURL, "$") {
-		return fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
+		return "", fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
 	}
 	if strings.Contains(rootFSURL, "\\") {
-		return fmt.Errorf("invalid rootfs URL: contains invalid character '\\'")
+		return "", fmt.Errorf("invalid rootfs URL: contains invalid character '\\'")
 	}
 
-	// Add the rootfs_url parameter
-	replacement := "$1 $2 coreos.live.rootfs_url=\"" + rootFSURL + "\""
-	if err := editFile(filePath, linePattern, replacement); err != nil {
-		return err
-	}
+	var err error
 
 	// Remove the coreos.liveiso parameter
-	if err := editFile(filePath, ` coreos\.liveiso=\S+`, ""); err != nil {
-		return err
+	content, err = editString(content, `\b(?P<replace>coreos\.liveiso=\S+ ?)`, "")
+	if err != nil {
+		return "", err
 	}
 
-	return nil
+	// Add the rootfs_url parameter at the specified insertion point
+	replacement := " coreos.live.rootfs_url=\"" + rootFSURL + "\""
+	content, err = editString(content, insertionPattern, replacement)
+	if err != nil {
+		return "", err
+	}
+
+	return content, nil
 }
 
 //go:generate mockgen -package=isoeditor -destination=mock_editor.go . Editor
@@ -189,66 +193,104 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 		return fmt.Errorf("no grub.cfg found, possible paths are %v", availableGrubPaths)
 	}
 
+	// Read the file content
+	content, err := os.ReadFile(foundGrubPath)
+	if err != nil {
+		return err
+	}
+	contentStr := string(content)
+
 	// Typical grub.cfg lines we're modifying:
 	//
 	//	linux /images/pxeboot/vmlinuz rw  coreos.liveiso=rhcos-9.6.20250523-0 ignition.firstboot ignition.platform.id=metal
 	//	initrd /images/pxeboot/initrd.img /images/ignition.img
 
 	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
-	if err := transformKernelArgs(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, rootFSURL); err != nil {
+	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+linux .+)(?P<replace>$)`, rootFSURL)
+	if err != nil {
 		return err
 	}
 
-	// Edit config to add custom ramdisk image to initrd
+	// Edit config to add custom ramdisk image to initrd - capture the end-of-line position to append our images
+	var initrdReplacement string
 	if includeNmstateRamDisk {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
-			return err
-		}
+		initrdReplacement = " " + ramDiskImagePath + " " + nmstateDiskImagePath
 	} else {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
-			return err
-		}
+		initrdReplacement = " " + ramDiskImagePath
+	}
+	contentStr, err = editString(contentStr, `(?m)^(\s+initrd .+)(?P<replace>$)`, initrdReplacement)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	// Write the modified content back to the file
+	return os.WriteFile(foundGrubPath, []byte(contentStr), 0600)
 }
 
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
 	isolinuxPath := filepath.Join(extractDir, "isolinux/isolinux.cfg")
+
+	// Read the file content
+	content, err := os.ReadFile(isolinuxPath)
+	if err != nil {
+		return err
+	}
+	contentStr := string(content)
 
 	// Typical isolinux.cfg line we're modifying:
 	//
 	//	append initrd=/images/pxeboot/initrd.img,/images/ignition.img rw  coreos.liveiso=rhcos-9.6.20250523-0 ignition.firstboot ignition.platform.id=metal
 
 	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
-	if err := transformKernelArgs(isolinuxPath, `(?m)^(\s+append) (.+| )+$`, rootFSURL); err != nil {
-		return err
-	}
-
-	if includeNmstateRamDisk {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
-			return err
-		}
-	} else {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-func editFile(fileName string, reString string, replacement string) error {
-	content, err := os.ReadFile(fileName)
+	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+append .+)(?P<replace>$)`, rootFSURL)
 	if err != nil {
 		return err
 	}
 
-	re := regexp.MustCompile(reString)
-	newContent := re.ReplaceAllString(string(content), replacement)
-
-	if err := os.WriteFile(fileName, []byte(newContent), 0600); err != nil {
+	// Add ramdisk images to initrd specification - capture the position right after the initrd argument to append our images
+	var initrdReplacement string
+	if includeNmstateRamDisk {
+		initrdReplacement = "," + ramDiskImagePath + "," + nmstateDiskImagePath
+	} else {
+		initrdReplacement = "," + ramDiskImagePath
+	}
+	contentStr, err = editString(contentStr, `(?m)^(\s+append.*initrd=\S+)(?P<replace>)`, initrdReplacement)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	// Write the modified content back to the file
+	return os.WriteFile(isolinuxPath, []byte(contentStr), 0600)
+}
+
+// editString applies a regex replacement to a string and returns the modified string
+// It looks for a named capture group called "replace" and replaces only that content, using precise string manipulation
+func editString(content string, reString string, replacement string) (string, error) {
+	re := regexp.MustCompile(reString)
+
+	// Get the index of the "replace" named capture group
+	replaceIndex := re.SubexpIndex("replace")
+	if replaceIndex == -1 {
+		return "", fmt.Errorf("regex must have a named capture group called 'replace'")
+	}
+
+	// Find the first match with subgroups
+	submatchIndexes := re.FindStringSubmatchIndex(content)
+	if submatchIndexes == nil {
+		// No match found
+		return content, nil
+	}
+
+	// submatchIndexes contains [fullMatchStart, fullMatchEnd, group1Start, group1End, group2Start, group2End, ...]
+	if len(submatchIndexes) < (replaceIndex+1)*2 {
+		return "", fmt.Errorf("regex match does not contain the 'replace' capture group")
+	}
+
+	replaceStart := submatchIndexes[replaceIndex*2]
+	replaceEnd := submatchIndexes[replaceIndex*2+1]
+
+	// Replace only the "replace" capturing group
+	newContent := content[:replaceStart] + replacement + content[replaceEnd:]
+
+	return newContent, nil
 }
