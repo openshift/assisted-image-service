@@ -24,7 +24,7 @@ const (
 // transformKernelArgs applies the standard kernel argument transformations:
 // 1. Remove coreos.liveiso parameter
 // 2. Add coreos.live.rootfs_url parameter at the specified insertion point
-func transformKernelArgs(content string, insertionPattern string, rootFSURL string) (string, error) {
+func transformKernelArgs(content string, insertionPattern string, rootFSURL string, fileEntry *kargsFileEntry) (string, error) {
 	// Validate rootfs URL
 	if strings.Contains(rootFSURL, "$") {
 		return "", fmt.Errorf("invalid rootfs URL: contains invalid character '$'")
@@ -36,14 +36,14 @@ func transformKernelArgs(content string, insertionPattern string, rootFSURL stri
 	var err error
 
 	// Remove the coreos.liveiso parameter
-	content, err = editString(content, `\b(?P<replace>coreos\.liveiso=\S+ ?)`, "")
+	content, err = editString(content, `\b(?P<replace>coreos\.liveiso=\S+ ?)`, "", fileEntry)
 	if err != nil {
 		return "", err
 	}
 
 	// Add the rootfs_url parameter at the specified insertion point
 	replacement := " coreos.live.rootfs_url=\"" + rootFSURL + "\""
-	content, err = editString(content, insertionPattern, replacement)
+	content, err = editString(content, insertionPattern, replacement, fileEntry)
 	if err != nil {
 		return "", err
 	}
@@ -172,14 +172,16 @@ func embedInitrdPlaceholders(extractDir string) error {
 	return nil
 }
 
-// fixGrubConfig modifies grub.cfg
+// fixGrubConfig modifies grub.cfg and updates kargs config in place
 func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
+	var fileEntry *kargsFileEntry
 	for _, pathSection := range availableGrubPaths {
 		path := filepath.Join(extractDir, pathSection)
 		if _, err := os.Stat(path); err == nil {
 			foundGrubPath = path
+			fileEntry = kargs.FindFileByPath(pathSection)
 			break
 		}
 	}
@@ -200,7 +202,7 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kar
 	//	initrd /images/pxeboot/initrd.img /images/ignition.img
 
 	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
-	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+linux .+)(?P<replace>$)`, rootFSURL)
+	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+linux .+)(?P<replace>$)`, rootFSURL, fileEntry)
 	if err != nil {
 		return err
 	}
@@ -212,7 +214,7 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kar
 	} else {
 		initrdReplacement = " " + ramDiskImagePath
 	}
-	contentStr, err = editString(contentStr, `(?m)^(\s+initrd .+)(?P<replace>$)`, initrdReplacement)
+	contentStr, err = editString(contentStr, `(?m)^(\s+initrd .+)(?P<replace>$)`, initrdReplacement, fileEntry)
 	if err != nil {
 		return err
 	}
@@ -221,7 +223,7 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kar
 	return os.WriteFile(foundGrubPath, []byte(contentStr), 0600)
 }
 
-// fixIsolinuxConfig modifies isolinux.cfg
+// fixIsolinuxConfig modifies isolinux.cfg and updates kargs config in place
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
 	relativeIsolinuxPath := strings.TrimPrefix(defaultIsolinuxFilePath, "/")
 	isolinuxPath := filepath.Join(extractDir, relativeIsolinuxPath)
@@ -237,8 +239,11 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool,
 	//
 	//	append initrd=/images/pxeboot/initrd.img,/images/ignition.img rw  coreos.liveiso=rhcos-9.6.20250523-0 ignition.firstboot ignition.platform.id=metal
 
+	// Find the kargs file entry for this file
+	fileEntry := kargs.FindFileByPath(relativeIsolinuxPath)
+
 	// Apply standard kernel argument transformations (remove coreos.liveiso, add rootfs_url)
-	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+append .+)(?P<replace>$)`, rootFSURL)
+	contentStr, err = transformKernelArgs(contentStr, `(?m)^(\s+append .+)(?P<replace>$)`, rootFSURL, fileEntry)
 	if err != nil {
 		return err
 	}
@@ -250,7 +255,7 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool,
 	} else {
 		initrdReplacement = "," + ramDiskImagePath
 	}
-	contentStr, err = editString(contentStr, `(?m)^(\s+append.*initrd=\S+)(?P<replace>)`, initrdReplacement)
+	contentStr, err = editString(contentStr, `(?m)^(\s+append.*initrd=\S+)(?P<replace>)`, initrdReplacement, fileEntry)
 	if err != nil {
 		return err
 	}
@@ -261,7 +266,7 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool,
 
 // editString applies a regex replacement to a string and returns the modified string
 // It looks for a named capture group called "replace" and replaces only that content, using precise string manipulation
-func editString(content string, reString string, replacement string) (string, error) {
+func editString(content string, reString string, replacement string, fileEntry *kargsFileEntry) (string, error) {
 	re := regexp.MustCompile(reString)
 
 	// Get the index of the "replace" named capture group
@@ -288,20 +293,58 @@ func editString(content string, reString string, replacement string) (string, er
 	// Replace only the "replace" capturing group
 	newContent := content[:replaceStart] + replacement + content[replaceEnd:]
 
+	if content == newContent {
+		return content, nil
+	}
+
+	if fileEntry == nil || fileEntry.Offset == nil {
+		return newContent, nil
+	}
+
+	embedStart := *fileEntry.Offset
+	fileSizeChange := int64(len(newContent)) - int64(len(content))
+
+	replaceStartPos := int64(replaceStart)
+	replaceEndPos := int64(replaceEnd)
+
+	// Add boundary crossing check to ensure no replacements span across the embed area start boundary
+	if replaceStartPos < embedStart && replaceEndPos > embedStart {
+		return "", fmt.Errorf("replacement spans across embed area boundary (replace: %d-%d, embed starts: %d)", replaceStartPos, replaceEndPos, embedStart)
+	}
+
+	if replaceEndPos <= embedStart {
+		// Change is before embed area - affects offset
+		*fileEntry.Offset += fileSizeChange
+	}
+
 	return newContent, nil
 }
 
 type kargsFileEntry struct {
-	End    *string `json:"end"`
-	Offset *int64  `json:"offset"`
-	Pad    *string `json:"pad"`
-	Path   *string `json:"path"`
+	End    *string `json:"end,omitempty"`
+	Offset *int64  `json:"offset,omitempty"`
+	Pad    *string `json:"pad,omitempty"`
+	Path   *string `json:"path,omitempty"`
 }
 
 type kargsConfig struct {
 	Default string           `json:"default"`
 	Files   []kargsFileEntry `json:"files"`
 	Size    int64            `json:"size"`
+}
+
+// FindFileByPath searches for a file entry by its path and returns a pointer to it.
+// Returns nil if no file with the specified path is found.
+func (k *kargsConfig) FindFileByPath(path string) *kargsFileEntry {
+	if k == nil {
+		return nil
+	}
+	for i := range k.Files {
+		if k.Files[i].Path != nil && *k.Files[i].Path == path {
+			return &k.Files[i]
+		}
+	}
+	return nil
 }
 
 // updateDefaultKargs modifies the default kernel arguments to match bootloader modifications
@@ -311,8 +354,9 @@ func updateDefaultKargs(config *kargsConfig, rootFSURL string) error {
 
 	// Apply the same transformations we make to bootloader configs
 	// For default kargs, we append at the end (using $ insertion pattern)
+	// Pass nil for fileEntry since we don't track offsets for the default string
 	var err error
-	config.Default, err = transformKernelArgs(config.Default, `(?P<replace>$)`, rootFSURL)
+	config.Default, err = transformKernelArgs(config.Default, `(?P<replace>$)`, rootFSURL, nil)
 	if err != nil {
 		return err
 	}
@@ -324,7 +368,7 @@ func updateDefaultKargs(config *kargsConfig, rootFSURL string) error {
 	return nil
 }
 
-// updateKargs reads kargs.json, applies bootloader config fixes, and updates kargs.json
+// updateKargs reads kargs.json, applies fixes with embed area awareness, and updates kargs.json
 func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch string) error {
 	kargsPath := filepath.Join(extractDir, "coreos/kargs.json")
 
@@ -343,7 +387,7 @@ func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch 
 		config = &kargsStruct
 	}
 
-	// Apply bootloader config changes
+	// Apply bootloader config changes (without tracking size changes)
 	if err := fixGrubConfig(rootFSURL, extractDir, includeNmstateRamDisk, config); err != nil {
 		return fmt.Errorf("failed to fix grub config: %v", err)
 	}
@@ -373,4 +417,3 @@ func updateKargs(extractDir, rootFSURL string, includeNmstateRamDisk bool, arch 
 
 	return nil
 }
-
