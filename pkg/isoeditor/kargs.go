@@ -21,11 +21,18 @@ const (
 type FileReader func(isoPath, filePath string) ([]byte, error)
 
 func kargsFiles(isoPath string, fileReader FileReader) ([]string, error) {
+	// Try the canonical filename first (kargs.json from upstream ISOs)
 	kargsData, err := fileReader(isoPath, kargsConfigFilePath)
 	if err != nil {
-		// If the kargs file is not found, it is probably iso for old iso version which the file does not exist.  Therefore,
-		// default is returned
-		return []string{defaultGrubFilePath, defaultIsolinuxFilePath}, nil
+		// Try the truncated filename (kargs.jso - 3-char extension for ISO 9660 Level 1)
+		// This is used in minimal ISOs we create with diskfs
+		truncatedPath := kargsConfigFilePath[:len(kargsConfigFilePath)-1]
+		kargsData, err = fileReader(isoPath, truncatedPath)
+		if err != nil {
+			// If neither kargs file is found, it is probably an older ISO version where the file doesn't exist.
+			// Therefore, defaults are returned.
+			return []string{defaultGrubFilePath, defaultIsolinuxFilePath}, nil
+		}
 	}
 	var kargsConfig struct {
 		Files []struct {

@@ -100,7 +100,7 @@ func createS390TestFiles(volumeID string, minBootImageSize int64) (tmpDir string
 	Expect(os.Remove(isoFile)).To(Succeed())
 
 	// Create the boot catalog file:
-	bootCatalogFile := filepath.Join(tmpDir, "boot.catalog")
+	bootCatalogFile := filepath.Join(tmpDir, "boot.cat")
 	bootCatalogBytes := make([]byte, 2048)
 	Expect(os.WriteFile(bootCatalogFile, bootCatalogBytes, 0600)).ToNot(HaveOccurred())
 
