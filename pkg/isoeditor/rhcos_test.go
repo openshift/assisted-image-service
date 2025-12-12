@@ -108,12 +108,28 @@ var _ = Context("with test files", func() {
 			})
 
 			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
-				err := fixIsolinuxConfig(testRootFSURL, filesDir, true)
+				contentWithRamDiskPath, err := fixIsolinuxConfig(testRootFSURL, filesDir, true)
+				Expect(contentWithRamDiskPath).ToNot(BeEmpty())
 				Expect(err).ToNot(HaveOccurred())
 
-				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s,%s random.trust_cpu=on rd.luks.options=discard rw ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
 				isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, nmstateDiskImagePath, testRootFSURL)
 				validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
+			})
+
+			It("fixKargsConfig alters the kernel parameters correctly", func() {
+				contentWithRamDiskPath, err := fixIsolinuxConfig(testRootFSURL, filesDir, true)
+				Expect(contentWithRamDiskPath).ToNot(BeEmpty())
+				Expect(err).ToNot(HaveOccurred())
+
+				err = fixKargsConfig(filesDir, contentWithRamDiskPath, true)
+				Expect(err).ToNot(HaveOccurred())
+
+				kargsCfg := `  "default": "rw ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img",`
+				validateFileContainsLine(filepath.Join(filesDir, "coreos/kargs.jso"), kargsCfg)
+
+				offset := `      "offset": 1923,`
+				validateFileContainsLine(filepath.Join(filesDir, "coreos/kargs.jso"), offset)
 			})
 		})
 
@@ -132,12 +148,28 @@ var _ = Context("with test files", func() {
 			})
 
 			It("fixIsolinuxConfig alters the kernel parameters correctly", func() {
-				err := fixIsolinuxConfig(testRootFSURL, filesDir, false)
+				contentWithRamDiskPath, err := fixIsolinuxConfig(testRootFSURL, filesDir, false)
+				Expect(contentWithRamDiskPath).ToNot(BeEmpty())
 				Expect(err).ToNot(HaveOccurred())
 
-				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
+				newLine := "  append initrd=/images/pxeboot/initrd.img,/images/ignition.img,%s random.trust_cpu=on rd.luks.options=discard rw ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=%s"
 				isolinuxCfg := fmt.Sprintf(newLine, ramDiskImagePath, testRootFSURL)
 				validateFileContainsLine(filepath.Join(filesDir, "isolinux/isolinux.cfg"), isolinuxCfg)
+			})
+
+			It("fixKargsConfig alters the kernel parameters correctly", func() {
+				contentWithRamDiskPath, err := fixIsolinuxConfig(testRootFSURL, filesDir, false)
+				Expect(contentWithRamDiskPath).ToNot(BeEmpty())
+				Expect(err).ToNot(HaveOccurred())
+
+				err = fixKargsConfig(filesDir, contentWithRamDiskPath, false)
+				Expect(err).ToNot(HaveOccurred())
+
+				kargsCfg := `  "default": "rw ignition.firstboot ignition.platform.id=metal coreos.live.rootfs_url=https://example.com/pub/openshift-v4/dependencies/rhcos/4.7/4.7.7/rhcos-live-rootfs.x86_64.img",`
+				validateFileContainsLine(filepath.Join(filesDir, "coreos/kargs.jso"), kargsCfg)
+
+				offset := `      "offset": 1903,`
+				validateFileContainsLine(filepath.Join(filesDir, "coreos/kargs.jso"), offset)
 			})
 		})
 	})
