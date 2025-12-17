@@ -40,7 +40,7 @@ func (h *initrdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	initrdReader, lastModified, code, err := initrdOverlayReader(h.ImageStore, h.client, r, arch)
 	if err != nil {
-		httpErrorf(w, code, err.Error())
+		httpErrorf(w, code, "%s", err.Error())
 		return
 	}
 	defer initrdReader.Close()
