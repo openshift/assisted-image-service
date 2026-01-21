@@ -110,7 +110,7 @@ func (e *CommonExecuter) Execute(command, workDir string) (string, error) {
 	cmd := exec.Command("bash", "-c", command)
 	cmd.Stdout = &stdoutBytes
 	cmd.Stderr = &stderrBytes
-	log.Infof(fmt.Sprintf("Running cmd: %s\n", command))
+	log.Info(fmt.Sprintf("Running cmd: %s\n", command))
 	cmd.Dir = workDir
 	err := cmd.Run()
 	if err != nil {
