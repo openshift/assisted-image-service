@@ -44,7 +44,7 @@ WORKDIR /app
 RUN GO111MODULE=on GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-image-service main.go
 
 
-FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 ARG release=main
 ARG version=latest
 
@@ -61,7 +61,8 @@ RUN mkdir $DATA_TEMP_DIR && chmod 775 $DATA_TEMP_DIR
 VOLUME $DATA_TEMP_DIR
 ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
 
-RUN dnf -y update && dnf install -y cpio squashfs-tools && dnf clean all
+# Install runtime packages directly with microdnf (rpm-prefetching makes them available)
+RUN microdnf install -y cpio squashfs-tools && microdnf clean all
 
 # Copy the very minimum that we need from the external packages container. That is the 'dump.erofs'
 # binary and the compression library (from the 'xz' package) that it needs.
