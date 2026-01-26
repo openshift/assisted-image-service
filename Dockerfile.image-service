@@ -45,7 +45,7 @@ RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 RUN cd /app && git rev-parse --short HEAD > /commit-reference.txt
 
 ## Runtime
-FROM quay.io/centos/centos:stream9
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 
 ARG release=main
 ARG version=latest
@@ -61,6 +61,23 @@ LABEL version ${version}
 LABEL url https://github.com/openshift/assisted-image-service
 LABEL vendor "Red Hat, Inc."
 LABEL maintainer "Red Hat"
+
+# Install cpio directly with microdnf (available in UBI minimal)
+RUN microdnf install -y cpio && microdnf clean all
+
+# Install dnf for external repository management
+RUN microdnf install -y dnf && microdnf clean all
+
+# Add CentOS Stream repositories for packages not available in UBI
+RUN dnf install -y 'dnf-command(config-manager)' && \
+    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/ && \
+    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+
+# Import CentOS GPG keys for secure package verification
+RUN rpm --import https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+
+# Install squashfs-tools from CentOS Stream repositories
+RUN dnf install -y squashfs-tools && dnf clean all
 
 # Ensure UID can write in data dir (e.g.: when using podman, docker, ...)
 # Ensure root group can write in data dir when deployed on OCP
@@ -78,8 +95,6 @@ ARG GID=0
 RUN mkdir $DATA_TEMP_DIR && chmod 775 $DATA_TEMP_DIR && chown $UID:$GID /data
 VOLUME $DATA_TEMP_DIR
 ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
-
-RUN dnf install -y cpio squashfs-tools && dnf clean all
 
 # Copy the commit reference from the builder
 COPY --from=golang /commit-reference.txt /commit-reference.txt
