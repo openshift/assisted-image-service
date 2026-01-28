@@ -9,7 +9,6 @@ require (
 	github.com/diskfs/go-diskfs v1.4.1
 	github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453
 	github.com/go-chi/chi/v5 v5.0.12
-	github.com/golang/mock v1.6.0
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.7.0
@@ -22,6 +21,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
 	github.com/slok/go-http-metrics v0.11.0
 	github.com/thoas/go-funk v0.9.3
+	go.uber.org/mock v0.1.0
 	golang.org/x/sync v0.10.0
 )
 

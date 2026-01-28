@@ -7,7 +7,7 @@ package isoeditor
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockNmstatectlExtractor is a mock of NmstatectlExtractor interface.
