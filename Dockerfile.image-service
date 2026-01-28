@@ -34,7 +34,7 @@ COPY go.sum go.sum
 RUN go mod download
 ADD . /app
 WORKDIR /app
-RUN CGO_ENABLED=1 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service main.go
+RUN CGO_ENABLED=1 GOFIPS140=v1.0.0 GOFLAGS="" GO111MODULE=on go build -o /assisted-image-service main.go
 
 ## Licenses
 
