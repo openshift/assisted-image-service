@@ -155,6 +155,8 @@ parameters:
   value: "3Gi"
 - name: EPHEMERAL_STORAGE_LIMIT
   value: "6Gi"
+- name: PDB_MIN_AVAILABLE
+  value: "2"
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -260,7 +262,7 @@ objects:
   metadata:
     name: assisted-image-service
   spec:
-    minAvailable: 2
+    minAvailable: ${{PDB_MIN_AVAILABLE}}
     selector:
       matchLabels:
         service: image-service

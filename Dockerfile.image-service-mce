@@ -24,7 +24,7 @@ RUN cd /packages && ./build.sh
 
 
 # Used to build the service:
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1.24 AS builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -93,4 +93,5 @@ LABEL com.redhat.component="multicluster-engine-assisted-image-service-container
       io.openshift.tags="OpenShift 4" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
-      org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service"
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-image-service" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.11::el9"
