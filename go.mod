@@ -8,7 +8,7 @@ require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
 	github.com/diskfs/go-diskfs v1.7.1-0.20251217162235-58541aa8f559
 	github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453
-	github.com/go-chi/chi/v5 v5.2.4
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang/mock v1.6.0
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
