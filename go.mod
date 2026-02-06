@@ -1,6 +1,8 @@
 module github.com/openshift/assisted-image-service
 
-go 1.21
+go 1.25.0
+
+toolchain go1.25.5
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
