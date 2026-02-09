@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -46,6 +47,112 @@ func kargsFiles(isoPath string, fileReader FileReader) ([]string, error) {
 
 func KargsFiles(isoPath string) ([]string, error) {
 	return kargsFiles(isoPath, ReadFileFromISO)
+}
+
+// EmbedKargsIntoBootImage appends custom kernel arguments into a staging ISO image that
+// already contains an ignition config, using offsets and size limits defined in `coreos/kargs.json`
+// that are extracted from the original base ISO.
+//
+// This function is only invoked when both the ignition config and kernel arguments must be embedded
+// into the same boot image.
+func EmbedKargsIntoBootImage(baseIsoPath string, stagingIsoPath string, customKargs string) error {
+
+	// Read the kargs.json file content from the ISO
+	kargsData, err := ReadFileFromISO(baseIsoPath, kargsConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read kargs config from %s: %w", kargsConfigFilePath, err)
+	}
+
+	// Loading the kargs config JSON file
+	var kargsConfig struct {
+		Default string `json:"default"`
+		Files   []struct {
+			Path   string `json:"path"`
+			Offset int64  `json:"offset"`
+			End    string `json:"end"`
+			Pad    string `json:"pad"`
+		} `json:"files"`
+		Size int `json:"size"`
+	}
+	if err := json.Unmarshal(kargsData, &kargsConfig); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", kargsConfigFilePath, err)
+	}
+
+	// Make sure kargs config files are present
+	if len(kargsConfig.Files) == 0 {
+		return fmt.Errorf("no kargs file entries found in %s", kargsConfigFilePath)
+	}
+
+	// Fetch kargs files from the ISO
+	files, err := KargsFiles(baseIsoPath)
+	if err != nil {
+		return err
+	}
+
+	// Embed kargs config into each file
+	for _, filePath := range files {
+		// Check if file exists
+		absFilePath := filepath.Join(stagingIsoPath, filePath)
+		fileExists, err := fileExists(absFilePath)
+		if err != nil {
+			return err
+		}
+		if !fileExists {
+			return fmt.Errorf("file %s does not exist", absFilePath)
+		}
+
+		// Finding offset for the target filePath
+		var kargsOffset int64
+		for _, file := range kargsConfig.Files {
+			if file.Path == filePath {
+				kargsOffset = file.Offset
+				break
+			}
+		}
+
+		// Calculate the customKargsOffset
+		existingKargs := []byte(kargsConfig.Default)
+		appendKargsOffset := kargsOffset + int64(len(existingKargs))
+
+		// Now open the file for read/write and patch at offset
+		f, err := os.OpenFile(absFilePath, os.O_RDWR, 0)
+		if err != nil {
+			return fmt.Errorf("failed to open target file %s: %w", absFilePath, err)
+		}
+		defer f.Close()
+
+		// Seek to the kargs offset in the filePath
+		_, err = f.Seek(appendKargsOffset, io.SeekStart)
+		if err != nil {
+			return fmt.Errorf("failed to seek to kargs offset %d in %s: %w", appendKargsOffset, absFilePath, err)
+		}
+
+		// Determine available kargs field size if possible
+		var maxLen int64
+		if kargsConfig.Size > 0 {
+			maxLen = int64(kargsConfig.Size)
+		} else {
+			// Try to get remaining bytes until next file or EOF (best-effort)
+			// If we can't determine a safe max, at least ensure we don't write beyond file size.
+			fi, statErr := f.Stat()
+			if statErr == nil {
+				maxLen = fi.Size() - appendKargsOffset
+			}
+		}
+
+		// Ensure to not overflow the kargs field size
+		kargsLength := len(existingKargs) + len(customKargs)
+		if maxLen > 0 && int64(kargsLength) > maxLen {
+			return fmt.Errorf("kargs length %d exceeds available field size %d", kargsLength, maxLen)
+		}
+
+		// Write the kargs bytes
+		if _, err = f.Write([]byte(customKargs)); err != nil {
+			return fmt.Errorf("failed writing kargs into %s: %w", absFilePath, err)
+		}
+	}
+
+	return nil
 }
 
 func kargsFileData(isoPath string, file string, appendKargs []byte) (FileData, error) {
