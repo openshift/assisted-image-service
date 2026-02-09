@@ -24,7 +24,7 @@ RUN cd /packages && ./build.sh
 
 
 # Used to build the service:
-FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS golang
+FROM registry.access.redhat.com/ubi9/go-toolset:9.7 AS golang
 
 USER 0
 
@@ -45,7 +45,7 @@ RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 RUN cd /app && git rev-parse --short HEAD > /commit-reference.txt
 
 ## Runtime
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:759f5f42d9d6ce2a705e290b7fc549e2d2cd39312c4fa345f93c02e4abb8da95
 
 ARG release=main
 ARG version=latest
