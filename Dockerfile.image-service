@@ -70,8 +70,8 @@ RUN microdnf install -y dnf && microdnf clean all
 
 # Add CentOS Stream repositories for packages not available in UBI
 RUN dnf install -y 'dnf-command(config-manager)' && \
-    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/ && \
-    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
+    dnf config-manager --add-repo https://mirror.stream.centos.org/9-stream/BaseOS/\$basearch/os/ && \
+    dnf config-manager --add-repo https://mirror.stream.centos.org/9-stream/AppStream/\$basearch/os/
 
 # Import CentOS GPG keys for secure package verification
 RUN rpm --import https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
