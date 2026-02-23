@@ -1,13 +1,15 @@
 # Used to build external packages:
-FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4 AS packages
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71 AS packages
 
 # Install the build tools and the required libraries:
 RUN \
-  dnf install -y \
+  microdnf install -y \
   \
   gcc \
+  gzip \
   libtool \
   make \
+  tar \
   \
   libselinux-devel \
   libuuid-devel \
@@ -16,7 +18,7 @@ RUN \
   zlib-devel \
   \
   && \
-  dnf clean all
+  microdnf clean all
 
 # Build the packages:
 COPY packages /packages
