@@ -27,7 +27,7 @@ var _ = Describe("NewInitRamFSStreamReader", func() {
 	initrdPath := filepath.Join(filesDir, "images/ignition.img")
 
 	It("appends the ignition", func() {
-		streamReader, err := NewInitRamFSStreamReader(initrdPath, &IgnitionContent{ignitionContent})
+		streamReader, err := NewInitRamFSStreamReader(initrdPath, &IgnitionContent{Config: ignitionContent})
 		Expect(err).NotTo(HaveOccurred())
 
 		var output, expected strings.Builder

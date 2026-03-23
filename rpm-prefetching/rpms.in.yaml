@@ -3,6 +3,7 @@ contentOrigin:
 packages:
   - cpio
   - gcc
+  - gzip
   - libselinux-devel
   - libtool
   - libuuid-devel
@@ -10,9 +11,12 @@ packages:
   - lz4-devel
   - make
   - squashfs-tools
+  - tar
   - zlib-devel
 arches:
   - aarch64
   - x86_64
   - ppc64le
   - s390x
+context:
+  containerfile: ../Dockerfile.image-service-mce

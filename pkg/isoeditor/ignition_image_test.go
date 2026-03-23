@@ -33,7 +33,7 @@ var _ = Describe("IgnitionContent.Archive", func() {
 	})
 
 	It("streams the ignition image", func() {
-		content := IgnitionContent{ignitionContent}
+		content := IgnitionContent{Config: ignitionContent}
 
 		outputs, err := NewIgnitionImageReader(isoFile, &content)
 		Expect(err).NotTo(HaveOccurred())

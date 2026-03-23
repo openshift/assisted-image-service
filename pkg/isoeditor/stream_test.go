@@ -54,7 +54,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 	}
 
 	It("embeds the ignition with no ramdisk content", func() {
-		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, nil)
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -69,7 +69,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 
 	It("embeds the ignition and ramdisk content", func() {
 		initrdContent := []byte("someramdiskcontent")
-		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, initrdContent, nil)
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, initrdContent, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -84,7 +84,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 	})
 	It("embeds the ignition and kargs content", func() {
 		kargs := []byte(" p1 p2 p3 p4\n")
-		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{ignitionContent}, nil, kargs)
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, nil, kargs)
 		Expect(err).NotTo(HaveOccurred())
 
 		f, err := os.CreateTemp(filesDir, "streamed*.iso")
@@ -111,7 +111,7 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		}()
 
 		// Copy the output ISO to a file:
-		outputReader, err := NewRHCOSStreamReader(inputFile, &IgnitionContent{ignitionContent}, nil, nil)
+		outputReader, err := NewRHCOSStreamReader(inputFile, &IgnitionContent{Config: ignitionContent}, nil, nil)
 		Expect(err).ToNot(HaveOccurred())
 		defer func() {
 			Expect(outputReader.Close()).To(Succeed())
