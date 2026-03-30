@@ -1,17 +1,15 @@
 module github.com/openshift/assisted-image-service
 
-go 1.25.0
-
-toolchain go1.25.5
+go 1.25.7
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
-	github.com/diskfs/go-diskfs v1.7.1-0.20251217162235-58541aa8f559
-	github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453
+	github.com/diskfs/go-diskfs v1.8.0
+	github.com/erofs/go-erofs v0.1.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-version v1.8.0
+	github.com/hashicorp/go-version v1.9.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.39.1
@@ -22,7 +20,7 @@ require (
 	github.com/slok/go-http-metrics v0.13.0
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/mock v0.6.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
@@ -37,7 +35,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pierrec/lz4/v4 v4.1.17 // indirect
-	github.com/pkg/xattr v0.4.9 // indirect
+	github.com/pkg/xattr v0.4.12 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
