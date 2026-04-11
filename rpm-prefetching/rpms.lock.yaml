@@ -25,13 +25,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-3.el9_7.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-4.el9_7.noarch.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 18145
-    checksum: sha256:0f68ce0803b75b2df53e330c47c32e97db670534af7f6b5986f63cfafa21d1f8
+    size: 22648
+    checksum: sha256:3fe264b718996d85fcb4551ca0bbf4d0a946cad12981b13fe0f9b76d9dc66aae
     name: NetworkManager-config-server
-    evr: 1:1.54.0-3.el9_7
-    sourcerpm: NetworkManager-1.54.0-3.el9_7.src.rpm
+    evr: 1:1.54.0-4.el9_7
+    sourcerpm: NetworkManager-1.54.0-4.el9_7.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 45196
@@ -85,13 +85,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-3.el9_7.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-4.el9_7.noarch.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 18145
-    checksum: sha256:0f68ce0803b75b2df53e330c47c32e97db670534af7f6b5986f63cfafa21d1f8
+    size: 22648
+    checksum: sha256:3fe264b718996d85fcb4551ca0bbf4d0a946cad12981b13fe0f9b76d9dc66aae
     name: NetworkManager-config-server
-    evr: 1:1.54.0-3.el9_7
-    sourcerpm: NetworkManager-1.54.0-3.el9_7.src.rpm
+    evr: 1:1.54.0-4.el9_7
+    sourcerpm: NetworkManager-1.54.0-4.el9_7.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 46315
@@ -145,13 +145,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-3.el9_7.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-4.el9_7.noarch.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 18145
-    checksum: sha256:0f68ce0803b75b2df53e330c47c32e97db670534af7f6b5986f63cfafa21d1f8
+    size: 22648
+    checksum: sha256:3fe264b718996d85fcb4551ca0bbf4d0a946cad12981b13fe0f9b76d9dc66aae
     name: NetworkManager-config-server
-    evr: 1:1.54.0-3.el9_7
-    sourcerpm: NetworkManager-1.54.0-3.el9_7.src.rpm
+    evr: 1:1.54.0-4.el9_7
+    sourcerpm: NetworkManager-1.54.0-4.el9_7.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 45258
@@ -205,13 +205,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-3.el9_7.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/n/NetworkManager-config-server-1.54.0-4.el9_7.noarch.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 18145
-    checksum: sha256:0f68ce0803b75b2df53e330c47c32e97db670534af7f6b5986f63cfafa21d1f8
+    size: 22648
+    checksum: sha256:3fe264b718996d85fcb4551ca0bbf4d0a946cad12981b13fe0f9b76d9dc66aae
     name: NetworkManager-config-server
-    evr: 1:1.54.0-3.el9_7
-    sourcerpm: NetworkManager-1.54.0-3.el9_7.src.rpm
+    evr: 1:1.54.0-4.el9_7
+    sourcerpm: NetworkManager-1.54.0-4.el9_7.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 45675
