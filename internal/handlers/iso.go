@@ -84,6 +84,9 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer isoReader.Close()
 
 	fileName := fmt.Sprintf("%s-discovery.iso", params.imageID)
+	if params.imageType == imagestore.ImageTypeDisconnectedIso {
+		fileName = fmt.Sprintf("agent-ove.%s.iso", params.arch)
+	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 	modTime, err := http.ParseTime(lastModified)
 	if err != nil {

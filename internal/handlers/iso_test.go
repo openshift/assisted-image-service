@@ -209,6 +209,18 @@ var _ = Describe("ServeHTTP", func() {
 					expectSuccessfulResponse(resp, []byte("someisocontent"))
 				})
 
+				It("returns a disconnected image with agent-ove filename", func() {
+					initIgnitionHandler("discovery_iso_type=disconnected-iso&file_name=discovery.ign")
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeDisconnectedIso, "4.8", defaultArch).Return(fullImageFilename)
+					path := fmt.Sprintf("/byid/%s/4.8/x86_64/disconnected.iso", imageID)
+					setInfraenvKargsHandlerSuccess()
+					resp, err := client.Get(server.URL + path)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(resp.StatusCode).To(Equal(http.StatusOK))
+					Expect(resp.Header.Get("Content-Disposition")).To(Equal("attachment; filename=agent-ove.x86_64.iso"))
+				})
+
 				It("returns a minimal image with an initrd", func() {
 					initIgnitionHandler("discovery_iso_type=minimal-iso&file_name=discovery.ign")
 					initrdContent = []byte("someramdisk")
