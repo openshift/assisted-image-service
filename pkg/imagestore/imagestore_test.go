@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -136,6 +137,7 @@ var _ = Context("with a data directory configured", func() {
 				ctrl               *gomock.Controller
 				mockEditor         *isoeditor.MockEditor
 				mockNmstateHandler *isoeditor.MockNmstateHandler
+				isoDir             string
 				validVolumeID      = "rhcos-411.86.202210041459-0"
 				version            = map[string]string{
 					"openshift_version": "4.8",
@@ -145,24 +147,32 @@ var _ = Context("with a data directory configured", func() {
 			)
 
 			BeforeEach(func() {
+				requireGenisoimage()
 				ctrl = gomock.NewController(GinkgoT())
 				mockEditor = isoeditor.NewMockEditor(ctrl)
 				mockNmstateHandler = isoeditor.NewMockNmstateHandler(ctrl)
 				osImageDownloadHeadersMap = map[string]string{}
 				osImageDownloadQueryParamsMap = map[string]string{}
+				var err error
+				isoDir, err = os.MkdirTemp("", "populateTestISO")
+				Expect(err).NotTo(HaveOccurred())
 			})
 
-			isoInfo := func(id string) ([]byte, http.Header) {
-				content := make([]byte, 32840)
-				copy(content[32808:], id)
+			AfterEach(func() {
+				os.RemoveAll(isoDir)
+			})
+
+			readTestISO := func(volumeID string) ([]byte, http.Header) {
+				isoFile := buildTestISO(isoDir, volumeID, minRootfsSize+1024, minKernelSize+1024)
+				content, err := os.ReadFile(isoFile)
+				Expect(err).NotTo(HaveOccurred())
 				header := http.Header{}
 				header.Add("Content-Length", strconv.Itoa(len(content)))
-
 				return content, header
 			}
 
 			It("downloads an image correctly", func() {
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
@@ -211,6 +221,7 @@ var _ = Context("with a data directory configured", func() {
 				ctrl               *gomock.Controller
 				mockEditor         *isoeditor.MockEditor
 				mockNmstateHandler *isoeditor.MockNmstateHandler
+				isoDir             string
 				validVolumeID      = "rhcos-411.86.202210041459-0"
 				version            = map[string]string{
 					"openshift_version": "4.8",
@@ -225,24 +236,41 @@ var _ = Context("with a data directory configured", func() {
 			)
 
 			BeforeEach(func() {
+				requireGenisoimage()
 				ctrl = gomock.NewController(GinkgoT())
 				mockEditor = isoeditor.NewMockEditor(ctrl)
 				mockNmstateHandler = isoeditor.NewMockNmstateHandler(ctrl)
+				var err error
+				isoDir, err = os.MkdirTemp("", "populateTestISO")
+				Expect(err).NotTo(HaveOccurred())
 			})
 
-			isoInfo := func(id string) ([]byte, http.Header) {
-				content := make([]byte, 32840)
-				copy(content[32808:], id)
+			AfterEach(func() {
+				os.RemoveAll(isoDir)
+			})
+
+			readTestISO := func(volumeID string) ([]byte, http.Header) {
+				isoFile := buildTestISO(isoDir, volumeID, minRootfsSize+1024, minKernelSize+1024)
+				content, err := os.ReadFile(isoFile)
+				Expect(err).NotTo(HaveOccurred())
 				header := http.Header{}
 				header.Add("Content-Length", strconv.Itoa(len(content)))
+				return content, header
+			}
 
+			readTestISOWithSizes := func(volumeID string, rootfsSize, kernelSize int) ([]byte, http.Header) {
+				isoFile := buildTestISO(isoDir, volumeID, rootfsSize, kernelSize)
+				content, err := os.ReadFile(isoFile)
+				Expect(err).NotTo(HaveOccurred())
+				header := http.Header{}
+				header.Add("Content-Length", strconv.Itoa(len(content)))
 				return content, header
 			}
 
 			It("passes query parameters in request when parameters have been provided during creation", func() {
 				osImageDownloadQueryParamsMap["foo"] = "bar"
 				osImageDownloadQueryParamsMap["bar"] = "foo"
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso", "foo=bar&bar=foo"),
@@ -267,7 +295,7 @@ var _ = Context("with a data directory configured", func() {
 			It("passes http headers in request when parameters have been provided during creation", func() {
 				osImageDownloadHeadersMap["foo"] = "bar"
 				osImageDownloadHeadersMap["bar"] = "foo"
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				httpHeader := http.Header{}
 				httpHeader.Add("foo", "bar")
 				httpHeader.Add("bar", "foo")
@@ -294,7 +322,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("downloads an image correctly", func() {
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
@@ -331,7 +359,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("fails and removes the file when the downloaded iso has an invalid volume ID", func() {
-				isoContent, isoHeader := isoInfo("Fedora-S-dvd-x86_64-37")
+				isoContent, isoHeader := readTestISO("Fedora-S-dvd-x86_64-37")
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
@@ -405,7 +433,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("downloads image with x.y.z openshift_version correctly", func() {
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/somepatchversion.iso"),
@@ -430,7 +458,7 @@ var _ = Context("with a data directory configured", func() {
 			It("populates Fedora/Centos images correctly", func() {
 				validVolumeIDs := []string{"fedora-coreos-35.20220101.0.3", "scos-413.9.20231000101-0"}
 				for _, testValidVolumeID := range validVolumeIDs {
-					isoContent, isoHeader := isoInfo(testValidVolumeID)
+					isoContent, isoHeader := readTestISO(testValidVolumeID)
 					ts.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", "/somepatchversion.iso"),
@@ -449,11 +477,31 @@ var _ = Context("with a data directory configured", func() {
 				}
 			})
 
+			It("fails and removes the file when boot artifact validation fails", func() {
+				isoContent, isoHeader := readTestISOWithSizes(validVolumeID, 1024, minKernelSize+1024)
+				ts.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", "/some.iso"),
+						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
+					),
+				)
+				version["url"] = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = is.Populate(ctx)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to validate boot artifacts"))
+
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				Expect(err).To(MatchError(fs.ErrNotExist))
+			})
+
 			It("cleans up files that are not configured isos", func() {
 				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
 				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
 
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
@@ -503,7 +551,7 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("downloads fails when imageServiceBaseURL is invalid", func() {
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/some.iso"),
@@ -532,7 +580,7 @@ var _ = Context("with a data directory configured", func() {
 				}
 
 				// Provide valid ISO response
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/s390x.iso"),
@@ -565,7 +613,7 @@ var _ = Context("with a data directory configured", func() {
 					}
 
 					// Provide valid ISO response
-					isoContent, isoHeader := isoInfo(validVolumeID)
+					isoContent, isoHeader := readTestISO(validVolumeID)
 					ts.AppendHandlers(
 						ghttp.CombineHandlers(
 							ghttp.VerifyRequest("GET", "/"+arch+".iso"),
@@ -600,7 +648,7 @@ var _ = Context("with a data directory configured", func() {
 					"version":           "45.82.202009222340-0",
 				}
 
-				isoContent, isoHeader := isoInfo(validVolumeID)
+				isoContent, isoHeader := readTestISO(validVolumeID)
 				ts.AppendHandlers(
 					ghttp.CombineHandlers(
 						ghttp.VerifyRequest("GET", "/old.iso"),
@@ -757,6 +805,128 @@ var _ = Describe("NewImageStore", func() {
 	})
 })
 
+func truncateFile(path string, size int) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, f.Truncate(int64(size))).To(Succeed())
+	ExpectWithOffset(1, f.Close()).To(Succeed())
+}
+
+func buildTestISO(outDir, volumeID string, rootfsSize, kernelSize int) string {
+	filesDir, err := os.MkdirTemp("", "isofiles")
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	defer os.RemoveAll(filesDir)
+
+	ExpectWithOffset(1, os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)).To(Succeed())
+
+	if rootfsSize > 0 {
+		truncateFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), rootfsSize)
+	}
+	if kernelSize > 0 {
+		truncateFile(filepath.Join(filesDir, "images/pxeboot/vmlinuz"), kernelSize)
+	}
+
+	isoFile := filepath.Join(outDir, "test.iso")
+	cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long",
+		"-V", volumeID, "-o", isoFile, filesDir)
+	output, err := cmd.CombinedOutput()
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), fmt.Sprintf("genisoimage failed: %s", output))
+	return isoFile
+}
+
+func requireGenisoimage() {
+	if _, err := exec.LookPath("genisoimage"); err != nil {
+		Skip("genisoimage not available")
+	}
+}
+
+var _ = Describe("validateBootArtifacts", func() {
+	var isoDir string
+
+	BeforeEach(func() {
+		requireGenisoimage()
+		var err error
+		isoDir, err = os.MkdirTemp("", "bootArtifactsTest")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(isoDir)
+	})
+
+	createISO := func(includeRootfs bool, rootfsSize int, includeVmlinuz bool, kernelSize int, includeKernelImg bool) string {
+		filesDir, err := os.MkdirTemp("", "isofiles")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(filesDir)
+
+		Expect(os.MkdirAll(filepath.Join(filesDir, "images/pxeboot"), 0755)).To(Succeed())
+
+		if includeRootfs {
+			truncateFile(filepath.Join(filesDir, "images/pxeboot/rootfs.img"), rootfsSize)
+		}
+		if includeVmlinuz {
+			truncateFile(filepath.Join(filesDir, "images/pxeboot/vmlinuz"), kernelSize)
+		}
+		if includeKernelImg {
+			truncateFile(filepath.Join(filesDir, "images/pxeboot/kernel.img"), kernelSize)
+		}
+
+		isoFile := filepath.Join(isoDir, "test.iso")
+		cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long",
+			"-V", "rhcos-test", "-o", isoFile, filesDir)
+		output, err := cmd.CombinedOutput()
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("genisoimage failed: %s", output))
+		return isoFile
+	}
+
+	It("succeeds with valid boot artifacts", func() {
+		isoFile := createISO(true, minRootfsSize+1024, true, minKernelSize+1024, false)
+		Expect(validateBootArtifacts(isoFile, "x86_64")).To(Succeed())
+	})
+
+	It("fails when rootfs is missing", func() {
+		isoFile := createISO(false, 0, true, minKernelSize+1024, false)
+		err := validateBootArtifacts(isoFile, "x86_64")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("rootfs not found"))
+	})
+
+	It("fails when rootfs is too small", func() {
+		isoFile := createISO(true, 1024, true, minKernelSize+1024, false)
+		err := validateBootArtifacts(isoFile, "x86_64")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("rootfs size"))
+		Expect(err.Error()).To(ContainSubstring("below minimum"))
+	})
+
+	It("fails when kernel is missing", func() {
+		isoFile := createISO(true, minRootfsSize+1024, false, 0, false)
+		err := validateBootArtifacts(isoFile, "x86_64")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("kernel not found"))
+	})
+
+	It("fails when kernel is too small", func() {
+		isoFile := createISO(true, minRootfsSize+1024, true, 1024, false)
+		err := validateBootArtifacts(isoFile, "x86_64")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("kernel size"))
+		Expect(err.Error()).To(ContainSubstring("below minimum"))
+	})
+
+	It("succeeds with s390x kernel.img fallback", func() {
+		isoFile := createISO(true, minRootfsSize+1024, false, minKernelSize+1024, true)
+		Expect(validateBootArtifacts(isoFile, "s390x")).To(Succeed())
+	})
+
+	It("fails for s390x when both vmlinuz and kernel.img are missing", func() {
+		isoFile := createISO(true, minRootfsSize+1024, false, 0, false)
+		err := validateBootArtifacts(isoFile, "s390x")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("kernel not found"))
+	})
+})
+
 var _ = Context("cleanDataDir", func() {
 	var (
 		dataDir    string
@@ -887,6 +1057,7 @@ var _ = Describe("Populate with disconnected ISO", func() {
 	)
 
 	BeforeEach(func() {
+		requireGenisoimage()
 		var err error
 		dataDir, err = os.MkdirTemp("", "imageStoreTestDisconnected")
 		Expect(err).NotTo(HaveOccurred())
@@ -923,8 +1094,10 @@ var _ = Describe("Populate with disconnected ISO", func() {
 			}
 
 			validVolumeID := "rhcos-48.84.202109241901-0"
-			isoContent := make([]byte, 32840)
-			copy(isoContent[32808:], validVolumeID)
+			isoFile := buildTestISO(dataDir, validVolumeID, minRootfsSize+1024, minKernelSize+1024)
+			isoContent, err := os.ReadFile(isoFile)
+			Expect(err).NotTo(HaveOccurred())
+			os.Remove(isoFile)
 
 			header := http.Header{}
 			header.Add("Content-Length", strconv.Itoa(len(isoContent)))
