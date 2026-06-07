@@ -90,6 +90,13 @@ const (
 	ImageTypeFull            = "full-iso"
 	ImageTypeMinimal         = "minimal-iso"
 	ImageTypeDisconnectedIso = "disconnected-iso"
+
+	// Minimum expected sizes for boot artifacts in RHCOS ISOs.
+	// Reference: RHCOS artifacts on mirror.openshift.com — rootfs is ~1.1 GB, kernel is ~13 MB
+	// for a typical x86_64 release. Thresholds are set ~10x below real sizes to catch
+	// truncated downloads without false-positiving on normal variance across releases.
+	minRootfsSize = 100 * 1024 * 1024
+	minKernelSize = 5 * 1024 * 1024
 )
 
 func NewImageStore(ed isoeditor.Editor, dataDir, imageServiceBaseURL string, insecureSkipVerify bool, versions []map[string]string,
@@ -233,6 +240,40 @@ func validateISOID(path string) error {
 	return nil
 }
 
+type bootArtifactValidationError struct {
+	message string
+}
+
+func (e *bootArtifactValidationError) Error() string { return e.message }
+
+// validateBootArtifacts checks that the downloaded ISO contains rootfs and kernel
+// above minimum expected sizes. This catches rare cases where a download is truncated
+// by a CDN or proxy, producing an ISO that passes volume ID validation but fails to boot.
+func validateBootArtifacts(isoPath, arch string) error {
+	_, rootfsSize, err := isoeditor.GetISOFileInfo(isoeditor.RootfsImagePath, isoPath)
+	if err != nil {
+		return &bootArtifactValidationError{fmt.Sprintf("rootfs not found in ISO: %v", err)}
+	}
+	if rootfsSize < minRootfsSize {
+		return &bootArtifactValidationError{fmt.Sprintf("rootfs size %d bytes is below minimum %d", rootfsSize, minRootfsSize)}
+	}
+
+	kernelPath := "/images/pxeboot/vmlinuz"
+	_, kernelSize, err := isoeditor.GetISOFileInfo(kernelPath, isoPath)
+	if err != nil && arch == "s390x" {
+		kernelPath = "/images/pxeboot/kernel.img"
+		_, kernelSize, err = isoeditor.GetISOFileInfo(kernelPath, isoPath)
+	}
+	if err != nil {
+		return &bootArtifactValidationError{fmt.Sprintf("kernel not found in ISO: %v", err)}
+	}
+	if kernelSize < minKernelSize {
+		return &bootArtifactValidationError{fmt.Sprintf("kernel size %d bytes is below minimum %d", kernelSize, minKernelSize)}
+	}
+
+	return nil
+}
+
 func (s *rhcosStore) Populate(ctx context.Context) error {
 	if err := s.cleanDataDir(); err != nil {
 		return err
@@ -269,6 +310,18 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 					}
 					log.Error(message)
 					return errors.New(message)
+				}
+				if err := validateBootArtifacts(fullPath, arch); err != nil {
+					var sizeErr *bootArtifactValidationError
+					if errors.As(err, &sizeErr) {
+						message := fmt.Sprintf("failed to validate boot artifacts in %s: %v", fullPath, err)
+						if removeErr := os.Remove(fullPath); removeErr != nil {
+							log.WithError(removeErr).Errorf("failed to remove corrupt ISO %s", fullPath)
+						}
+						log.Error(message)
+						return errors.New(message)
+					}
+					log.WithError(err).Warningf("boot artifact validation could not complete for %s", fullPath)
 				}
 			}
 
