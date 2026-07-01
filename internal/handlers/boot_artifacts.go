@@ -88,7 +88,9 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	defer fileReader.Close()
 
-	fileInfo, err := os.Stat(isoFileName)
+	// isoFileName is safe: version and arch are validated against a known whitelist by HaveVersion()
+	// before reaching this point, so path traversal via user input is not possible.
+	fileInfo, err := os.Stat(isoFileName) //nolint:gosec // G703 false positive, path is whitelisted
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", isoFileName)
 		return
