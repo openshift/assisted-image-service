@@ -102,7 +102,7 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 			if err != nil {
 				return nil, "", http.StatusInternalServerError, err
 			}
-			nmstateImgContent, err := os.Open(nmstatectlPath)
+			nmstateImgContent, err := os.Open(nmstatectlPath) //nolint:gosec // G703 false positive, path is checked inside NmstatectlPathForParams
 			if err != nil {
 				return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to read nmstate img: %v", err)
 			}
