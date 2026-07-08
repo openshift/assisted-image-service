@@ -25,8 +25,9 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"go.uber.org/mock/gomock"
+
+	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
 
 var (
@@ -183,13 +184,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, caCertFileName, osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(content).To(Equal(isoContent))
 			})
@@ -281,13 +282,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(content).To(Equal(isoContent))
 			})
@@ -310,13 +311,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(content).To(Equal(isoContent))
 			})
@@ -333,13 +334,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(content).To(Equal(isoContent))
 			})
@@ -372,7 +373,7 @@ var _ = Context("with a data directory configured", func() {
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 
-				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 
@@ -387,7 +388,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(fmt.Errorf("minimal iso creation failed"))
@@ -405,9 +406,9 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
+				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
@@ -418,13 +419,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				fullPath := filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso")
+				fullPath := filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso")
 				Expect(os.WriteFile(fullPath, []byte("moreisocontent"), 0600)).To(Succeed())
 
-				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-4.8-48.84.202109241901-0-x86_64.iso")
+				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso")
 				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version["openshift_version"], nmstatectlPath).Return(nil)
@@ -444,13 +445,13 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, versionPatch["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
-				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-4.8.1-48.84.202109241901-0-x86_64.iso"))
+				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(content).To(Equal(isoContent))
 			})
@@ -469,7 +470,7 @@ var _ = Context("with a data directory configured", func() {
 					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 					Expect(err).NotTo(HaveOccurred())
 
-					rootfs := fmt.Sprintf(rootfsURL, versionPatch["openshift_version"])
+					rootfs := fmt.Sprintf(rootfsURL, versionPatch["version"])
 					nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
 					Expect(err).NotTo(HaveOccurred())
 					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
@@ -493,12 +494,12 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to validate boot artifacts"))
 
-				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 
 			It("cleans up files that are not configured isos", func() {
-				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
+				oldISOPath := filepath.Join(dataDir, "rhcos-full-iso-47.84.202109241831-0-x86_64.iso")
 				Expect(os.WriteFile(oldISOPath, []byte("oldisocontent"), 0600)).To(Succeed())
 
 				isoContent, isoHeader := readTestISO(validVolumeID)
@@ -512,7 +513,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["openshift_version"])
+				rootfs := fmt.Sprintf(rootfsURL, version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
@@ -537,7 +538,7 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("unexpected EOF"))
 
-				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+				_, err = os.Stat(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
 				Expect(err).To(MatchError(fs.ErrNotExist))
 			})
 
@@ -563,7 +564,7 @@ var _ = Context("with a data directory configured", func() {
 				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).ToNot(HaveOccurred())
 
-				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["openshift_version"])
+				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["version"])
 				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), gomock.Any(), nmstatectlPath).Return(nil)
@@ -631,7 +632,7 @@ var _ = Context("with a data directory configured", func() {
 					Expect(os.WriteFile(nmstatectlPath, []byte(cacheContent), 0755)).To(Succeed()) //nolint:gosec
 
 					// Mock minimal ISO creation
-					expectedRootfs := fmt.Sprintf("http://images.example.com/boot-artifacts/rootfs?arch=%s&version=%s", arch, archVersion["openshift_version"])
+					expectedRootfs := fmt.Sprintf("http://images.example.com/boot-artifacts/rootfs?arch=%s&version=%s", arch, archVersion["version"])
 					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), expectedRootfs, arch, gomock.Any(), archVersion["openshift_version"], nmstatectlPath).Return(nil)
 					// If nmstatectl is cached, BuildNmstateCpioArchive must not be called.
 					mockNmstateHandler.EXPECT().BuildNmstateCpioArchive(gomock.Any()).Times(0)
@@ -672,7 +673,7 @@ var _ = Context("with a data directory configured", func() {
 })
 
 var _ = Describe("PathForParams", func() {
-	It("creates the correct path", func() {
+	It("creates the correct path when looked up by openshift version", func() {
 		versions := []map[string]string{{
 			"openshift_version": "4.8",
 			"cpu_architecture":  "x86_64",
@@ -681,8 +682,21 @@ var _ = Describe("PathForParams", func() {
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-full-4.8-48.84.202109241901-0-x86_64.iso"
+		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
+	})
+
+	It("creates the correct path when looked up by RHCOS version", func() {
+		versions := []map[string]string{{
+			"openshift_version": "4.8",
+			"cpu_architecture":  "x86_64",
+			"url":               "http://example.com/image/x86_64-48.iso",
+			"version":           "48.84.202109241901-0",
+		}}
+		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).NotTo(HaveOccurred())
+		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
+		Expect(is.PathForParams("full", "48.84.202109241901-0", "x86_64")).To(Equal(expected))
 	})
 })
 
@@ -725,12 +739,47 @@ var _ = Describe("HaveVersion", func() {
 		Expect(store.HaveVersion("4.15", "s390x")).To(BeTrue())
 	})
 
+	It("is true when looked up by RHCOS version", func() {
+		Expect(store.HaveVersion("48.84.202109241901-0", "x86_64")).To(BeTrue())
+		Expect(store.HaveVersion("49.84.202110081407-0", "arm64")).To(BeTrue())
+		Expect(store.HaveVersion("415.92.202403212258-0", "s390x")).To(BeTrue())
+	})
+
 	It("is false for versions that are missing", func() {
 		Expect(store.HaveVersion("4.9", "x86_64")).To(BeFalse())
 		Expect(store.HaveVersion("4.8", "arm64")).To(BeFalse())
 		Expect(store.HaveVersion("4.7", "x86_64")).To(BeFalse())
 		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
 		Expect(store.HaveVersion("4.11", "s390x")).To(BeFalse())
+	})
+})
+
+var _ = Describe("deduplicateVersions", func() {
+	It("keeps the entry with the highest openshift_version per RHCOS version and architecture", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.10",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/first.iso",
+				"version":           "410.84.202201251210-0",
+			},
+			{
+				"openshift_version": "4.10.1",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/second.iso",
+				"version":           "410.84.202201251210-0",
+			},
+			{
+				"openshift_version": "4.11",
+				"cpu_architecture":  "arm64",
+				"url":               "http://example.com/arm64.iso",
+				"version":           "411.86.202204190940-0",
+			},
+		}
+		dedupedVersions := deduplicateVersions(versions)
+		Expect(dedupedVersions).To(HaveLen(2))
+		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/second.iso")))
+		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("openshift_version", "4.10.1")))
 	})
 })
 
@@ -980,14 +1029,14 @@ var _ = Context("cleanDataDir", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create expected files
-		fullISOx86 := filepath.Join(dataDir, "rhcos-full-iso-4.18-418.84.202109241901-0-x86_64.iso")
-		fullISOs390x := filepath.Join(dataDir, "rhcos-full-iso-4.18-418.92.202403212258-0-s390x.iso")
-		fullISOarm64 := filepath.Join(dataDir, "rhcos-full-iso-4.18-418.84.202109241901-0-arm64.iso")
-		fullISOppc64le := filepath.Join(dataDir, "rhcos-full-iso-4.18-418.84.202109241901-0-ppc64le.iso")
-		nmstatectlx86 := filepath.Join(dataDir, "nmstatectl-4.18-418.84.202109241901-0-x86_64")
-		nmstatectls390x := filepath.Join(dataDir, "nmstatectl-4.18-418.92.202403212258-0-s390x")
-		nmstatectlarm64 := filepath.Join(dataDir, "nmstatectl-4.18-418.84.202109241901-0-arm64")
-		nmstatectlppc64le := filepath.Join(dataDir, "nmstatectl-4.18-418.84.202109241901-0-ppc64le")
+		fullISOx86 := filepath.Join(dataDir, "rhcos-full-iso-418.84.202109241901-0-x86_64.iso")
+		fullISOs390x := filepath.Join(dataDir, "rhcos-full-iso-418.92.202403212258-0-s390x.iso")
+		fullISOarm64 := filepath.Join(dataDir, "rhcos-full-iso-418.84.202109241901-0-arm64.iso")
+		fullISOppc64le := filepath.Join(dataDir, "rhcos-full-iso-418.84.202109241901-0-ppc64le.iso")
+		nmstatectlx86 := filepath.Join(dataDir, "nmstatectl-418.84.202109241901-0-x86_64")
+		nmstatectls390x := filepath.Join(dataDir, "nmstatectl-418.92.202403212258-0-s390x")
+		nmstatectlarm64 := filepath.Join(dataDir, "nmstatectl-418.84.202109241901-0-arm64")
+		nmstatectlppc64le := filepath.Join(dataDir, "nmstatectl-418.84.202109241901-0-ppc64le")
 
 		// Create files that should be kept
 		Expect(os.WriteFile(fullISOx86, []byte("iso-content-x86"), 0600)).To(Succeed())
@@ -1000,8 +1049,8 @@ var _ = Context("cleanDataDir", func() {
 		Expect(os.WriteFile(nmstatectlppc64le, []byte("nmstatectl-ppc64le"), 0755)).To(Succeed()) //nolint:gosec
 
 		// Create files that should be removed
-		oldISO := filepath.Join(dataDir, "rhcos-full-iso-4.7-47.84.202109241831-0-x86_64.iso")
-		minimalISO := filepath.Join(dataDir, "rhcos-minimal-iso-4.8-48.84.202109241901-0-x86_64.iso")
+		oldISO := filepath.Join(dataDir, "rhcos-full-iso-47.84.202109241831-0-x86_64.iso")
+		minimalISO := filepath.Join(dataDir, "rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso")
 		randomFile := filepath.Join(dataDir, "random-file.txt")
 
 		Expect(os.WriteFile(oldISO, []byte("old-iso"), 0600)).To(Succeed())
@@ -1115,7 +1164,7 @@ var _ = Describe("Populate with disconnected ISO", func() {
 			err = is.Populate(ctx)
 			Expect(err).To(Succeed())
 
-			content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-disconnected-iso-4.8-48.84.202109241901-0-x86_64.iso"))
+			content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-disconnected-iso-48.84.202109241901-0-x86_64.iso"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(content).To(Equal(isoContent))
 		})
