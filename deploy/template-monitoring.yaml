@@ -26,3 +26,21 @@ objects:
     selector:
       matchLabels:
         name: assisted-image-service
+- apiVersion: monitoring.rhobs/v1
+  kind: ServiceMonitor
+  metadata:
+    labels:
+      prometheus: app-sre
+    name: servicemonitor-image-service-coo
+  spec:
+    endpoints:
+    - interval: 30s
+      path: /metrics
+      port: image-service
+      scheme: http
+    namespaceSelector:
+      matchNames:
+      - ${NAMESPACE}
+    selector:
+      matchLabels:
+        name: assisted-image-service
