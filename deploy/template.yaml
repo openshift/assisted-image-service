@@ -133,6 +133,9 @@ parameters:
   value: "6Gi"
 - name: PDB_MIN_AVAILABLE
   value: "2"
+- name: OS_IMAGES_REQUEST_HEADERS
+  value: ''
+  required: false
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -177,6 +180,8 @@ objects:
             value: "8080"
           - name: RHCOS_VERSIONS
             value: ${OS_IMAGES}
+          - name: OS_IMAGES_REQUEST_HEADERS
+            value: ${OS_IMAGES_REQUEST_HEADERS}
           - name: ASSISTED_SERVICE_SCHEME
             value: http
           - name: ASSISTED_SERVICE_HOST
