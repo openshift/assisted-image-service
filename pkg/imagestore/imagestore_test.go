@@ -781,6 +781,28 @@ var _ = Describe("deduplicateVersions", func() {
 		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/second.iso")))
 		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("openshift_version", "4.10.1")))
 	})
+
+	It("keeps 2 entries with the same RHCOS version and architecture but different image types", func() {
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.10",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/disconnected.iso",
+				"version":           "410.84.202201251210-0",
+				"type":              "disconnected-iso",
+			},
+			{
+				"openshift_version": "4.10",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/full.iso",
+				"version":           "410.84.202201251210-0",
+			},
+		}
+		dedupedVersions := deduplicateVersions(versions)
+		Expect(dedupedVersions).To(HaveLen(2))
+		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/disconnected.iso")))
+		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/full.iso")))
+	})
 })
 
 var _ = Describe("NewImageStore", func() {

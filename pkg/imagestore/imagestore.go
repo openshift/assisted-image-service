@@ -386,14 +386,18 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	return nil
 }
 
-// deduplicateVersions keeps a single entry per RHCOS version and CPU architecture pair.
+// deduplicateVersions keeps a single entry per RHCOS version, CPU architecture pair and image type.
 // When multiple pairs share the same RHCOS image, the entry with the highest openshift_version is kept.
 // It's important to keep that entry because the openshift_version is used to decide if we want the nmstatectl for that entry.
 func deduplicateVersions(versions []map[string]string) []map[string]string {
 	m := make(map[string]map[string]string, len(versions))
 
 	for _, entry := range versions {
-		key := entry["version"] + "@" + entry["cpu_architecture"]
+		imageType := entry["type"]
+		if imageType == "" {
+			imageType = ImageTypeFull
+		}
+		key := entry["version"] + "@" + entry["cpu_architecture"] + "@" + imageType
 		existing, ok := m[key]
 		if !ok {
 			m[key] = entry
@@ -402,21 +406,21 @@ func deduplicateVersions(versions []map[string]string) []map[string]string {
 		greater, err := common.VersionGreaterOrEqual(entry["openshift_version"], existing["openshift_version"])
 		if err != nil {
 			log.Debugf(
-				"Couldn't check if OS image entry for RHCOS version %s and architecture %s with openshift_version %s has a greater openshift version, keeping %s, error: %v",
-				entry["version"], entry["cpu_architecture"], entry["openshift_version"], existing["openshift_version"], err,
+				"Couldn't check if OS image entry for key %s with openshift_version %s has a greater openshift version, keeping %s, error: %v",
+				key, entry["openshift_version"], existing["openshift_version"], err,
 			)
 			continue
 		}
 		if greater {
 			log.Debugf(
-				"Replacing duplicate OS image entry for RHCOS version %s and architecture %s with openshift_version %s (was %s)",
-				entry["version"], entry["cpu_architecture"], entry["openshift_version"], existing["openshift_version"],
+				"Replacing duplicate OS image entry for key %s with openshift_version %s (was %s)",
+				key, entry["openshift_version"], existing["openshift_version"],
 			)
 			m[key] = entry
 		} else {
 			log.Debugf(
-				"Skipping duplicate OS image entry for RHCOS version %s and architecture %s (openshift_version %s, keeping %s)",
-				entry["version"], entry["cpu_architecture"], entry["openshift_version"], existing["openshift_version"],
+				"Skipping duplicate OS image entry for key %s (openshift_version %s, keeping %s)",
+				key, entry["openshift_version"], existing["openshift_version"],
 			)
 		}
 	}
