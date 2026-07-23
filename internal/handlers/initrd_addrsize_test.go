@@ -12,8 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"go.uber.org/mock/gomock"
+
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 )
 
 var _ = Describe("ServeHTTP", func() {
@@ -86,6 +87,7 @@ var _ = Describe("ServeHTTP", func() {
 	mockImage := func(version, arch string) {
 		mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
 		mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, version, arch).Return(imageFilename).AnyTimes()
+		mockImageStore.EXPECT().OpenshiftVersionForParams(version, arch).Return(version, nil).AnyTimes()
 	}
 
 	expectSuccessfulResponse := func(resp *http.Response, content []byte) {

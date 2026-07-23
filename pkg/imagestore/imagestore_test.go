@@ -754,6 +754,58 @@ var _ = Describe("HaveVersion", func() {
 	})
 })
 
+var _ = Describe("OpenshiftVersionForParams", func() {
+	var store ImageStore
+
+	BeforeEach(func() {
+		var err error
+		store, err = NewImageStore(nil, "", imageServiceBaseURL, false, []map[string]string{
+			{
+				"openshift_version": "4.14",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-shared.iso",
+				"version":           "shared-rhcos",
+			},
+			{
+				"openshift_version": "4.16.2",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-shared.iso",
+				"version":           "shared-rhcos",
+			},
+			{
+				"openshift_version": "4.15.1",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-shared.iso",
+				"version":           "shared-rhcos",
+			},
+			{
+				"openshift_version": "4.18",
+				"cpu_architecture":  "arm64",
+				"url":               "http://example.com/image/arm64.iso",
+				"version":           "arm-rhcos",
+			},
+		}, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("returns the highest OpenShift version for a shared RHCOS version", func() {
+		openshiftVersion, err := store.OpenshiftVersionForParams("shared-rhcos", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(openshiftVersion).To(Equal("4.16.2"))
+	})
+
+	It("returns the OpenShift version when looked up by OpenShift version", func() {
+		openshiftVersion, err := store.OpenshiftVersionForParams("4.18", "arm64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(openshiftVersion).To(Equal("4.18"))
+	})
+
+	It("fails for unsupported version", func() {
+		_, err := store.OpenshiftVersionForParams("missing", "x86_64")
+		Expect(err).To(HaveOccurred())
+	})
+})
+
 var _ = Describe("deduplicateVersions", func() {
 	It("keeps the entry with the highest openshift_version per RHCOS version and architecture", func() {
 		versions := []map[string]string{

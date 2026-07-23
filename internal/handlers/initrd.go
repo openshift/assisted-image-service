@@ -92,7 +92,12 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 			return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to create append reader for initrd: %v", err)
 		}
 
-		versionOK, err := common.VersionGreaterOrEqual(version, isoeditor.MinimalVersionForNmstatectl)
+		openshiftVersion, err := imageStore.OpenshiftVersionForParams(version, arch)
+		if err != nil {
+			return nil, "", http.StatusBadRequest, err
+		}
+
+		versionOK, err := common.VersionGreaterOrEqual(openshiftVersion, isoeditor.MinimalVersionForNmstatectl)
 		if err != nil {
 			return nil, "", http.StatusInternalServerError, err
 		}
