@@ -73,7 +73,8 @@ type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
-	NmstatectlPathForParams(openshiftVersion, arch string) (string, error)
+	OpenshiftVersionForParams(version, arch string) (string, error)
+	NmstatectlPathForParams(version, arch string) (string, error)
 }
 
 type rhcosStore struct {
@@ -550,9 +551,9 @@ func (s *rhcosStore) findVersionEntry(versionKey, arch string) map[string]string
 	return nil
 }
 
-func (s *rhcosStore) PathForParams(imageType, versionKey, arch string) string {
-	rhcosVersion := versionKey
-	entry := s.findVersionEntry(versionKey, arch)
+func (s *rhcosStore) PathForParams(imageType, version, arch string) string {
+	rhcosVersion := version
+	entry := s.findVersionEntry(version, arch)
 	if entry != nil {
 		rhcosVersion = entry["version"]
 	}
@@ -612,9 +613,50 @@ func (s *rhcosStore) HaveVersion(version, arch string) bool {
 	return s.findVersionEntry(version, arch) != nil
 }
 
-func (s *rhcosStore) NmstatectlPathForParams(versionKey, arch string) (string, error) {
-	rhcosVersion := versionKey
-	entry := s.findVersionEntry(versionKey, arch)
+// OpenshiftVersionForParams returns the OpenShift version associated with the given version
+// and CPU architecture. The version may be an RHCOS version or an OpenShift version. When multiple
+// entries share the same RHCOS version, the highest OpenShift version is returned.
+func (s *rhcosStore) OpenshiftVersionForParams(version, arch string) (string, error) {
+	var highest string
+	for _, entry := range s.versions {
+		if entry["cpu_architecture"] != arch {
+			continue
+		}
+		if entry["version"] != version {
+			continue
+		}
+		openshiftVersion := entry["openshift_version"]
+		if highest == "" {
+			highest = openshiftVersion
+			continue
+		}
+		greater, err := common.VersionGreaterOrEqual(openshiftVersion, highest)
+		if err != nil {
+			continue
+		}
+		if greater {
+			highest = openshiftVersion
+		}
+	}
+	if highest != "" {
+		return highest, nil
+	}
+
+	for _, entry := range s.versions {
+		if entry["cpu_architecture"] != arch {
+			continue
+		}
+		if entry["openshift_version"] == version {
+			return version, nil
+		}
+	}
+
+	return "", fmt.Errorf("openshift version for version %s and architecture %s not found", version, arch)
+}
+
+func (s *rhcosStore) NmstatectlPathForParams(version, arch string) (string, error) {
+	rhcosVersion := version
+	entry := s.findVersionEntry(version, arch)
 	if entry != nil {
 		rhcosVersion = entry["version"]
 	}

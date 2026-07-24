@@ -12,8 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"go.uber.org/mock/gomock"
+
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 )
 
 var _ = Describe("ServeHTTP", func() {
@@ -93,6 +94,7 @@ var _ = Describe("ServeHTTP", func() {
 	mockImage := func(version, arch string) {
 		mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
 		mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, version, arch).Return(imageFilename).AnyTimes()
+		mockImageStore.EXPECT().OpenshiftVersionForParams(version, arch).Return(version, nil).AnyTimes()
 	}
 
 	expectSuccessfulResponse := func(resp *http.Response, content []byte) {
@@ -205,6 +207,23 @@ var _ = Describe("ServeHTTP", func() {
 		)
 		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "x86_64").Return(nmstatectlPathForCaching, nil).AnyTimes()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.18&arch=x86_64", server.URL, imageID))
+		Expect(err).NotTo(HaveOccurred())
+		expectSuccessfulResponse(resp, append(append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...), nmstatectlContent...))
+	})
+
+	It("includes nmstatectl when looked up by RHCOS version that maps to a supported OCP version", func() {
+		rhcosVersion := "418.94.202410010000-0"
+		mockImageStore.EXPECT().HaveVersion(rhcosVersion, "x86_64").Return(true).AnyTimes()
+		mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, rhcosVersion, "x86_64").Return(imageFilename).AnyTimes()
+		mockImageStore.EXPECT().OpenshiftVersionForParams(rhcosVersion, "x86_64").Return("4.18", nil).AnyTimes()
+		assistedServer.AppendHandlers(
+			ghttp.CombineHandlers(
+				ghttp.VerifyRequest("GET", fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/downloads/minimal-initrd", imageID)),
+				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
+			),
+		)
+		mockImageStore.EXPECT().NmstatectlPathForParams(rhcosVersion, "x86_64").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=%s&arch=x86_64", server.URL, imageID, rhcosVersion))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...), nmstatectlContent...))
 	})

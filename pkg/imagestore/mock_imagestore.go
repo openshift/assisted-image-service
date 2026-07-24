@@ -55,18 +55,33 @@ func (mr *MockImageStoreMockRecorder) HaveVersion(version, arch any) *gomock.Cal
 }
 
 // NmstatectlPathForParams mocks base method.
-func (m *MockImageStore) NmstatectlPathForParams(openshiftVersion, arch string) (string, error) {
+func (m *MockImageStore) NmstatectlPathForParams(version, arch string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NmstatectlPathForParams", openshiftVersion, arch)
+	ret := m.ctrl.Call(m, "NmstatectlPathForParams", version, arch)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NmstatectlPathForParams indicates an expected call of NmstatectlPathForParams.
-func (mr *MockImageStoreMockRecorder) NmstatectlPathForParams(openshiftVersion, arch any) *gomock.Call {
+func (mr *MockImageStoreMockRecorder) NmstatectlPathForParams(version, arch any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NmstatectlPathForParams", reflect.TypeOf((*MockImageStore)(nil).NmstatectlPathForParams), openshiftVersion, arch)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NmstatectlPathForParams", reflect.TypeOf((*MockImageStore)(nil).NmstatectlPathForParams), version, arch)
+}
+
+// OpenshiftVersionForParams mocks base method.
+func (m *MockImageStore) OpenshiftVersionForParams(version, arch string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenshiftVersionForParams", version, arch)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenshiftVersionForParams indicates an expected call of OpenshiftVersionForParams.
+func (mr *MockImageStoreMockRecorder) OpenshiftVersionForParams(version, arch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenshiftVersionForParams", reflect.TypeOf((*MockImageStore)(nil).OpenshiftVersionForParams), version, arch)
 }
 
 // PathForParams mocks base method.
