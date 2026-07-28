@@ -102,6 +102,65 @@ var _ = Describe("NewRHCOSStreamReader", func() {
 		}
 	})
 
+	It("appends a newline to kargs content if missing", func() {
+		kargsNoNewline := []byte(" p1 p2 p3 p4")
+		kargsWithNewline := []byte(" p1 p2 p3 p4\n")
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, nil, kargsNoNewline)
+		Expect(err).NotTo(HaveOccurred())
+
+		f, err := os.CreateTemp(filesDir, "streamed*.iso")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(f, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Sync()).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+
+		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		grubFileContent := string(isoFileContent(f.Name(), defaultGrubFilePath))
+		isolinuxContent := string(isoFileContent(f.Name(), defaultIsolinuxFilePath))
+		for _, content := range []string{grubFileContent, isolinuxContent} {
+			Expect(content).To(MatchRegexp(string(kargsWithNewline) + "#+ COREOS_KARG_EMBED_AREA"))
+		}
+	})
+
+	It("succeeds with nil kargs", func() {
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, nil, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		f, err := os.CreateTemp(filesDir, "streamed*.iso")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(f, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Sync()).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+
+		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		grubFileContent := string(isoFileContent(f.Name(), defaultGrubFilePath))
+		isolinuxContent := string(isoFileContent(f.Name(), defaultIsolinuxFilePath))
+		for _, content := range []string{grubFileContent, isolinuxContent} {
+			Expect(content).To(MatchRegexp("\n#+ COREOS_KARG_EMBED_AREA"))
+		}
+	})
+
+	It("succeeds with empty kargs", func() {
+		streamReader, err := NewRHCOSStreamReader(isoFile, &IgnitionContent{Config: ignitionContent}, nil, []byte{})
+		Expect(err).NotTo(HaveOccurred())
+
+		f, err := os.CreateTemp(filesDir, "streamed*.iso")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = io.Copy(f, streamReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(f.Sync()).To(Succeed())
+		Expect(f.Close()).To(Succeed())
+
+		Expect(isoFileContent(f.Name(), ignitionImagePath)).To(Equal(ignitionArchiveBytes))
+		grubFileContent := string(isoFileContent(f.Name(), defaultGrubFilePath))
+		isolinuxContent := string(isoFileContent(f.Name(), defaultIsolinuxFilePath))
+		for _, content := range []string{grubFileContent, isolinuxContent} {
+			Expect(content).To(MatchRegexp("\n#+ COREOS_KARG_EMBED_AREA"))
+		}
+	})
+
 	It("Embeds the ignition in a ISO that uses the 'igninfo.json' file", func() {
 		// Create input ISO:
 		tmpDir, inputFile := createS390TestFiles("Assisted123", 0)
