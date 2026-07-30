@@ -2,12 +2,21 @@ package servers
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
+
+var tlsVersions = map[string]uint16{
+	"VersionTLS10": tls.VersionTLS10,
+	"VersionTLS11": tls.VersionTLS11,
+	"VersionTLS12": tls.VersionTLS12,
+	"VersionTLS13": tls.VersionTLS13,
+}
 
 type ServerInfo struct {
 	HTTP            *http.Server
@@ -85,6 +94,60 @@ func (s *ServerInfo) Shutdown() bool {
 		}
 	}
 	return true
+}
+
+// ApplyTLSProfile configures the HTTPS server with the given TLS minimum
+// version and cipher suites. The version should be a Go TLS version name
+// (e.g., "VersionTLS12"). Cipher suites should be comma-separated IANA names.
+// If minVersion is empty, no TLS configuration is applied.
+func (s *ServerInfo) ApplyTLSProfile(minVersion, cipherSuites string) {
+	if s.HTTPS == nil || minVersion == "" {
+		return
+	}
+
+	version, ok := tlsVersions[minVersion]
+	if !ok {
+		log.Warnf("Unknown TLS version %q, skipping TLS profile configuration", minVersion)
+		return
+	}
+
+	cfg := &tls.Config{MinVersion: version}
+
+	if version < tls.VersionTLS13 && cipherSuites != "" {
+		var unsupported []string
+		for _, name := range strings.Split(cipherSuites, ",") {
+			name = strings.TrimSpace(name)
+			if id, ok := cipherSuiteID(name); ok {
+				cfg.CipherSuites = append(cfg.CipherSuites, id)
+			} else {
+				unsupported = append(unsupported, name)
+			}
+		}
+		if len(unsupported) > 0 {
+			log.Infof("TLS profile contains cipher suites that Go does not implement, ignoring: %s", strings.Join(unsupported, ", "))
+		}
+	}
+
+	s.HTTPS.TLSConfig = cfg
+	log.Infof("TLS profile applied: MinVersion=%s", minVersion)
+}
+
+// cipherSuiteID resolves an IANA cipher suite name to its Go identifier. Both
+// the secure and the insecure lists are searched, since the Old TLS profile
+// legitimately includes suites that Go classifies as insecure and the cluster
+// profile is the authority on what is allowed.
+func cipherSuiteID(name string) (uint16, bool) {
+	for _, suite := range tls.CipherSuites() {
+		if suite.Name == name {
+			return suite.ID, true
+		}
+	}
+	for _, suite := range tls.InsecureCipherSuites() {
+		if suite.Name == name {
+			return suite.ID, true
+		}
+	}
+	return 0, false
 }
 
 func (s *ServerInfo) httpListen() {
