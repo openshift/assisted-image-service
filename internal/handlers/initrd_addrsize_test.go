@@ -134,7 +134,7 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
 			),
 		)
-		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "s390x").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "s390x").Return(nmstatectlPathForCaching, true, nil).AnyTimes()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/s390x-initrd-addrsize?version=4.18", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, initrdAddrsizeWithNmstatectl)

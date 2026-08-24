@@ -140,10 +140,10 @@ var _ = Context("with a data directory configured", func() {
 				mockNmstateHandler *isoeditor.MockNmstateHandler
 				isoDir             string
 				validVolumeID      = "rhcos-411.86.202210041459-0"
-				version            = map[string]string{
-					"openshift_version": "4.8",
-					"cpu_architecture":  "x86_64",
-					"version":           "48.84.202109241901-0",
+				version            = OSImage{
+					OpenshiftVersion: "4.8",
+					CPUArchitecture:  "x86_64",
+					Version:          "48.84.202109241901-0",
 				}
 			)
 
@@ -180,14 +180,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, caCertFileName, osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, caCertFileName, osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
@@ -224,15 +224,15 @@ var _ = Context("with a data directory configured", func() {
 				mockNmstateHandler *isoeditor.MockNmstateHandler
 				isoDir             string
 				validVolumeID      = "rhcos-411.86.202210041459-0"
-				version            = map[string]string{
-					"openshift_version": "4.8",
-					"cpu_architecture":  "x86_64",
-					"version":           "48.84.202109241901-0",
+				version            = OSImage{
+					OpenshiftVersion: "4.8",
+					CPUArchitecture:  "x86_64",
+					Version:          "48.84.202109241901-0",
 				}
-				versionPatch = map[string]string{
-					"openshift_version": "4.8.1",
-					"cpu_architecture":  "x86_64",
-					"version":           "48.84.202109241901-0",
+				versionPatch = OSImage{
+					OpenshiftVersion: "4.8.1",
+					CPUArchitecture:  "x86_64",
+					Version:          "48.84.202109241901-0",
 				}
 			)
 
@@ -278,14 +278,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
@@ -307,14 +307,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
@@ -330,14 +330,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
@@ -352,8 +352,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusInternalServerError, "server error"),
 					),
 				)
-				version["url"] = ts.URL() + "/fail.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/fail.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -367,8 +367,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -384,14 +384,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere"),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(fmt.Errorf("minimal iso creation failed"))
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(fmt.Errorf("minimal iso creation failed"))
 				Expect(is.Populate(ctx)).NotTo(Succeed())
 			})
 
@@ -402,21 +402,21 @@ var _ = Context("with a data directory configured", func() {
 						http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
 					),
 				)
-				version["url"] = ts.URL() + "/dontcallthis.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/dontcallthis.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(os.WriteFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"), []byte("moreisocontent"), 0600)).To(Succeed())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
 
 			It("recreates the minimal iso even when it's already present", func() {
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				fullPath := filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso")
@@ -425,10 +425,10 @@ var _ = Context("with a data directory configured", func() {
 				minimalPath := filepath.Join(dataDir, "rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso")
 				Expect(os.WriteFile(minimalPath, []byte("minimalisocontent"), 0600)).To(Succeed())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(fullPath, rootfs, "x86_64", minimalPath, version.OpenshiftVersion, nmstatectlPath).Return(nil)
 
 				Expect(is.Populate(ctx)).To(Succeed())
 			})
@@ -441,14 +441,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				versionPatch.URL = ts.URL() + "/somepatchversion.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, versionPatch["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, versionPatch.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(versionPatch.OpenshiftVersion, versionPatch.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				content, err := os.ReadFile(filepath.Join(dataDir, "rhcos-full-iso-48.84.202109241901-0-x86_64.iso"))
@@ -466,14 +466,14 @@ var _ = Context("with a data directory configured", func() {
 							ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 						),
 					)
-					versionPatch["url"] = ts.URL() + "/somepatchversion.iso"
-					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+					versionPatch.URL = ts.URL() + "/somepatchversion.iso"
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{versionPatch}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 					Expect(err).NotTo(HaveOccurred())
 
-					rootfs := fmt.Sprintf(rootfsURL, versionPatch["version"])
-					nmstatectlPath, err := is.NmstatectlPathForParams(versionPatch["openshift_version"], versionPatch["cpu_architecture"])
+					rootfs := fmt.Sprintf(rootfsURL, versionPatch.Version)
+					nmstatectlPath, _, err := is.NmstatectlPathForParams(versionPatch.OpenshiftVersion, versionPatch.CPUArchitecture)
 					Expect(err).NotTo(HaveOccurred())
-					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch["openshift_version"], nmstatectlPath).Return(nil)
+					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), versionPatch.OpenshiftVersion, nmstatectlPath).Return(nil)
 					Expect(is.Populate(ctx)).To(Succeed())
 				}
 			})
@@ -486,8 +486,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = is.Populate(ctx)
@@ -509,14 +509,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				rootfs := fmt.Sprintf(rootfsURL, version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf(rootfsURL, version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), version.OpenshiftVersion, nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 				_, err = os.Stat(oldISOPath)
@@ -530,8 +530,8 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, "someisocontenthere", http.Header{"Content-Length": []string{"1"}}),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				version.URL = ts.URL() + "/some.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = is.Populate(ctx)
@@ -543,9 +543,9 @@ var _ = Context("with a data directory configured", func() {
 			})
 
 			It("fails when imageServiceBaseURL is not set", func() {
-				is, err := NewImageStore(mockEditor, dataDir, "", false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, "", false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), "", "x86_64", gomock.Any(), gomock.Any(), nmstatectlPath).Return(nil)
 				Expect(is.Populate(ctx)).NotTo(Succeed())
@@ -559,13 +559,13 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				version["url"] = ts.URL() + "/some.iso"
+				version.URL = ts.URL() + "/some.iso"
 				baseURL := ":"
-				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []map[string]string{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, baseURL, false, []OSImage{version}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).ToNot(HaveOccurred())
 
-				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version["version"])
-				nmstatectlPath, err := is.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+				rootfs := fmt.Sprintf("https://images.example.com/api/assisted-images/boot-artifacts/rootfs?arch=x86_64&version=%s", version.Version)
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), rootfs, "x86_64", gomock.Any(), gomock.Any(), nmstatectlPath).Return(nil)
 				err = is.Populate(ctx)
@@ -573,11 +573,11 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err.Error()).To(Equal("failed to build rootfs URL: parse \":\": missing protocol scheme"))
 			})
 			It("happy flow for s390x architecture with cached nmstatectl", func() {
-				s390xVersion := map[string]string{
-					"openshift_version": "4.18",
-					"cpu_architecture":  "s390x",
-					"version":           "418.92.202403212258-0",
-					"url":               ts.URL() + "/s390x.iso",
+				s390xVersion := OSImage{
+					OpenshiftVersion: "4.18",
+					CPUArchitecture:  "s390x",
+					Version:          "418.92.202403212258-0",
+					URL:              ts.URL() + "/s390x.iso",
 				}
 
 				// Provide valid ISO response
@@ -589,12 +589,13 @@ var _ = Context("with a data directory configured", func() {
 					),
 				)
 
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{s390xVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{s390xVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Pre-create the cached nmstatectl file to avoid extraction
-				nmstatectlPath, err := is.NmstatectlPathForParams(s390xVersion["openshift_version"], s390xVersion["cpu_architecture"])
+				nmstatectlPath, exists, err := is.NmstatectlPathForParams(s390xVersion.OpenshiftVersion, s390xVersion.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
+				Expect(exists).To(BeFalse())
 				Expect(os.WriteFile(nmstatectlPath, []byte("cached-nmstatectl"), 0755)).To(Succeed()) //nolint:gosec
 
 				// If arch is s390x, CreateMinimalISOTemplate must not be called.
@@ -606,11 +607,11 @@ var _ = Context("with a data directory configured", func() {
 			})
 			DescribeTable("happy flow for all architectures  except s390x, with a cached nmstatectl",
 				func(arch string) {
-					archVersion := map[string]string{
-						"openshift_version": "4.18",
-						"cpu_architecture":  arch,
-						"version":           "418.84.202109241901-0",
-						"url":               ts.URL() + "/" + arch + ".iso",
+					archVersion := OSImage{
+						OpenshiftVersion: "4.18",
+						CPUArchitecture:  arch,
+						Version:          "418.84.202109241901-0",
+						URL:              ts.URL() + "/" + arch + ".iso",
 					}
 
 					// Provide valid ISO response
@@ -622,18 +623,19 @@ var _ = Context("with a data directory configured", func() {
 						),
 					)
 
-					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{archVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+					is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{archVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 					Expect(err).NotTo(HaveOccurred())
 
 					// Pre-create nmstatectl cache to avoid actual extraction
-					nmstatectlPath, err := is.NmstatectlPathForParams(archVersion["openshift_version"], archVersion["cpu_architecture"])
+					nmstatectlPath, exists, err := is.NmstatectlPathForParams(archVersion.OpenshiftVersion, archVersion.CPUArchitecture)
 					Expect(err).NotTo(HaveOccurred())
+					Expect(exists).To(BeFalse())
 					cacheContent := fmt.Sprintf("cached-nmstatectl-%s", arch)
 					Expect(os.WriteFile(nmstatectlPath, []byte(cacheContent), 0755)).To(Succeed()) //nolint:gosec
 
 					// Mock minimal ISO creation
-					expectedRootfs := fmt.Sprintf("http://images.example.com/boot-artifacts/rootfs?arch=%s&version=%s", arch, archVersion["version"])
-					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), expectedRootfs, arch, gomock.Any(), archVersion["openshift_version"], nmstatectlPath).Return(nil)
+					expectedRootfs := fmt.Sprintf("http://images.example.com/boot-artifacts/rootfs?arch=%s&version=%s", arch, archVersion.Version)
+					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), expectedRootfs, arch, gomock.Any(), archVersion.OpenshiftVersion, nmstatectlPath).Return(nil)
 					// If nmstatectl is cached, BuildNmstateCpioArchive must not be called.
 					mockNmstateHandler.EXPECT().BuildNmstateCpioArchive(gomock.Any()).Times(0)
 					Expect(is.Populate(ctx)).To(Succeed())
@@ -643,10 +645,10 @@ var _ = Context("with a data directory configured", func() {
 				Entry("ppc64le architecture", "ppc64le"),
 			)
 			It("Skip nmstatectl extraction for versions below the minimum supported", func() {
-				oldVersion := map[string]string{
-					"openshift_version": "4.5", // Version that doesn't support nmstatectl
-					"cpu_architecture":  "x86_64",
-					"version":           "45.82.202009222340-0",
+				oldVersion := OSImage{
+					OpenshiftVersion: "4.5", // Version that doesn't support nmstatectl,
+					CPUArchitecture:  "x86_64",
+					Version:          "45.82.202009222340-0",
 				}
 
 				isoContent, isoHeader := readTestISO(validVolumeID)
@@ -656,14 +658,14 @@ var _ = Context("with a data directory configured", func() {
 						ghttp.RespondWith(http.StatusOK, isoContent, isoHeader),
 					),
 				)
-				oldVersion["url"] = ts.URL() + "/old.iso"
-				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{oldVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+				oldVersion.URL = ts.URL() + "/old.iso"
+				is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{oldVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 				Expect(err).NotTo(HaveOccurred())
 
-				nmstatectlPath, err := is.NmstatectlPathForParams(oldVersion["openshift_version"], oldVersion["cpu_architecture"])
+				nmstatectlPath, _, err := is.NmstatectlPathForParams(oldVersion.OpenshiftVersion, oldVersion.CPUArchitecture)
 				Expect(err).NotTo(HaveOccurred())
 
-				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), gomock.Any(), "x86_64", gomock.Any(), oldVersion["openshift_version"], nmstatectlPath).Return(nil)
+				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), gomock.Any(), "x86_64", gomock.Any(), oldVersion.OpenshiftVersion, nmstatectlPath).Return(nil)
 				mockNmstateHandler.EXPECT().BuildNmstateCpioArchive(gomock.Any()).Times(0)
 
 				Expect(is.Populate(ctx)).To(Succeed())
@@ -674,11 +676,11 @@ var _ = Context("with a data directory configured", func() {
 
 var _ = Describe("PathForParams", func() {
 	It("creates the correct path when looked up by openshift version", func() {
-		versions := []map[string]string{{
-			"openshift_version": "4.8",
-			"cpu_architecture":  "x86_64",
-			"url":               "http://example.com/image/x86_64-48.iso",
-			"version":           "48.84.202109241901-0",
+		versions := []OSImage{{
+			OpenshiftVersion: "4.8",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/image/x86_64-48.iso",
+			Version:          "48.84.202109241901-0",
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -687,11 +689,11 @@ var _ = Describe("PathForParams", func() {
 	})
 
 	It("creates the correct path when looked up by RHCOS version", func() {
-		versions := []map[string]string{{
-			"openshift_version": "4.8",
-			"cpu_architecture":  "x86_64",
-			"url":               "http://example.com/image/x86_64-48.iso",
-			"version":           "48.84.202109241901-0",
+		versions := []OSImage{{
+			OpenshiftVersion: "4.8",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/image/x86_64-48.iso",
+			Version:          "48.84.202109241901-0",
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -700,26 +702,78 @@ var _ = Describe("PathForParams", func() {
 	})
 })
 
+var _ = Describe("NmstatectlPathForParams", func() {
+	var (
+		dataDir string
+		is      ImageStore
+	)
+
+	BeforeEach(func() {
+		var err error
+		dataDir, err = os.MkdirTemp("", "nmstatectlPathTest")
+		Expect(err).NotTo(HaveOccurred())
+
+		versions := []OSImage{{
+			OpenshiftVersion: "4.18",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/image/x86_64-418.iso",
+			Version:          "418.94.202410010000-0",
+		}}
+		is, err = NewImageStore(nil, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		os.RemoveAll(dataDir)
+	})
+
+	It("returns the path and exists=false when the file is missing", func() {
+		path, exists, err := is.NmstatectlPathForParams("4.18", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeFalse())
+		Expect(path).To(Equal(filepath.Join(dataDir, "nmstatectl-418.94.202410010000-0-x86_64")))
+	})
+
+	It("returns exists=true when the file is present", func() {
+		path, exists, err := is.NmstatectlPathForParams("4.18", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeFalse())
+		Expect(os.WriteFile(path, []byte("cached"), 0755)).To(Succeed()) //nolint:gosec
+
+		path, exists, err = is.NmstatectlPathForParams("4.18", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeTrue())
+		Expect(path).To(Equal(filepath.Join(dataDir, "nmstatectl-418.94.202410010000-0-x86_64")))
+	})
+
+	It("looks up the path by RHCOS version", func() {
+		path, exists, err := is.NmstatectlPathForParams("418.94.202410010000-0", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(exists).To(BeFalse())
+		Expect(path).To(Equal(filepath.Join(dataDir, "nmstatectl-418.94.202410010000-0-x86_64")))
+	})
+})
+
 var _ = Describe("HaveVersion", func() {
 	var (
-		versions = []map[string]string{
+		versions = []OSImage{
 			{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/image/x86_64-48.iso",
-				"version":           "48.84.202109241901-0",
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/image/x86_64-48.iso",
+				Version:          "48.84.202109241901-0",
 			},
 			{
-				"openshift_version": "4.9",
-				"cpu_architecture":  "arm64",
-				"url":               "http://example.com/image/arm64-49.iso",
-				"version":           "49.84.202110081407-0",
+				OpenshiftVersion: "4.9",
+				CPUArchitecture:  "arm64",
+				URL:              "http://example.com/image/arm64-49.iso",
+				Version:          "49.84.202110081407-0",
 			},
 			{
-				"openshift_version": "4.15",
-				"cpu_architecture":  "s390x",
-				"url":               "http://example.com/image/s390x-415.iso",
-				"version":           "415.92.202403212258-0",
+				OpenshiftVersion: "4.15",
+				CPUArchitecture:  "s390x",
+				URL:              "http://example.com/image/s390x-415.iso",
+				Version:          "415.92.202403212258-0",
 			},
 		}
 		store ImageStore
@@ -756,63 +810,78 @@ var _ = Describe("HaveVersion", func() {
 
 var _ = Describe("deduplicateVersions", func() {
 	It("keeps the entry with the highest openshift_version per RHCOS version and architecture", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.10",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/first.iso",
-				"version":           "410.84.202201251210-0",
+				OpenshiftVersion: "4.10",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/first.iso",
+				Version:          "410.84.202201251210-0",
 			},
 			{
-				"openshift_version": "4.10.1",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/second.iso",
-				"version":           "410.84.202201251210-0",
+				OpenshiftVersion: "4.10.1",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/second.iso",
+				Version:          "410.84.202201251210-0",
 			},
 			{
-				"openshift_version": "4.11",
-				"cpu_architecture":  "arm64",
-				"url":               "http://example.com/arm64.iso",
-				"version":           "411.86.202204190940-0",
+				OpenshiftVersion: "4.11",
+				CPUArchitecture:  "arm64",
+				URL:              "http://example.com/arm64.iso",
+				Version:          "411.86.202204190940-0",
 			},
 		}
 		dedupedVersions := deduplicateVersions(versions)
 		Expect(dedupedVersions).To(HaveLen(2))
-		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/second.iso")))
-		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("openshift_version", "4.10.1")))
+		Expect(dedupedVersions).To(ContainElement(OSImage{
+			OpenshiftVersion: "4.10.1",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/second.iso",
+			Version:          "410.84.202201251210-0",
+		}))
 	})
 
 	It("keeps 2 entries with the same RHCOS version and architecture but different image types", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.10",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/disconnected.iso",
-				"version":           "410.84.202201251210-0",
-				"type":              "disconnected-iso",
+				OpenshiftVersion: "4.10",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/disconnected.iso",
+				Version:          "410.84.202201251210-0",
+				Type:             "disconnected-iso",
 			},
 			{
-				"openshift_version": "4.10",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/full.iso",
-				"version":           "410.84.202201251210-0",
+				OpenshiftVersion: "4.10",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/full.iso",
+				Version:          "410.84.202201251210-0",
 			},
 		}
 		dedupedVersions := deduplicateVersions(versions)
 		Expect(dedupedVersions).To(HaveLen(2))
-		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/disconnected.iso")))
-		Expect(dedupedVersions).To(ContainElement(HaveKeyWithValue("url", "http://example.com/full.iso")))
+		Expect(dedupedVersions).To(ContainElement(OSImage{
+			OpenshiftVersion: "4.10",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/disconnected.iso",
+			Version:          "410.84.202201251210-0",
+			Type:             "disconnected-iso",
+		}))
+		Expect(dedupedVersions).To(ContainElement(OSImage{
+			OpenshiftVersion: "4.10",
+			CPUArchitecture:  "x86_64",
+			URL:              "http://example.com/full.iso",
+			Version:          "410.84.202201251210-0",
+		}))
 	})
 })
 
 var _ = Describe("NewImageStore", func() {
 	It("should not error with valid version", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/image/x86_64-48.iso",
-				"version":           "48.84.202109241901-0",
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/image/x86_64-48.iso",
+				Version:          "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
@@ -820,7 +889,7 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	It("should error when RHCOS_IMAGES are not set i.e. versions is an empty slice", func() {
-		versions := []map[string]string{}
+		versions := []OSImage{}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal("invalid versions: must not be empty"))
@@ -828,11 +897,11 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	It("should error when openshift_version is not set", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"cpu_architecture": "x86_64",
-				"url":              "http://example.com/image/x86_64-48.iso",
-				"version":          "48.84.202109241901-0",
+				CPUArchitecture: "x86_64",
+				URL:             "http://example.com/image/x86_64-48.iso",
+				Version:         "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
@@ -840,11 +909,11 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	It("should error when cpu_architecture is not set", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.8",
-				"url":               "http://example.com/image/x86_64-48.iso",
-				"version":           "48.84.202109241901-0",
+				OpenshiftVersion: "4.8",
+				URL:              "http://example.com/image/x86_64-48.iso",
+				Version:          "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
@@ -852,11 +921,11 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	It("should error when url is not set", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"version":           "48.84.202109241901-0",
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				Version:          "48.84.202109241901-0",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
@@ -864,15 +933,31 @@ var _ = Describe("NewImageStore", func() {
 	})
 
 	It("should error when version is not set", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/image/x86_64-48.iso",
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/image/x86_64-48.iso",
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("accepts stream metadata including boolean default_os_stream", func() {
+		defaultStream := true
+		versions := []OSImage{
+			{
+				OpenshiftVersion: "4.19",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/image.iso",
+				Version:          "419.94.202501010000-0",
+				OsStream:         "rhel-9",
+				DefaultOsStream:  &defaultStream,
+			},
+		}
+		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
@@ -1020,30 +1105,30 @@ var _ = Context("cleanDataDir", func() {
 	})
 
 	It("preserves nmstatectl cached files for all architectures", func() {
-		versions := []map[string]string{
+		versions := []OSImage{
 			{
-				"openshift_version": "4.18",
-				"cpu_architecture":  "x86_64",
-				"url":               "http://example.com/image/x86_64-418.iso",
-				"version":           "418.84.202109241901-0",
+				OpenshiftVersion: "4.18",
+				CPUArchitecture:  "x86_64",
+				URL:              "http://example.com/image/x86_64-418.iso",
+				Version:          "418.84.202109241901-0",
 			},
 			{
-				"openshift_version": "4.18",
-				"cpu_architecture":  "s390x",
-				"url":               "http://example.com/image/s390x-418.iso",
-				"version":           "418.92.202403212258-0",
+				OpenshiftVersion: "4.18",
+				CPUArchitecture:  "s390x",
+				URL:              "http://example.com/image/s390x-418.iso",
+				Version:          "418.92.202403212258-0",
 			},
 			{
-				"openshift_version": "4.18",
-				"cpu_architecture":  "arm64",
-				"url":               "http://example.com/image/arm64-418.iso",
-				"version":           "418.84.202109241901-0",
+				OpenshiftVersion: "4.18",
+				CPUArchitecture:  "arm64",
+				URL:              "http://example.com/image/arm64-418.iso",
+				Version:          "418.84.202109241901-0",
 			},
 			{
-				"openshift_version": "4.18",
-				"cpu_architecture":  "ppc64le",
-				"url":               "http://example.com/image/ppc64le-418.iso",
-				"version":           "418.84.202109241901-0",
+				OpenshiftVersion: "4.18",
+				CPUArchitecture:  "ppc64le",
+				URL:              "http://example.com/image/ppc64le-418.iso",
+				Version:          "418.84.202109241901-0",
 			},
 		}
 
@@ -1156,12 +1241,12 @@ var _ = Describe("Populate with disconnected ISO", func() {
 		})
 
 		It("downloads disconnected ISO without creating minimal ISO", func() {
-			disconnectedVersion := map[string]string{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"url":               ts.URL() + "/disconnected.iso",
-				"version":           "48.84.202109241901-0",
-				"type":              ImageTypeDisconnectedIso,
+			disconnectedVersion := OSImage{
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              ts.URL() + "/disconnected.iso",
+				Version:          "48.84.202109241901-0",
+				Type:             ImageTypeDisconnectedIso,
 			}
 
 			validVolumeID := "rhcos-48.84.202109241901-0"
@@ -1180,7 +1265,7 @@ var _ = Describe("Populate with disconnected ISO", func() {
 				),
 			)
 
-			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = is.Populate(ctx)
@@ -1192,15 +1277,15 @@ var _ = Describe("Populate with disconnected ISO", func() {
 		})
 
 		It("fails when invalid image type is specified", func() {
-			invalidVersion := map[string]string{
-				"openshift_version": "4.8",
-				"cpu_architecture":  "x86_64",
-				"url":               ts.URL() + "/invalid.iso",
-				"version":           "48.84.202109241901-0",
-				"type":              "invalid-type",
+			invalidVersion := OSImage{
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              ts.URL() + "/invalid.iso",
+				Version:          "48.84.202109241901-0",
+				Type:             "invalid-type",
 			}
 
-			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []map[string]string{invalidVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{invalidVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = is.Populate(ctx)

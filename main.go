@@ -94,7 +94,7 @@ func main() {
 		versionsJSON = Options.RHCOSVersions
 	}
 
-	var versions []map[string]string
+	var versions []imagestore.OSImage
 	if versionsJSON == "" {
 		versions = imagestore.DefaultVersions
 	} else {
