@@ -31,66 +31,66 @@ import (
 )
 
 var (
-	versions = []map[string]string{
+	versions = []imagestore.OSImage{
 		{
-			"openshift_version": "4.17.0-ec.1",
-			"cpu_architecture":  "arm64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live-iso.aarch64.iso",
-			"version":           "arm-latest",
+			OpenshiftVersion: "4.17.0-ec.1",
+			CPUArchitecture:  "arm64",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/arm64/dependencies/rhcos/pre-release/latest/rhcos-live-iso.aarch64.iso",
+			Version:          "arm-latest",
 		},
 		{
-			"openshift_version": "4.8",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/latest/rhcos-live.x86_64.iso",
-			"version":           "4.8-latest",
+			OpenshiftVersion: "4.8",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.8/latest/rhcos-live.x86_64.iso",
+			Version:          "4.8-latest",
 		},
 		{
-			"openshift_version": "4.10.0-rc.0",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live.x86_64.iso",
-			"version":           "x86_64-latest",
+			OpenshiftVersion: "4.10.0-rc.0",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/4.10.0-rc.0/rhcos-live.x86_64.iso",
+			Version:          "x86_64-latest",
 		},
 		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live.x86_64.iso",
-			"version":           "x86_64-latest",
+			OpenshiftVersion: "4.11",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/x86_64/fedora-coreos-35.20220103.3.0-live.x86_64.iso",
+			Version:          "x86_64-latest",
 		},
 		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "arm64",
-			"url":               "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
-			"version":           "arm-latest",
+			OpenshiftVersion: "4.11",
+			CPUArchitecture:  "arm64",
+			URL:              "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/35.20220103.3.0/aarch64/fedora-coreos-35.20220103.3.0-live.aarch64.iso",
+			Version:          "arm-latest",
 		},
 		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "s390x",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-s390x-live.s390x.iso",
-			"version":           "s390x-latest",
+			OpenshiftVersion: "4.11",
+			CPUArchitecture:  "s390x",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-s390x-live.s390x.iso",
+			Version:          "s390x-latest",
 		},
 		{
-			"openshift_version": "4.11",
-			"cpu_architecture":  "ppc64le",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-ppc64le-live.ppc64le.iso",
-			"version":           "ppc64le-latest",
+			OpenshiftVersion: "4.11",
+			CPUArchitecture:  "ppc64le",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.11/4.11.9/rhcos-4.11.9-ppc64le-live.ppc64le.iso",
+			Version:          "ppc64le-latest",
 		},
 		{
-			"openshift_version": "4.13",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://okd-scos.s3.amazonaws.com/okd-scos/builds/413.9.202302280609-0/x86_64/scos-413.9.202302280609-0-live.x86_64.iso",
-			"version":           "x86_64-latest",
+			OpenshiftVersion: "4.13",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://okd-scos.s3.amazonaws.com/okd-scos/builds/413.9.202302280609-0/x86_64/scos-413.9.202302280609-0-live.x86_64.iso",
+			Version:          "x86_64-latest",
 		},
 		{
-			"openshift_version": "4.18",
-			"cpu_architecture":  "s390x",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.18/4.18.1/rhcos-4.18.1-s390x-live.s390x.iso",
-			"version":           "s390x-418",
+			OpenshiftVersion: "4.18",
+			CPUArchitecture:  "s390x",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/4.18/4.18.1/rhcos-4.18.1-s390x-live.s390x.iso",
+			Version:          "s390x-418",
 		},
 		{
-			"openshift_version": "4.18",
-			"cpu_architecture":  "x86_64",
-			"url":               "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.18/4.18.1/rhcos-4.18.1-x86_64-live.x86_64.iso",
-			"version":           "x86_64-418",
+			OpenshiftVersion: "4.18",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.18/4.18.1/rhcos-4.18.1-x86_64-live.x86_64.iso",
+			Version:          "x86_64-418",
 		},
 	}
 
@@ -221,8 +221,8 @@ var _ = Describe("Image integration tests", func() {
 			for i := range versions {
 				version := versions[i]
 
-				It("returns a properly generated "+tc.name+" iso image "+version["version"], func() {
-					if version["cpu_architecture"] == "s390x" {
+				It("returns a properly generated "+tc.name+" iso image "+version.Version, func() {
+					if version.CPUArchitecture == "s390x" {
 						if tc.imageType == imagestore.ImageTypeMinimal {
 							Skip("minimal ISO is not supported for s390x architecture")
 						}
@@ -232,12 +232,12 @@ var _ = Describe("Image integration tests", func() {
 					}
 
 					By("getting an iso")
-					path := fmt.Sprintf("/byid/%s/%s/%s/%s", imageID, version["openshift_version"], version["cpu_architecture"], tc.fileName)
+					path := fmt.Sprintf("/byid/%s/%s/%s/%s", imageID, version.OpenshiftVersion, version.CPUArchitecture, tc.fileName)
 					resp, err := imageClient.Get(imageServer.URL + path)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-					isoFile, err := os.CreateTemp("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version["openshift_version"], tc.name, version["cpu_architecture"]))
+					isoFile, err := os.CreateTemp("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version.OpenshiftVersion, tc.name, version.CPUArchitecture))
 					Expect(err).NotTo(HaveOccurred())
 					_, err = io.Copy(isoFile, resp.Body)
 					Expect(err).NotTo(HaveOccurred())
@@ -330,8 +330,8 @@ var _ = Describe("Image integration tests", func() {
 			for i := range versions {
 				version := versions[i]
 
-				It("includes nmstate for "+version["openshift_version"]+" "+version["cpu_architecture"], func() {
-					ok, err := common.VersionGreaterOrEqual(version["openshift_version"], isoeditor.MinimalVersionForNmstatectl)
+				It("includes nmstate for "+version.OpenshiftVersion+" "+version.CPUArchitecture, func() {
+					ok, err := common.VersionGreaterOrEqual(version.OpenshiftVersion, isoeditor.MinimalVersionForNmstatectl)
 					Expect(err).NotTo(HaveOccurred())
 
 					if len(tc.expectedRamdisk) <= 0 || !ok {
@@ -339,7 +339,7 @@ var _ = Describe("Image integration tests", func() {
 					}
 
 					path := fmt.Sprintf("/images/%s/pxe-initrd?version=%s&arch=%s",
-						imageID, version["openshift_version"], version["cpu_architecture"])
+						imageID, version.OpenshiftVersion, version.CPUArchitecture)
 					resp2, err := imageClient.Get(imageServer.URL + path)
 					Expect(err).NotTo(HaveOccurred())
 					defer resp2.Body.Close()
@@ -348,8 +348,9 @@ var _ = Describe("Image integration tests", func() {
 					initrdBytes, err := io.ReadAll(resp2.Body)
 					Expect(err).NotTo(HaveOccurred())
 
-					nmPath, err := imageStore.NmstatectlPathForParams(version["openshift_version"], version["cpu_architecture"])
+					nmPath, exists, err := imageStore.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
 					Expect(err).NotTo(HaveOccurred())
+					Expect(exists).To(BeTrue())
 					nmBytes, err := os.ReadFile(nmPath)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -390,7 +391,7 @@ func TestIntegration(t *testing.T) {
 	RunSpecs(t, "image building tests")
 }
 
-func ignitionPayloadReader(fs filesystem.FileSystem, version map[string]string) (io.ReadCloser, error) {
+func ignitionPayloadReader(fs filesystem.FileSystem, version imagestore.OSImage) (io.ReadCloser, error) {
 	ignInfoFile, err := fs.OpenFile("/coreos/igninfo.json", os.O_RDONLY)
 	if err == nil {
 		defer ignInfoFile.Close()

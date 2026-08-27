@@ -12,8 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-image-service/pkg/imagestore"
 	"go.uber.org/mock/gomock"
+
+	"github.com/openshift/assisted-image-service/pkg/imagestore"
 )
 
 var _ = Describe("ServeHTTP", func() {
@@ -125,6 +126,7 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
 			),
 		)
+		mockImageStore.EXPECT().NmstatectlPathForParams("4.9", "x86_64").Return(nmstatectlPathForCaching, false, nil).AnyTimes()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.9&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...))
@@ -203,7 +205,7 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
 			),
 		)
-		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "x86_64").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "x86_64").Return(nmstatectlPathForCaching, true, nil).AnyTimes()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.18&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...), nmstatectlContent...))
