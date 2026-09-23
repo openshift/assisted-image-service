@@ -1276,6 +1276,189 @@ var _ = Describe("Populate with disconnected ISO", func() {
 			Expect(content).To(Equal(isoContent))
 		})
 
+		It("skips removal and download when disconnected ISO already exists", func() {
+			existingPath := filepath.Join(dataDir, "rhcos-disconnected-iso-48.84.202109241901-0-x86_64.iso")
+			existingContent := []byte("existing-disconnected-iso")
+			Expect(os.WriteFile(existingPath, existingContent, 0600)).To(Succeed())
+
+			ts.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/dontcallthis.iso"),
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Fail("endpoint should not be queried") }),
+				),
+			)
+
+			disconnectedVersion := OSImage{
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              ts.URL() + "/dontcallthis.iso",
+				Version:          "48.84.202109241901-0",
+				Type:             ImageTypeDisconnectedIso,
+			}
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(is.Populate(ctx)).To(Succeed())
+
+			content, err := os.ReadFile(existingPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(existingContent))
+			Expect(ts.ReceivedRequests()).To(BeEmpty())
+		})
+
+		It("downloads a new disconnected ISO when it is not present", func() {
+			validVolumeID := "rhcos-48.84.202109241901-0"
+			isoFile := buildTestISO(dataDir, validVolumeID, minRootfsSize+1024, minKernelSize+1024)
+			isoContent, err := os.ReadFile(isoFile)
+			Expect(err).NotTo(HaveOccurred())
+			os.Remove(isoFile)
+
+			header := http.Header{}
+			header.Add("Content-Length", strconv.Itoa(len(isoContent)))
+			ts.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/new-disconnected.iso"),
+					ghttp.RespondWith(http.StatusOK, isoContent, header),
+				),
+			)
+
+			disconnectedVersion := OSImage{
+				OpenshiftVersion: "4.8",
+				CPUArchitecture:  "x86_64",
+				URL:              ts.URL() + "/new-disconnected.iso",
+				Version:          "48.84.202109241901-0",
+				Type:             ImageTypeDisconnectedIso,
+			}
+
+			dest := filepath.Join(dataDir, "rhcos-disconnected-iso-48.84.202109241901-0-x86_64.iso")
+			_, err = os.Stat(dest)
+			Expect(os.IsNotExist(err)).To(BeTrue())
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, []OSImage{disconnectedVersion}, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(is.Populate(ctx)).To(Succeed())
+
+			content, err := os.ReadFile(dest)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(isoContent))
+			Expect(ts.ReceivedRequests()).To(HaveLen(1))
+		})
+
+		It("removes disconnected ISOs absent from OS_IMAGES and downloads newly added ones", func() {
+			keptPath := filepath.Join(dataDir, "rhcos-disconnected-iso-48.84.202109241901-0-x86_64.iso")
+			removedPath := filepath.Join(dataDir, "rhcos-disconnected-iso-47.84.202109241831-0-x86_64.iso")
+			keptContent := []byte("kept-disconnected-iso")
+			Expect(os.WriteFile(keptPath, keptContent, 0600)).To(Succeed())
+			Expect(os.WriteFile(removedPath, []byte("removed-disconnected-iso"), 0600)).To(Succeed())
+
+			validVolumeID := "rhcos-49.84.202110081407-0"
+			isoFile := buildTestISO(dataDir, validVolumeID, minRootfsSize+1024, minKernelSize+1024)
+			newISOContent, err := os.ReadFile(isoFile)
+			Expect(err).NotTo(HaveOccurred())
+			os.Remove(isoFile)
+
+			header := http.Header{}
+			header.Add("Content-Length", strconv.Itoa(len(newISOContent)))
+			ts.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/new.iso"),
+					ghttp.RespondWith(http.StatusOK, newISOContent, header),
+				),
+			)
+
+			versions := []OSImage{
+				{
+					OpenshiftVersion: "4.8",
+					CPUArchitecture:  "x86_64",
+					URL:              ts.URL() + "/kept.iso",
+					Version:          "48.84.202109241901-0",
+					Type:             ImageTypeDisconnectedIso,
+				},
+				{
+					OpenshiftVersion: "4.9",
+					CPUArchitecture:  "x86_64",
+					URL:              ts.URL() + "/new.iso",
+					Version:          "49.84.202110081407-0",
+					Type:             ImageTypeDisconnectedIso,
+				},
+			}
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, versions, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(is.Populate(ctx)).To(Succeed())
+
+			_, err = os.Stat(removedPath)
+			Expect(os.IsNotExist(err)).To(BeTrue())
+
+			content, err := os.ReadFile(keptPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(keptContent))
+
+			newPath := filepath.Join(dataDir, "rhcos-disconnected-iso-49.84.202110081407-0-x86_64.iso")
+			content, err = os.ReadFile(newPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(newISOContent))
+			Expect(ts.ReceivedRequests()).To(HaveLen(1))
+			Expect(ts.ReceivedRequests()[0].URL.Path).To(Equal("/new.iso"))
+		})
+
+		It("keeps existing disconnected ISOs and downloads newly added ones", func() {
+			existingPath := filepath.Join(dataDir, "rhcos-disconnected-iso-48.84.202109241901-0-x86_64.iso")
+			existingContent := []byte("existing-disconnected-iso")
+			Expect(os.WriteFile(existingPath, existingContent, 0600)).To(Succeed())
+
+			validVolumeID := "rhcos-49.84.202110081407-0"
+			isoFile := buildTestISO(dataDir, validVolumeID, minRootfsSize+1024, minKernelSize+1024)
+			newISOContent, err := os.ReadFile(isoFile)
+			Expect(err).NotTo(HaveOccurred())
+			os.Remove(isoFile)
+
+			header := http.Header{}
+			header.Add("Content-Length", strconv.Itoa(len(newISOContent)))
+			ts.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("GET", "/new.iso"),
+					ghttp.RespondWith(http.StatusOK, newISOContent, header),
+				),
+			)
+
+			versions := []OSImage{
+				{
+					OpenshiftVersion: "4.8",
+					CPUArchitecture:  "x86_64",
+					URL:              ts.URL() + "/existing.iso",
+					Version:          "48.84.202109241901-0",
+					Type:             ImageTypeDisconnectedIso,
+				},
+				{
+					OpenshiftVersion: "4.9",
+					CPUArchitecture:  "x86_64",
+					URL:              ts.URL() + "/new.iso",
+					Version:          "49.84.202110081407-0",
+					Type:             ImageTypeDisconnectedIso,
+				},
+			}
+
+			is, err := NewImageStore(mockEditor, dataDir, imageServiceBaseURL, false, versions, "", osImageDownloadHeadersMap, osImageDownloadQueryParamsMap, mockNmstateHandler)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(is.Populate(ctx)).To(Succeed())
+
+			content, err := os.ReadFile(existingPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(existingContent))
+
+			newPath := filepath.Join(dataDir, "rhcos-disconnected-iso-49.84.202110081407-0-x86_64.iso")
+			content, err = os.ReadFile(newPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(content).To(Equal(newISOContent))
+			Expect(ts.ReceivedRequests()).To(HaveLen(1))
+			Expect(ts.ReceivedRequests()[0].URL.Path).To(Equal("/new.iso"))
+		})
+
 		It("fails when invalid image type is specified", func() {
 			invalidVersion := OSImage{
 				OpenshiftVersion: "4.8",

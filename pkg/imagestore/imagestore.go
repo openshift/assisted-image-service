@@ -597,8 +597,14 @@ func buildRootfsURL(baseURL, arch, version string) (string, error) {
 func (s *rhcosStore) cleanDataDir() error {
 	var expectedFiles []string
 	for _, version := range s.versions {
-		// Only add full isos here as we want to regenerate the minimal image on each deploy
-		expectedFiles = append(expectedFiles, isoFileName(ImageTypeFull, version.Version, version.CPUArchitecture))
+		imageType, err := getImageType(version)
+		if err != nil {
+			return err
+		}
+		if imageType == ImageTypeFull || imageType == ImageTypeDisconnectedIso {
+			// Only add full and disconnected isos here as we want to regenerate the minimal image on each deploy
+			expectedFiles = append(expectedFiles, isoFileName(imageType, version.Version, version.CPUArchitecture))
+		}
 		// Keep nmstatectl cached files for all architectures (including s390x)
 		expectedFiles = append(expectedFiles, nmstatectlFileName(version.Version, version.CPUArchitecture))
 	}
