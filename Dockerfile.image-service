@@ -45,7 +45,7 @@ RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 RUN cd /app && git rev-parse --short HEAD > /commit-reference.txt
 
 ## Runtime
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:186a94b76e386782f576c9c49813b16dceb2ba63102af5a28405dcefec2806d0
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8ebe2ad8fdf3cab3e5a53c1edc69194c98209cfadab24b884f4ad9ebcf7bbbfc
 
 ARG release=main
 ARG version=latest
