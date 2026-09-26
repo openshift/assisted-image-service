@@ -4,20 +4,20 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nmstate-2.2.60-1.el9_8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nmstate-2.2.60-2.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 4310461
-    checksum: sha256:782afde191c4d8c6d7ca9ebe9ddc9b71f953928af7b15be99721564b8a7db12c
+    size: 4316477
+    checksum: sha256:1943d4ef8df028efc9dd74f05be0145f212aae1e5c1539fb8caaafdc30770b94
     name: nmstate
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nmstate-libs-2.2.60-1.el9_8.aarch64.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nmstate-libs-2.2.60-2.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 3454869
-    checksum: sha256:7603f042a6582ff8512fb64bd9cde78dad44ebf3fca27ab62c8ab63cd14e8caa
+    size: 3457920
+    checksum: sha256:14464b3de6772922a4d30f40b6e74c5d4883ebdf8d965f37e76451a4f6acd8aa
     name: nmstate-libs
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 38310
@@ -25,13 +25,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-4.el9_8.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-5.el9_8.noarch.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 22564
-    checksum: sha256:840ec917ea5d87dfe7a1f9ff10a0f22ddb3f2a1d9e29b163a150b8456f67f727
+    size: 21974
+    checksum: sha256:6aaa743b728c6a5875a67e6fbe9d5211928fcfcd70c0a3f2284f76289deda32e
     name: NetworkManager-config-server
-    evr: 1:1.54.3-4.el9_8
-    sourcerpm: NetworkManager-1.54.3-4.el9_8.src.rpm
+    evr: 1:1.54.3-5.el9_8
+    sourcerpm: NetworkManager-1.54.3-5.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 45196
@@ -53,31 +53,31 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-1.el9_8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-2.el9_8.aarch64.rpm
     repoid: codeready-builder-for-rhel-9-aarch64-rpms
-    size: 24646
-    checksum: sha256:8985d4192744ccf5e15eefb4c9abcfb525271fe55519f785ac6989ac1d108f8f
+    size: 24121
+    checksum: sha256:48a5826f661670292001919555df9045d317dc981b7475ac792cfaeae739c7f8
     name: nmstate-devel
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/n/nmstate-2.2.60-1.el9_8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/n/nmstate-2.2.60-2.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 4935562
-    checksum: sha256:a0231e7fafde3b64bdb48722e73b7de705cbc495f2be2fee7ffc35370fe13b88
+    size: 4940065
+    checksum: sha256:f036bdb77b638e8127398428af9d7151ceb3f69ac329a8c1cf13ea84cbf79d72
     name: nmstate
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/n/nmstate-libs-2.2.60-1.el9_8.ppc64le.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/n/nmstate-libs-2.2.60-2.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 3819703
-    checksum: sha256:b05e6d2b9a91307717670a2728101ce87c1c3e40437fcda07361065e22e25645
+    size: 3823262
+    checksum: sha256:cb5c3a17828666b591ed0b420a7dfad243108a15000e5b0f1afd976254822bd8
     name: nmstate-libs
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 42712
@@ -85,13 +85,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-4.el9_8.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-5.el9_8.noarch.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 22564
-    checksum: sha256:840ec917ea5d87dfe7a1f9ff10a0f22ddb3f2a1d9e29b163a150b8456f67f727
+    size: 21974
+    checksum: sha256:6aaa743b728c6a5875a67e6fbe9d5211928fcfcd70c0a3f2284f76289deda32e
     name: NetworkManager-config-server
-    evr: 1:1.54.3-4.el9_8
-    sourcerpm: NetworkManager-1.54.3-4.el9_8.src.rpm
+    evr: 1:1.54.3-5.el9_8
+    sourcerpm: NetworkManager-1.54.3-5.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 46315
@@ -113,31 +113,31 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-1.el9_8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-2.el9_8.ppc64le.rpm
     repoid: codeready-builder-for-rhel-9-ppc64le-rpms
-    size: 24657
-    checksum: sha256:9ac8e34e200737902856c377b42eb514a37f804196c6b92f796053ec41012ed2
+    size: 24141
+    checksum: sha256:78c05b2956fb625e3083f18168e3ec38f7d2bdc50ec2c53351a7b5ec7e3b0dc4
     name: nmstate-devel
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/n/nmstate-2.2.60-1.el9_8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/n/nmstate-2.2.60-2.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 4580546
-    checksum: sha256:51f66101d40fafa0b19db71d4e6761b3f204e8a88b95204aa93c9a7c5275d643
+    size: 4585170
+    checksum: sha256:9f5963ac997711bb74a72386ebfe130e6da491fbd67c0e13c2bc9533439ca9f1
     name: nmstate
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/n/nmstate-libs-2.2.60-1.el9_8.s390x.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/n/nmstate-libs-2.2.60-2.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 3622985
-    checksum: sha256:2408ce492dc81f85deffa6257936a3d2524aa7477d97120032b8a26beb3b57d3
+    size: 3627178
+    checksum: sha256:1b57ddcbd87e397cb861d98afde8a954b856f739f97c6e9ec00b999b362ea061
     name: nmstate-libs
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 37876
@@ -145,13 +145,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-4.el9_8.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-5.el9_8.noarch.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 22564
-    checksum: sha256:840ec917ea5d87dfe7a1f9ff10a0f22ddb3f2a1d9e29b163a150b8456f67f727
+    size: 21974
+    checksum: sha256:6aaa743b728c6a5875a67e6fbe9d5211928fcfcd70c0a3f2284f76289deda32e
     name: NetworkManager-config-server
-    evr: 1:1.54.3-4.el9_8
-    sourcerpm: NetworkManager-1.54.3-4.el9_8.src.rpm
+    evr: 1:1.54.3-5.el9_8
+    sourcerpm: NetworkManager-1.54.3-5.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 45258
@@ -173,31 +173,31 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-1.el9_8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-2.el9_8.s390x.rpm
     repoid: codeready-builder-for-rhel-9-s390x-rpms
-    size: 24650
-    checksum: sha256:90aef3cafcab5468382af0722ad9abc68aa38fbdcb6a7070f665a30f32acd4f8
+    size: 24142
+    checksum: sha256:f522bfa90b933d80ca4b5b2d71c86d408228229d953399cf42f3e07f20002507
     name: nmstate-devel
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nmstate-2.2.60-1.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nmstate-2.2.60-2.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 4573358
-    checksum: sha256:8eb17ff897faf521829e1c49d3c3bd27c9a8ea510e18cfdc851c2e650a184ec3
+    size: 4578770
+    checksum: sha256:8c43432b6a5331ee03b082def31b60e9e061851eefbed1649477d6aa335ce6dc
     name: nmstate
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nmstate-libs-2.2.60-1.el9_8.x86_64.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nmstate-libs-2.2.60-2.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 3649288
-    checksum: sha256:8a13a923c694c005913f611d59223dd7fb5f66d39ec43076f565df8889ab69be
+    size: 3653162
+    checksum: sha256:3f97573811a15b044836f99c40b160904c2d65cc3c18ce0863f9a7c770a6ef04
     name: nmstate-libs
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 38387
@@ -205,13 +205,13 @@ arches:
     name: libpkgconf
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-4.el9_8.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/n/NetworkManager-config-server-1.54.3-5.el9_8.noarch.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 22564
-    checksum: sha256:840ec917ea5d87dfe7a1f9ff10a0f22ddb3f2a1d9e29b163a150b8456f67f727
+    size: 21974
+    checksum: sha256:6aaa743b728c6a5875a67e6fbe9d5211928fcfcd70c0a3f2284f76289deda32e
     name: NetworkManager-config-server
-    evr: 1:1.54.3-4.el9_8
-    sourcerpm: NetworkManager-1.54.3-4.el9_8.src.rpm
+    evr: 1:1.54.3-5.el9_8
+    sourcerpm: NetworkManager-1.54.3-5.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 45675
@@ -233,12 +233,12 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-1.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/codeready-builder/os/Packages/n/nmstate-devel-2.2.60-2.el9_8.x86_64.rpm
     repoid: codeready-builder-for-rhel-9-x86_64-rpms
-    size: 24670
-    checksum: sha256:1acf638c2bae7ed79893b92184f0fda8ca47f96653b7b32d78575572de872cff
+    size: 24163
+    checksum: sha256:0bdb64c61dcded81084fed51e5cefc6f7b2acfc64aef25e7351e351abe5e3c4b
     name: nmstate-devel
-    evr: 2.2.60-1.el9_8
-    sourcerpm: nmstate-2.2.60-1.el9_8.src.rpm
+    evr: 2.2.60-2.el9_8
+    sourcerpm: nmstate-2.2.60-2.el9_8.src.rpm
   source: []
   module_metadata: []
