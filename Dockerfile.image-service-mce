@@ -1,5 +1,5 @@
 # Used to build external packages:
-FROM --platform=$BUILDPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:22c70d6d7fa920df140c5facdce1f42178642ca7613590da5466f69418ddf57a AS packages
+FROM --platform=$BUILDPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:154811228435396156662801174566829a2c27d8a0b0f9af6e6d6e76ddf87ffe AS packages
 
 # Install the build tools and the required libraries:
 RUN \
@@ -46,7 +46,7 @@ WORKDIR /app
 RUN GO111MODULE=on GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-image-service main.go
 
 
-FROM --platform=$BUILDPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:22c70d6d7fa920df140c5facdce1f42178642ca7613590da5466f69418ddf57a
+FROM --platform=$BUILDPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:154811228435396156662801174566829a2c27d8a0b0f9af6e6d6e76ddf87ffe
 
 ARG release=main
 ARG version=latest
