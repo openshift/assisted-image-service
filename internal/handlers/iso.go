@@ -39,8 +39,8 @@ func (h *isoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.ImageStore.HaveVersion(params.version, params.arch) {
-		log.Errorf("version for %s %s, not found", params.version, params.arch)
+	if !h.ImageStore.HaveVersion(params.version, params.arch, params.imageType) {
+		log.Errorf("version for %s %s %s, not found", params.version, params.arch, params.imageType)
 		http.NotFound(w, r)
 		return
 	}

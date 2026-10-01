@@ -897,23 +897,31 @@ var _ = Describe("HaveVersion", func() {
 	})
 
 	It("is true for versions that are present", func() {
-		Expect(store.HaveVersion("4.8", "x86_64")).To(BeTrue())
-		Expect(store.HaveVersion("4.9", "arm64")).To(BeTrue())
-		Expect(store.HaveVersion("4.15", "s390x")).To(BeTrue())
+		Expect(store.HaveVersion("4.8", "x86_64", ImageTypeFull)).To(BeTrue())
+		Expect(store.HaveVersion("4.9", "arm64", ImageTypeFull)).To(BeTrue())
+		Expect(store.HaveVersion("4.15", "s390x", ImageTypeFull)).To(BeTrue())
 	})
 
 	It("is true when looked up by RHCOS version", func() {
-		Expect(store.HaveVersion("48.84.202109241901-0", "x86_64")).To(BeTrue())
-		Expect(store.HaveVersion("49.84.202110081407-0", "arm64")).To(BeTrue())
-		Expect(store.HaveVersion("415.92.202403212258-0", "s390x")).To(BeTrue())
+		Expect(store.HaveVersion("48.84.202109241901-0", "x86_64", ImageTypeFull)).To(BeTrue())
+		Expect(store.HaveVersion("49.84.202110081407-0", "arm64", ImageTypeFull)).To(BeTrue())
+		Expect(store.HaveVersion("415.92.202403212258-0", "s390x", ImageTypeFull)).To(BeTrue())
+	})
+
+	It("is true for minimal when a full image exists", func() {
+		Expect(store.HaveVersion("4.8", "x86_64", ImageTypeMinimal)).To(BeTrue())
+	})
+
+	It("is false for disconnected when only full images are configured", func() {
+		Expect(store.HaveVersion("4.8", "x86_64", ImageTypeDisconnectedIso)).To(BeFalse())
 	})
 
 	It("is false for versions that are missing", func() {
-		Expect(store.HaveVersion("4.9", "x86_64")).To(BeFalse())
-		Expect(store.HaveVersion("4.8", "arm64")).To(BeFalse())
-		Expect(store.HaveVersion("4.7", "x86_64")).To(BeFalse())
-		Expect(store.HaveVersion("4.8", "aarch64")).To(BeFalse())
-		Expect(store.HaveVersion("4.11", "s390x")).To(BeFalse())
+		Expect(store.HaveVersion("4.9", "x86_64", ImageTypeFull)).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "arm64", ImageTypeFull)).To(BeFalse())
+		Expect(store.HaveVersion("4.7", "x86_64", ImageTypeFull)).To(BeFalse())
+		Expect(store.HaveVersion("4.8", "aarch64", ImageTypeFull)).To(BeFalse())
+		Expect(store.HaveVersion("4.11", "s390x", ImageTypeFull)).To(BeFalse())
 	})
 })
 

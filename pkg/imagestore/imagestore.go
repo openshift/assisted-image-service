@@ -85,7 +85,7 @@ var DefaultVersions = []OSImage{
 type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
-	HaveVersion(version, arch string) bool
+	HaveVersion(version, arch, imageType string) bool
 	NmstatectlPathForParams(openshiftVersion, arch string) (string, bool, error)
 }
 
@@ -730,8 +730,13 @@ func (s *rhcosStore) cleanDataDir() error {
 	return nil
 }
 
-func (s *rhcosStore) HaveVersion(version, arch string) bool {
-	return s.findVersionEntry(version, arch, "") != nil
+func (s *rhcosStore) HaveVersion(version, arch, imageType string) bool {
+	// Minimal ISOs are derived from full OS image catalog entries.
+	lookupType := imageType
+	if imageType == ImageTypeMinimal {
+		lookupType = ImageTypeFull
+	}
+	return s.findVersionEntry(version, arch, lookupType) != nil
 }
 
 func (s *rhcosStore) NmstatectlPathForParams(versionKey, arch string) (string, bool, error) {
