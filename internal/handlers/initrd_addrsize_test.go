@@ -84,7 +84,7 @@ var _ = Describe("ServeHTTP", func() {
 	})
 
 	mockImage := func(version, arch string) {
-		mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
+		mockImageStore.EXPECT().HaveVersion(version, arch, imagestore.ImageTypeFull).Return(true).AnyTimes()
 		mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, version, arch).Return(imageFilename).AnyTimes()
 	}
 

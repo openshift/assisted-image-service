@@ -110,7 +110,7 @@ func (b *BootArtifactsHandler) parseQueryParams(values url.Values) (string, stri
 		arch = defaultArch
 	}
 
-	if !b.ImageStore.HaveVersion(version, arch) {
+	if !b.ImageStore.HaveVersion(version, arch, imagestore.ImageTypeFull) {
 		return "", "", fmt.Errorf("version for %s %s, not found", version, arch)
 	}
 

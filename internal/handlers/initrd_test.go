@@ -92,7 +92,7 @@ var _ = Describe("ServeHTTP", func() {
 	})
 
 	mockImage := func(version, arch string) {
-		mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
+		mockImageStore.EXPECT().HaveVersion(version, arch, imagestore.ImageTypeFull).Return(true).AnyTimes()
 		mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeFull, version, arch).Return(imageFilename).AnyTimes()
 	}
 
@@ -161,7 +161,7 @@ var _ = Describe("ServeHTTP", func() {
 	})
 
 	It("returns bad request when the specified version is missing", func() {
-		mockImageStore.EXPECT().HaveVersion("4.11", "x86_64").Return(false)
+		mockImageStore.EXPECT().HaveVersion("4.11", "x86_64", imagestore.ImageTypeFull).Return(false)
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.11&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
