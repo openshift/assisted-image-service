@@ -684,8 +684,8 @@ var _ = Describe("PathForParams", func() {
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-full-iso-48.84.202109241901-0-x86_64.iso"
-		Expect(is.PathForParams(ImageTypeFull, "4.8", "x86_64")).To(Equal(expected))
+		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
+		Expect(is.PathForParams("full", "4.8", "x86_64")).To(Equal(expected))
 	})
 
 	It("creates the correct path when looked up by RHCOS version", func() {
@@ -697,8 +697,8 @@ var _ = Describe("PathForParams", func() {
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-full-iso-48.84.202109241901-0-x86_64.iso"
-		Expect(is.PathForParams(ImageTypeFull, "48.84.202109241901-0", "x86_64")).To(Equal(expected))
+		expected := "/tmp/some/dir/rhcos-full-48.84.202109241901-0-x86_64.iso"
+		Expect(is.PathForParams("full", "48.84.202109241901-0", "x86_64")).To(Equal(expected))
 	})
 
 	It("resolves minimal ISO paths from full OS image catalog entries", func() {
@@ -706,13 +706,13 @@ var _ = Describe("PathForParams", func() {
 			OpenshiftVersion: "4.8",
 			CPUArchitecture:  "x86_64",
 			URL:              "http://example.com/image/x86_64-48.iso",
-			Version:          "4.8-latest",
+			Version:          "48.84.202109241901-0",
 		}}
 		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).NotTo(HaveOccurred())
-		expected := "/tmp/some/dir/rhcos-minimal-iso-4.8-latest-x86_64.iso"
+		expected := "/tmp/some/dir/rhcos-minimal-iso-48.84.202109241901-0-x86_64.iso"
 		Expect(is.PathForParams(ImageTypeMinimal, "4.8", "x86_64")).To(Equal(expected))
-		Expect(is.PathForParams(ImageTypeMinimal, "4.8-latest", "x86_64")).To(Equal(expected))
+		Expect(is.PathForParams(ImageTypeMinimal, "48.84.202109241901-0", "x86_64")).To(Equal(expected))
 	})
 
 	It("includes openshift_version in the path for disconnected ISOs", func() {
@@ -727,10 +727,10 @@ var _ = Describe("PathForParams", func() {
 		Expect(err).NotTo(HaveOccurred())
 		expected := "/tmp/some/dir/rhcos-disconnected-iso-4.22.13-9.8.20260715-1-x86_64.iso"
 		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22.13", "x86_64")).To(Equal(expected))
-		Expect(is.PathForParams(ImageTypeDisconnectedIso, "9.8.20260715-1", "x86_64")).To(Equal(expected))
+		Expect(is.HaveVersion("9.8.20260715-1", "x86_64", ImageTypeDisconnectedIso)).To(BeFalse())
 	})
 
-	It("warns and does not resolve when multiple disconnected ISOs share openshift_version and RHCOS version", func() {
+	It("fails to create a store when multiple disconnected ISOs share openshift_version", func() {
 		versions := []OSImage{
 			{
 				OpenshiftVersion: "4.22",
@@ -747,13 +747,9 @@ var _ = Describe("PathForParams", func() {
 				Type:             ImageTypeDisconnectedIso,
 			},
 		}
-		is, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
-		Expect(err).NotTo(HaveOccurred())
-
-		resolvedByOCP := "/tmp/some/dir/rhcos-disconnected-iso-4.22-9.8.20260715-1-x86_64.iso"
-		// Ambiguous: same openshift_version and RHCOS version, no way to tell which entry was intended.
-		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22", "x86_64")).NotTo(Equal(resolvedByOCP))
-		Expect(is.PathForParams(ImageTypeDisconnectedIso, "9.8.20260715-1", "x86_64")).NotTo(Equal(resolvedByOCP))
+		_, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("duplicate openshift_version 4.22"))
 	})
 
 	It("selects each disconnected image by its openshift z-stream even when RHCOS versions match", func() {
@@ -780,9 +776,10 @@ var _ = Describe("PathForParams", func() {
 		pathB := "/tmp/some/dir/rhcos-disconnected-iso-4.22.13-9.8.20260715-1-x86_64.iso"
 		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22.8", "x86_64")).To(Equal(pathA))
 		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22.13", "x86_64")).To(Equal(pathB))
+		Expect(is.HaveVersion("9.8.20260715-1", "x86_64", ImageTypeDisconnectedIso)).To(BeFalse())
 	})
 
-	It("resolves by RHCOS version when each openshift z-stream has a distinct RHCOS version", func() {
+	It("does not look up disconnected ISOs by RHCOS version", func() {
 		versions := []OSImage{
 			{
 				OpenshiftVersion: "4.22.8",
@@ -806,8 +803,8 @@ var _ = Describe("PathForParams", func() {
 		pathB := "/tmp/some/dir/rhcos-disconnected-iso-4.22.13-9.8.20260801-0-x86_64.iso"
 		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22.8", "x86_64")).To(Equal(pathA))
 		Expect(is.PathForParams(ImageTypeDisconnectedIso, "4.22.13", "x86_64")).To(Equal(pathB))
-		Expect(is.PathForParams(ImageTypeDisconnectedIso, "9.8.20260715-1", "x86_64")).To(Equal(pathA))
-		Expect(is.PathForParams(ImageTypeDisconnectedIso, "9.8.20260801-0", "x86_64")).To(Equal(pathB))
+		Expect(is.HaveVersion("9.8.20260715-1", "x86_64", ImageTypeDisconnectedIso)).To(BeFalse())
+		Expect(is.HaveVersion("9.8.20260801-0", "x86_64", ImageTypeDisconnectedIso)).To(BeFalse())
 	})
 })
 
