@@ -164,6 +164,7 @@ func validateVersions(versions []OSImage) error {
 	if len(versions) == 0 {
 		return fmt.Errorf("invalid versions: must not be empty")
 	}
+	seen := make(map[string]string, len(versions))
 	for _, entry := range versions {
 		missingKeyFmt := "invalid version entry %+v: missing %s key"
 		if entry.OpenshiftVersion == "" {
@@ -178,6 +179,19 @@ func validateVersions(versions []OSImage) error {
 		if entry.Version == "" {
 			return fmt.Errorf(missingKeyFmt, entry, "version")
 		}
+
+		imageType := entry.Type
+		if imageType == "" {
+			imageType = ImageTypeFull
+		}
+		key := entry.OpenshiftVersion + "@" + entry.CPUArchitecture + "@" + imageType
+		if existingURL, ok := seen[key]; ok {
+			return fmt.Errorf(
+				"invalid versions: duplicate openshift_version %s for arch %s and type %s (urls %s and %s)",
+				entry.OpenshiftVersion, entry.CPUArchitecture, imageType, existingURL, entry.URL,
+			)
+		}
+		seen[key] = entry.URL
 	}
 
 	return nil
@@ -554,114 +568,63 @@ func entryImageType(entry *OSImage) string {
 	return entry.Type
 }
 
-// findVersionEntry looks up an OS image by RHCOS version or openshift_version for the given arch.
-// When imageType is non-empty, only entries of that type are considered.
-//
-// Disconnected (offline) ISOs are identified by openshift_version (including the z-stream when
-// present in OS_IMAGES) together with RHCOS version. Different z-streams use different
-// openshift_version values, so requesting that openshift_version selects the correct image.
-// A warning is logged only when multiple catalog entries are indistinguishable (same
-// openshift_version for the same arch/type).
+// findVersionEntry looks up an OS image by openshift_version, then RHCOS version, for the given arch.
+// Minimal requests are satisfied from full OS image catalog entries.
+// When imageType is full-iso or disconnected-iso, only entries of that type are considered.
+// Disconnected ISOs are looked up only by openshift_version.
 func (s *rhcosStore) findVersionEntry(versionKey, arch, imageType string) *OSImage {
-	matchesType := func(entry *OSImage) bool {
-		if imageType == "" {
-			return true
-		}
-		return entryImageType(entry) == imageType
+	switch imageType {
+	case ImageTypeMinimal:
+		// Minimal ISOs are generated from full OS image catalog entries; there is no
+		// separate minimal-iso type in OS_IMAGES.
+		imageType = ImageTypeFull
+	case ImageTypeFull, ImageTypeDisconnectedIso, "":
+		// Keep as-is.
+	default:
+		// Unknown values are only used for filename substitution by some callers;
+		// look up among online/full images.
+		imageType = ""
 	}
 
+	matches := func(matchVersion func(*OSImage) bool) *OSImage {
+		for i := range s.versions {
+			entry := &s.versions[i]
+			if entry.CPUArchitecture != arch {
+				continue
+			}
+			entryType := entryImageType(entry)
+			// Callers that omit imageType (e.g. nmstatectl) only use online/full images.
+			if (imageType != "" && entryType != imageType) ||
+				(imageType == "" && entryType == ImageTypeDisconnectedIso) {
+				continue
+			}
+			if matchVersion(entry) {
+				return entry
+			}
+		}
+		return nil
+	}
+
+	if entry := matches(func(entry *OSImage) bool {
+		return entry.OpenshiftVersion == versionKey
+	}); entry != nil {
+		return entry
+	}
+
+	// Disconnected ISOs must be requested by openshift_version.
 	if imageType == ImageTypeDisconnectedIso {
-		var ocpMatches []*OSImage
-		for i := range s.versions {
-			entry := &s.versions[i]
-			if entry.CPUArchitecture != arch || !matchesType(entry) {
-				continue
-			}
-			if entry.OpenshiftVersion == versionKey {
-				ocpMatches = append(ocpMatches, entry)
-			}
-		}
-		switch len(ocpMatches) {
-		case 1:
-			return ocpMatches[0]
-		case 0:
-			// Fall through to RHCOS version lookup.
-		default:
-			// Same openshift_version listed more than once — cannot tell which entry was intended.
-			log.Warnf("ambiguous disconnected ISO lookup for openshift_version %s and arch %s; cannot uniquely select an image", versionKey, arch)
-			return nil
-		}
-
-		var rhcosMatches []*OSImage
-		for i := range s.versions {
-			entry := &s.versions[i]
-			if entry.CPUArchitecture != arch || !matchesType(entry) {
-				continue
-			}
-			if entry.Version == versionKey {
-				rhcosMatches = append(rhcosMatches, entry)
-			}
-		}
-		switch len(rhcosMatches) {
-		case 0:
-			return nil
-		case 1:
-			return rhcosMatches[0]
-		default:
-			if disconnectedEntriesShareOpenshiftVersion(rhcosMatches) {
-				log.Warnf("ambiguous disconnected ISO lookup for RHCOS version %s and arch %s; cannot uniquely select an image", versionKey, arch)
-				return nil
-			}
-			// Distinct openshift_version (z-stream) values share this RHCOS version; the caller
-			// should look up by openshift_version. Do not guess among them.
-			return nil
-		}
+		return nil
 	}
 
-	for i := range s.versions {
-		entry := &s.versions[i]
-		if entry.CPUArchitecture != arch || !matchesType(entry) {
-			continue
-		}
-		if entry.Version == versionKey {
-			return entry
-		}
-	}
-	for i := range s.versions {
-		entry := &s.versions[i]
-		if entry.CPUArchitecture != arch || !matchesType(entry) {
-			continue
-		}
-		if entry.OpenshiftVersion == versionKey {
-			return entry
-		}
-	}
-	return nil
-}
-
-func disconnectedEntriesShareOpenshiftVersion(entries []*OSImage) bool {
-	if len(entries) == 0 {
-		return true
-	}
-	first := entries[0].OpenshiftVersion
-	for _, entry := range entries[1:] {
-		if entry.OpenshiftVersion != first {
-			return false
-		}
-	}
-	return true
+	return matches(func(entry *OSImage) bool {
+		return entry.Version == versionKey
+	})
 }
 
 func (s *rhcosStore) PathForParams(imageType, versionKey, arch string) string {
 	rhcosVersion := versionKey
 	openshiftVersion := versionKey
-	// Minimal ISOs are generated from full OS image catalog entries; there is no
-	// separate minimal-iso type in OS_IMAGES.
-	lookupType := imageType
-	if imageType == ImageTypeMinimal {
-		lookupType = ImageTypeFull
-	}
-	entry := s.findVersionEntry(versionKey, arch, lookupType)
+	entry := s.findVersionEntry(versionKey, arch, imageType)
 	if entry != nil {
 		rhcosVersion = entry.Version
 		openshiftVersion = entry.OpenshiftVersion
@@ -731,12 +694,7 @@ func (s *rhcosStore) cleanDataDir() error {
 }
 
 func (s *rhcosStore) HaveVersion(version, arch, imageType string) bool {
-	// Minimal ISOs are derived from full OS image catalog entries.
-	lookupType := imageType
-	if imageType == ImageTypeMinimal {
-		lookupType = ImageTypeFull
-	}
-	return s.findVersionEntry(version, arch, lookupType) != nil
+	return s.findVersionEntry(version, arch, imageType) != nil
 }
 
 func (s *rhcosStore) NmstatectlPathForParams(versionKey, arch string) (string, bool, error) {
