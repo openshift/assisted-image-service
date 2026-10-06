@@ -85,7 +85,7 @@ var DefaultVersions = []OSImage{
 type ImageStore interface {
 	Populate(ctx context.Context) error
 	PathForParams(imageType, version, arch string) string
-	HaveVersion(version, arch string) bool
+	HaveVersion(version, arch, imageType string) bool
 	NmstatectlPathForParams(openshiftVersion, arch string) (string, bool, error)
 }
 
@@ -164,6 +164,7 @@ func validateVersions(versions []OSImage) error {
 	if len(versions) == 0 {
 		return fmt.Errorf("invalid versions: must not be empty")
 	}
+	seen := make(map[string]string, len(versions))
 	for _, entry := range versions {
 		missingKeyFmt := "invalid version entry %+v: missing %s key"
 		if entry.OpenshiftVersion == "" {
@@ -178,6 +179,19 @@ func validateVersions(versions []OSImage) error {
 		if entry.Version == "" {
 			return fmt.Errorf(missingKeyFmt, entry, "version")
 		}
+
+		imageType := entry.Type
+		if imageType == "" {
+			imageType = ImageTypeFull
+		}
+		key := entry.OpenshiftVersion + "@" + entry.CPUArchitecture + "@" + imageType
+		if existingURL, ok := seen[key]; ok {
+			return fmt.Errorf(
+				"invalid versions: duplicate openshift_version %s for arch %s and type %s (urls %s and %s)",
+				entry.OpenshiftVersion, entry.CPUArchitecture, imageType, existingURL, entry.URL,
+			)
+		}
+		seen[key] = entry.URL
 	}
 
 	return nil
@@ -299,6 +313,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 	for i := range versions {
 		imageInfo := versions[i]
 		errs.Go(func() error {
+			openshiftVersion := imageInfo.OpenshiftVersion
 			imageVersion := imageInfo.Version
 			arch := imageInfo.CPUArchitecture
 
@@ -307,7 +322,7 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 				return fmt.Errorf("failed to get image type: %v", err)
 			}
 
-			fullPath := filepath.Join(s.dataDir, isoFileName(imageType, imageVersion, arch))
+			fullPath := filepath.Join(s.dataDir, isoFileName(imageType, imageVersion, arch, openshiftVersion))
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				url := imageInfo.URL
 				log.Infof("Downloading iso from %s to %s", url, fullPath)
@@ -373,11 +388,11 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 		if arch == "s390x" {
 			continue
 		}
-		minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, imageVersion, arch))
+		minimalPath := filepath.Join(s.dataDir, isoFileName(ImageTypeMinimal, imageVersion, arch, openshiftVersion))
 		if _, err := os.Stat(minimalPath); os.IsNotExist(err) {
 			log.Infof("Creating minimal iso for %s-%s", imageVersion, arch)
 
-			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, imageVersion, arch))
+			fullPath := filepath.Join(s.dataDir, isoFileName(ImageTypeFull, imageVersion, arch, openshiftVersion))
 			rootfsURL, err := buildRootfsURL(s.imageServiceBaseURL, arch, imageVersion)
 			if err != nil {
 				return fmt.Errorf("failed to build rootfs URL: %v", err)
@@ -400,8 +415,10 @@ func (s *rhcosStore) Populate(ctx context.Context) error {
 }
 
 // deduplicateVersions keeps a single entry per RHCOS version, CPU architecture pair and image type.
-// When multiple pairs share the same RHCOS image, the entry with the highest openshift_version is kept.
+// When multiple full-iso pairs share the same RHCOS image, the entry with the highest openshift_version is kept.
 // It's important to keep that entry because the openshift_version is used to decide if we want the nmstatectl for that entry.
+// Disconnected ISOs also key on openshift_version so multiple OCP z-stream OVE images can be stored
+// even when they share an RHCOS version string.
 func deduplicateVersions(versions []OSImage) []OSImage {
 	m := make(map[string]OSImage, len(versions))
 
@@ -411,6 +428,9 @@ func deduplicateVersions(versions []OSImage) []OSImage {
 			imageType = ImageTypeFull
 		}
 		key := entry.Version + "@" + entry.CPUArchitecture + "@" + imageType
+		if imageType == ImageTypeDisconnectedIso {
+			key += "@" + entry.OpenshiftVersion
+		}
 		existing, ok := m[key]
 		if !ok {
 			m[key] = entry
@@ -541,38 +561,84 @@ func (s *rhcosStore) extractAndCacheNmstatectl(imageInfo OSImage) error {
 	return nil
 }
 
-func (s *rhcosStore) findVersionEntry(versionKey, arch string) *OSImage {
-	for i := range s.versions {
-		entry := &s.versions[i]
-		if entry.CPUArchitecture != arch {
-			continue
-		}
-		if entry.Version == versionKey {
-			return entry
-		}
+func entryImageType(entry *OSImage) string {
+	if entry.Type == "" {
+		return ImageTypeFull
 	}
-	for i := range s.versions {
-		entry := &s.versions[i]
-		if entry.CPUArchitecture != arch {
-			continue
-		}
-		if entry.OpenshiftVersion == versionKey {
-			return entry
-		}
+	return entry.Type
+}
+
+// findVersionEntry looks up an OS image by openshift_version, then RHCOS version, for the given arch.
+// Minimal requests are satisfied from full OS image catalog entries.
+// When imageType is full-iso or disconnected-iso, only entries of that type are considered.
+// Disconnected ISOs are looked up only by openshift_version.
+func (s *rhcosStore) findVersionEntry(versionKey, arch, imageType string) *OSImage {
+	switch imageType {
+	case ImageTypeMinimal:
+		// Minimal ISOs are generated from full OS image catalog entries; there is no
+		// separate minimal-iso type in OS_IMAGES.
+		imageType = ImageTypeFull
+	case ImageTypeFull, ImageTypeDisconnectedIso, "":
+		// Keep as-is.
+	default:
+		// Unknown values are only used for filename substitution by some callers;
+		// look up among online/full images.
+		imageType = ""
 	}
-	return nil
+
+	matches := func(matchVersion func(*OSImage) bool) *OSImage {
+		for i := range s.versions {
+			entry := &s.versions[i]
+			if entry.CPUArchitecture != arch {
+				continue
+			}
+			entryType := entryImageType(entry)
+			// Callers that omit imageType (e.g. nmstatectl) only use online/full images.
+			if (imageType != "" && entryType != imageType) ||
+				(imageType == "" && entryType == ImageTypeDisconnectedIso) {
+				continue
+			}
+			if matchVersion(entry) {
+				return entry
+			}
+		}
+		return nil
+	}
+
+	if entry := matches(func(entry *OSImage) bool {
+		return entry.OpenshiftVersion == versionKey
+	}); entry != nil {
+		return entry
+	}
+
+	// Disconnected ISOs must be requested by openshift_version.
+	if imageType == ImageTypeDisconnectedIso {
+		return nil
+	}
+
+	return matches(func(entry *OSImage) bool {
+		return entry.Version == versionKey
+	})
 }
 
 func (s *rhcosStore) PathForParams(imageType, versionKey, arch string) string {
 	rhcosVersion := versionKey
-	entry := s.findVersionEntry(versionKey, arch)
+	openshiftVersion := versionKey
+	entry := s.findVersionEntry(versionKey, arch, imageType)
 	if entry != nil {
 		rhcosVersion = entry.Version
+		openshiftVersion = entry.OpenshiftVersion
 	}
-	return filepath.Join(s.dataDir, isoFileName(imageType, rhcosVersion, arch))
+	return filepath.Join(s.dataDir, isoFileName(imageType, rhcosVersion, arch, openshiftVersion))
 }
 
-func isoFileName(imageType, version, arch string) string {
+// isoFileName returns the on-disk ISO name.
+// Full and minimal ISOs are keyed by RHCOS version only (shared across OCP versions).
+// Disconnected ISOs also include openshift_version so multiple z-stream OVE images can coexist.
+func isoFileName(imageType, version, arch, openshiftVersion string) string {
+	if imageType == ImageTypeDisconnectedIso {
+		return fmt.Sprintf("rhcos-%s-%s-%s-%s.iso", imageType, openshiftVersion, version, arch)
+	}
 	return fmt.Sprintf("rhcos-%s-%s-%s.iso", imageType, version, arch)
 }
 
@@ -603,7 +669,7 @@ func (s *rhcosStore) cleanDataDir() error {
 		}
 		if imageType == ImageTypeFull || imageType == ImageTypeDisconnectedIso {
 			// Only add full and disconnected isos here as we want to regenerate the minimal image on each deploy
-			expectedFiles = append(expectedFiles, isoFileName(imageType, version.Version, version.CPUArchitecture))
+			expectedFiles = append(expectedFiles, isoFileName(imageType, version.Version, version.CPUArchitecture, version.OpenshiftVersion))
 		}
 		// Keep nmstatectl cached files for all architectures (including s390x)
 		expectedFiles = append(expectedFiles, nmstatectlFileName(version.Version, version.CPUArchitecture))
@@ -627,13 +693,13 @@ func (s *rhcosStore) cleanDataDir() error {
 	return nil
 }
 
-func (s *rhcosStore) HaveVersion(version, arch string) bool {
-	return s.findVersionEntry(version, arch) != nil
+func (s *rhcosStore) HaveVersion(version, arch, imageType string) bool {
+	return s.findVersionEntry(version, arch, imageType) != nil
 }
 
 func (s *rhcosStore) NmstatectlPathForParams(versionKey, arch string) (string, bool, error) {
 	rhcosVersion := versionKey
-	entry := s.findVersionEntry(versionKey, arch)
+	entry := s.findVersionEntry(versionKey, arch, "")
 	if entry != nil {
 		rhcosVersion = entry.Version
 	}

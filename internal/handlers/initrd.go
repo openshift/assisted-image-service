@@ -62,7 +62,7 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 	}
 
 	// check if image is available for given version and architecture
-	if !imageStore.HaveVersion(version, arch) {
+	if !imageStore.HaveVersion(version, arch, imagestore.ImageTypeFull) {
 		return nil, "", http.StatusBadRequest, fmt.Errorf("version for %s %s, not found ", version, arch)
 	}
 
