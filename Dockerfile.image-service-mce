@@ -6,8 +6,10 @@ RUN \
   dnf install -y \
   \
   gcc \
+  gzip \
   libtool \
   make \
+  tar \
   \
   libselinux-devel \
   libuuid-devel \
