@@ -72,7 +72,7 @@ var _ = Describe("ServeHTTP", func() {
 		})
 
 		mockImage := func(version, imageType, arch string) {
-			mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
+			mockImageStore.EXPECT().HaveVersion(version, arch, imageType).Return(true).AnyTimes()
 
 			var imageFile string
 			switch imageType {
@@ -211,7 +211,7 @@ var _ = Describe("ServeHTTP", func() {
 
 				It("returns a disconnected image with agent-ove filename", func() {
 					initIgnitionHandler("discovery_iso_type=disconnected-iso&file_name=discovery.ign")
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch, imagestore.ImageTypeDisconnectedIso).Return(true)
 					mockImageStore.EXPECT().PathForParams(imagestore.ImageTypeDisconnectedIso, "4.8", defaultArch).Return(fullImageFilename)
 					path := fmt.Sprintf("/byid/%s/4.8/x86_64/disconnected.iso", imageID)
 					setInfraenvKargsHandlerSuccess()
@@ -255,7 +255,7 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails for a non-existant version", func() {
-					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch, imagestore.ImageTypeFull).Return(false)
 					path := fmt.Sprintf("/byid/%s/4.7/x86_64/full.iso", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -263,7 +263,7 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails when no type is supplied", func() {
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch, "").Return(true)
 					path := fmt.Sprintf("/byid/%s/4.8/x86_64/", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -684,7 +684,7 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails for a non-existant version", func() {
-					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch).Return(false)
+					mockImageStore.EXPECT().HaveVersion("4.7", defaultArch, imagestore.ImageTypeFull).Return(false)
 					path := fmt.Sprintf("/images/%s?version=4.7&type=full-iso", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
@@ -699,7 +699,7 @@ var _ = Describe("ServeHTTP", func() {
 				})
 
 				It("fails when no type is supplied", func() {
-					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch).Return(true)
+					mockImageStore.EXPECT().HaveVersion("4.8", defaultArch, "").Return(true)
 					path := fmt.Sprintf("/images/%s?version=4.8", imageID)
 					resp, err := client.Get(server.URL + path)
 					Expect(err).NotTo(HaveOccurred())
