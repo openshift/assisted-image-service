@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/renameio"
 	"github.com/openshift/assisted-image-service/internal/common"
@@ -79,6 +80,8 @@ type ImageStore interface {
 	PathForParams(imageType, version, arch string) string
 	HaveVersion(version, arch string) bool
 	NmstatectlPathForParams(openshiftVersion, arch string) (string, error)
+	ModTimeForParams(imageType, openshiftVersion, arch string) (time.Time, error)
+	OpenNmstatectlForParams(openshiftVersion, arch string) (io.ReadSeekCloser, error)
 }
 
 type rhcosStore struct {
@@ -161,6 +164,11 @@ func validateVersions(versions []map[string]string) error {
 		}
 		if _, ok := entry["version"]; !ok {
 			return fmt.Errorf(missingKeyFmt, entry, "version")
+		}
+		for _, key := range []string{"openshift_version", "cpu_architecture", "version"} {
+			if !filepath.IsLocal(entry[key]) {
+				return fmt.Errorf("invalid version entry %+v: %s must be a local path component", entry, key)
+			}
 		}
 	}
 
@@ -470,13 +478,11 @@ func (s *rhcosStore) HaveVersion(version, arch string) bool {
 }
 
 func (s *rhcosStore) NmstatectlPathForParams(openshiftVersion, arch string) (string, error) {
-	var version string
-	for _, entry := range s.versions {
-		if entry["openshift_version"] == openshiftVersion && entry["cpu_architecture"] == arch {
-			version = entry["version"]
-		}
+	entry, ok := s.versionEntryForParams(openshiftVersion, arch)
+	if !ok {
+		return "", fmt.Errorf("version for %s %s, not found", openshiftVersion, arch)
 	}
-	nmstatectlPath := filepath.Join(s.dataDir, nmstatectlFileName(openshiftVersion, version, arch))
+	nmstatectlPath := filepath.Join(s.dataDir, nmstatectlFileName(entry["openshift_version"], entry["version"], entry["cpu_architecture"]))
 
 	// Safety check: ensures nmstatectlPath stays within the expected dataDir,
 	// preventing crafted inputs from escaping the intended directory
@@ -484,6 +490,59 @@ func (s *rhcosStore) NmstatectlPathForParams(openshiftVersion, arch string) (str
 		return "", fmt.Errorf("invalid nmstatectl path: %s", nmstatectlPath)
 	}
 	return nmstatectlPath, nil
+}
+
+func (s *rhcosStore) ModTimeForParams(imageType, openshiftVersion, arch string) (time.Time, error) {
+	if imageType != ImageTypeFull && imageType != ImageTypeMinimal {
+		return time.Time{}, fmt.Errorf("invalid image type: %s", imageType)
+	}
+	entry, ok := s.versionEntryForParams(openshiftVersion, arch)
+	if !ok {
+		return time.Time{}, fmt.Errorf("version for %s %s, not found", openshiftVersion, arch)
+	}
+
+	root, err := os.OpenRoot(s.dataDir)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer root.Close()
+
+	fileName := isoFileName(imageType, entry["openshift_version"], entry["version"], entry["cpu_architecture"])
+	fileInfo, err := root.Stat(fileName)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return fileInfo.ModTime(), nil
+}
+
+func (s *rhcosStore) OpenNmstatectlForParams(openshiftVersion, arch string) (io.ReadSeekCloser, error) {
+	entry, ok := s.versionEntryForParams(openshiftVersion, arch)
+	if !ok {
+		return nil, fmt.Errorf("version for %s %s, not found", openshiftVersion, arch)
+	}
+
+	root, err := os.OpenRoot(s.dataDir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	fileName := nmstatectlFileName(entry["openshift_version"], entry["version"], entry["cpu_architecture"])
+	file, err := root.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func (s *rhcosStore) versionEntryForParams(openshiftVersion, arch string) (map[string]string, bool) {
+	var matched map[string]string
+	for _, entry := range s.versions {
+		if entry["openshift_version"] == openshiftVersion && entry["cpu_architecture"] == arch {
+			matched = entry
+		}
+	}
+	return matched, matched != nil
 }
 
 func nmstatectlFileName(openshiftVersion, version, arch string) string {

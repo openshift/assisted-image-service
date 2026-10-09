@@ -203,7 +203,9 @@ var _ = Describe("ServeHTTP", func() {
 				ghttp.RespondWith(http.StatusOK, minimalInitrdContent),
 			),
 		)
-		mockImageStore.EXPECT().NmstatectlPathForParams("4.18", "x86_64").Return(nmstatectlPathForCaching, nil).AnyTimes()
+		nmstateFile, err := os.Open(nmstatectlPathForCaching)
+		Expect(err).NotTo(HaveOccurred())
+		mockImageStore.EXPECT().OpenNmstatectlForParams("4.18", "x86_64").Return(nmstateFile, nil).AnyTimes()
 		resp, err := client.Get(fmt.Sprintf("%s/images/%s/pxe-initrd?version=4.18&arch=x86_64", server.URL, imageID))
 		Expect(err).NotTo(HaveOccurred())
 		expectSuccessfulResponse(resp, append(append(append(initrdContent, ignitionArchiveBytes...), minimalInitrdContent...), nmstatectlContent...))

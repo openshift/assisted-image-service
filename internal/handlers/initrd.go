@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/openshift/assisted-image-service/internal/common"
@@ -98,16 +97,13 @@ func initrdOverlayReader(imageStore imagestore.ImageStore, client *AssistedServi
 		}
 
 		if versionOK {
-			nmstatectlPath, err := imageStore.NmstatectlPathForParams(version, arch)
-			if err != nil {
-				return nil, "", http.StatusInternalServerError, err
-			}
-			nmstateImgContent, err := os.Open(nmstatectlPath)
+			nmstateImgContent, err := imageStore.OpenNmstatectlForParams(version, arch)
 			if err != nil {
 				return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to read nmstate img: %v", err)
 			}
 			initrdReader, err = overlay.NewAppendReader(initrdReader, nmstateImgContent)
 			if err != nil {
+				nmstateImgContent.Close()
 				return nil, "", http.StatusInternalServerError, fmt.Errorf("failed to create append reader for initrd: %v", err)
 			}
 		}
