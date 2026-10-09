@@ -94,6 +94,22 @@ var _ = Context("with test files", func() {
 	})
 
 	Describe("Fix Config", func() {
+		It("does not edit a grub config symlink outside the extraction root", func() {
+			outsideFile := filepath.Join(workDir, "outside.cfg")
+			Expect(os.WriteFile(outsideFile, []byte("original"), 0600)).To(Succeed())
+
+			grubPath := filepath.Join(filesDir, "EFI/redhat/grub.cfg")
+			Expect(os.Remove(grubPath)).To(Succeed())
+			Expect(os.Symlink(outsideFile, grubPath)).To(Succeed())
+
+			err := fixGrubConfig(testRootFSURL, filesDir, false, nil)
+			Expect(err).To(HaveOccurred())
+
+			content, err := os.ReadFile(outsideFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(Equal("original"))
+		})
+
 		Context("with including nmstate disk image", func() {
 			It("fixGrubConfig alters the kernel parameters correctly", func() {
 				// Pass nil for kargs since we're just testing file changes

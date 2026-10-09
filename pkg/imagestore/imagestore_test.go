@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/fs"
 	"math/big"
 	"net"
@@ -753,6 +754,95 @@ var _ = Describe("NewImageStore", func() {
 			},
 		}
 		_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).To(HaveOccurred())
+	})
+
+	DescribeTable("should reject path traversal in version fields",
+		func(key string) {
+			versions := []map[string]string{
+				{
+					"openshift_version": "4.8",
+					"cpu_architecture":  "x86_64",
+					"url":               "http://example.com/image/x86_64-48.iso",
+					"version":           "48.84.202109241901-0",
+				},
+			}
+			versions[0][key] = "../../outside"
+			_, err := NewImageStore(nil, "", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+			Expect(err).To(HaveOccurred())
+		},
+		Entry("OpenShift version", "openshift_version"),
+		Entry("architecture", "cpu_architecture"),
+		Entry("image version", "version"),
+	)
+})
+
+var _ = Describe("confined file access", func() {
+	var (
+		dataDir string
+		store   ImageStore
+	)
+
+	BeforeEach(func() {
+		var err error
+		dataDir, err = os.MkdirTemp("", "confinedImageStoreTest")
+		Expect(err).NotTo(HaveOccurred())
+
+		versions := []map[string]string{
+			{
+				"openshift_version": "4.18",
+				"cpu_architecture":  "x86_64",
+				"url":               "http://example.com/image/x86_64-418.iso",
+				"version":           "418.84.202109241901-0",
+			},
+		}
+		store, err = NewImageStore(nil, dataDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(os.RemoveAll(dataDir)).To(Succeed())
+	})
+
+	It("reads nmstate content and ISO modification time from the data directory", func() {
+		nmstatePath := filepath.Join(dataDir, nmstatectlFileName("4.18", "418.84.202109241901-0", "x86_64"))
+		Expect(os.WriteFile(nmstatePath, []byte("nmstate"), 0600)).To(Succeed())
+		isoPath := filepath.Join(dataDir, isoFileName(ImageTypeFull, "4.18", "418.84.202109241901-0", "x86_64"))
+		Expect(os.WriteFile(isoPath, []byte("iso"), 0600)).To(Succeed())
+
+		file, err := store.OpenNmstatectlForParams("4.18", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		defer file.Close()
+		content, err := io.ReadAll(file)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).To(Equal([]byte("nmstate")))
+
+		modTime, err := store.ModTimeForParams(ImageTypeFull, "4.18", "x86_64")
+		Expect(err).NotTo(HaveOccurred())
+		info, err := os.Stat(isoPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(modTime).To(Equal(info.ModTime()))
+	})
+
+	It("rejects unknown versions instead of resolving arbitrary paths", func() {
+		_, err := store.OpenNmstatectlForParams("../../outside", "x86_64")
+		Expect(err).To(HaveOccurred())
+
+		_, err = store.ModTimeForParams(ImageTypeFull, "../../outside", "x86_64")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("does not follow cache symlinks outside the data directory", func() {
+		outsideDir, err := os.MkdirTemp("", "outsideImageStoreTest")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(outsideDir)
+
+		outsideFile := filepath.Join(outsideDir, "nmstate")
+		Expect(os.WriteFile(outsideFile, []byte("outside"), 0600)).To(Succeed())
+		cachePath := filepath.Join(dataDir, nmstatectlFileName("4.18", "418.84.202109241901-0", "x86_64"))
+		Expect(os.Symlink(outsideFile, cachePath)).To(Succeed())
+
+		_, err = store.OpenNmstatectlForParams("4.18", "x86_64")
 		Expect(err).To(HaveOccurred())
 	})
 })

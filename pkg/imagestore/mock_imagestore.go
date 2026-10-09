@@ -11,7 +11,9 @@ package imagestore
 
 import (
 	context "context"
+	io "io"
 	reflect "reflect"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -54,6 +56,21 @@ func (mr *MockImageStoreMockRecorder) HaveVersion(version, arch any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), version, arch)
 }
 
+// ModTimeForParams mocks base method.
+func (m *MockImageStore) ModTimeForParams(imageType, openshiftVersion, arch string) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ModTimeForParams", imageType, openshiftVersion, arch)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ModTimeForParams indicates an expected call of ModTimeForParams.
+func (mr *MockImageStoreMockRecorder) ModTimeForParams(imageType, openshiftVersion, arch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModTimeForParams", reflect.TypeOf((*MockImageStore)(nil).ModTimeForParams), imageType, openshiftVersion, arch)
+}
+
 // NmstatectlPathForParams mocks base method.
 func (m *MockImageStore) NmstatectlPathForParams(openshiftVersion, arch string) (string, error) {
 	m.ctrl.T.Helper()
@@ -67,6 +84,21 @@ func (m *MockImageStore) NmstatectlPathForParams(openshiftVersion, arch string) 
 func (mr *MockImageStoreMockRecorder) NmstatectlPathForParams(openshiftVersion, arch any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NmstatectlPathForParams", reflect.TypeOf((*MockImageStore)(nil).NmstatectlPathForParams), openshiftVersion, arch)
+}
+
+// OpenNmstatectlForParams mocks base method.
+func (m *MockImageStore) OpenNmstatectlForParams(openshiftVersion, arch string) (io.ReadSeekCloser, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenNmstatectlForParams", openshiftVersion, arch)
+	ret0, _ := ret[0].(io.ReadSeekCloser)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenNmstatectlForParams indicates an expected call of OpenNmstatectlForParams.
+func (mr *MockImageStoreMockRecorder) OpenNmstatectlForParams(openshiftVersion, arch any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenNmstatectlForParams", reflect.TypeOf((*MockImageStore)(nil).OpenNmstatectlForParams), openshiftVersion, arch)
 }
 
 // PathForParams mocks base method.

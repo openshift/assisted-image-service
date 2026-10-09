@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 
@@ -88,14 +87,14 @@ func (b *BootArtifactsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	defer fileReader.Close()
 
-	fileInfo, err := os.Stat(isoFileName)
+	modTime, err := b.ImageStore.ModTimeForParams(imagestore.ImageTypeFull, version, arch)
 	if err != nil {
 		httpErrorf(w, http.StatusInternalServerError, "Error reading file info for %s", isoFileName)
 		return
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", artifact))
-	http.ServeContent(w, r, artifact, fileInfo.ModTime(), fileReader)
+	http.ServeContent(w, r, artifact, modTime, fileReader)
 }
 
 func (b *BootArtifactsHandler) parseQueryParams(values url.Values) (string, string, error) {
