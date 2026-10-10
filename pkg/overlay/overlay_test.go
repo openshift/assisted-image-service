@@ -155,4 +155,23 @@ var _ = Describe("AppendReader", func() {
 		_, err = reader.Read(buf)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	It("closes the appended reader", func() {
+		appended := &closeTrackingReader{Reader: strings.NewReader("overlay")}
+		reader, err := NewAppendReader(strings.NewReader("base"), appended)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(reader.Close()).To(Succeed())
+		Expect(appended.closed).To(BeTrue())
+	})
 })
+
+type closeTrackingReader struct {
+	*strings.Reader
+	closed bool
+}
+
+func (r *closeTrackingReader) Close() error {
+	r.closed = true
+	return nil
+}

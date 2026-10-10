@@ -149,12 +149,17 @@ func embedInitrdPlaceholders(extractDir string) error {
 }
 
 func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+	root, err := os.OpenRoot(extractDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	for _, pathSection := range availableGrubPaths {
-		path := filepath.Join(extractDir, pathSection)
-		if _, err := os.Stat(path); err == nil {
-			foundGrubPath = path
+		if _, err := root.Stat(pathSection); err == nil {
+			foundGrubPath = pathSection
 			break
 		}
 	}
@@ -164,22 +169,22 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 
 	// Add the rootfs url
 	replacement := fmt.Sprintf("$1 $2 'coreos.live.rootfs_url=%s'", rootFSURL)
-	if err := editFile(foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
+	if err := editFile(root, foundGrubPath, `(?m)^(\s+linux) (.+| )+$`, replacement); err != nil {
 		return err
 	}
 
 	// Remove the coreos.liveiso parameter
-	if err := editFile(foundGrubPath, ` coreos.liveiso=\S+`, ""); err != nil {
+	if err := editFile(root, foundGrubPath, ` coreos.liveiso=\S+`, ""); err != nil {
 		return err
 	}
 
 	// Edit config to add custom ramdisk image to initrd
 	if includeNmstateRamDisk {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
+		if err := editFile(root, foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s %s", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
 			return err
 		}
 	} else {
-		if err := editFile(foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
+		if err := editFile(root, foundGrubPath, `(?m)^(\s+initrd) (.+| )+$`, fmt.Sprintf("$1 $2 %s", ramDiskImagePath)); err != nil {
 			return err
 		}
 	}
@@ -188,21 +193,27 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) err
 }
 
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool) error {
+	root, err := os.OpenRoot(extractDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
 	replacement := fmt.Sprintf("$1 $2 coreos.live.rootfs_url=%s", rootFSURL)
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
+	if err := editFile(root, "isolinux/isolinux.cfg", `(?m)^(\s+append) (.+| )+$`, replacement); err != nil {
 		return err
 	}
 
-	if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), ` coreos.liveiso=\S+`, ""); err != nil {
+	if err := editFile(root, "isolinux/isolinux.cfg", ` coreos.liveiso=\S+`, ""); err != nil {
 		return err
 	}
 
 	if includeNmstateRamDisk {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
+		if err := editFile(root, "isolinux/isolinux.cfg", `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s,%s ${2}", ramDiskImagePath, nmstateDiskImagePath)); err != nil {
 			return err
 		}
 	} else {
-		if err := editFile(filepath.Join(extractDir, "isolinux/isolinux.cfg"), `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
+		if err := editFile(root, "isolinux/isolinux.cfg", `(?m)^(\s+append.*initrd=\S+) (.*)$`, fmt.Sprintf("${1},%s ${2}", ramDiskImagePath)); err != nil {
 			return err
 		}
 	}
@@ -210,8 +221,8 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool)
 	return nil
 }
 
-func editFile(fileName string, reString string, replacement string) error {
-	content, err := os.ReadFile(fileName)
+func editFile(root *os.Root, fileName string, reString string, replacement string) error {
+	content, err := root.ReadFile(fileName)
 	if err != nil {
 		return err
 	}
@@ -219,7 +230,7 @@ func editFile(fileName string, reString string, replacement string) error {
 	re := regexp.MustCompile(reString)
 	newContent := re.ReplaceAllString(string(content), replacement)
 
-	if err := os.WriteFile(fileName, []byte(newContent), 0600); err != nil {
+	if err := root.WriteFile(fileName, []byte(newContent), 0600); err != nil {
 		return err
 	}
 

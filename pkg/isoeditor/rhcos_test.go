@@ -93,6 +93,22 @@ var _ = Context("with test files", func() {
 	})
 
 	Describe("Fix Config", func() {
+		It("does not write outside the extraction root", func() {
+			outsideFile := filepath.Join(workDir, "outside.cfg")
+			Expect(os.WriteFile(outsideFile, []byte("original"), 0600)).To(Succeed())
+
+			root, err := os.OpenRoot(filesDir)
+			Expect(err).NotTo(HaveOccurred())
+			defer root.Close()
+
+			err = editFile(root, "../outside.cfg", "original", "modified")
+			Expect(err).To(HaveOccurred())
+
+			content, err := os.ReadFile(outsideFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(content)).To(Equal("original"))
+		})
+
 		Context("with including nmstate disk image", func() {
 			It("fixGrubConfig alters the kernel parameters correctly", func() {
 				err := fixGrubConfig(testRootFSURL, filesDir, true)

@@ -6,7 +6,9 @@ package imagestore
 
 import (
 	context "context"
+	io "io"
 	reflect "reflect"
+	time "time"
 
 	gomock "github.com/golang/mock/gomock"
 )
@@ -48,6 +50,21 @@ func (mr *MockImageStoreMockRecorder) HaveVersion(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HaveVersion", reflect.TypeOf((*MockImageStore)(nil).HaveVersion), arg0, arg1)
 }
 
+// ModTimeForParams mocks base method.
+func (m *MockImageStore) ModTimeForParams(arg0, arg1, arg2 string) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ModTimeForParams", arg0, arg1, arg2)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ModTimeForParams indicates an expected call of ModTimeForParams.
+func (mr *MockImageStoreMockRecorder) ModTimeForParams(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModTimeForParams", reflect.TypeOf((*MockImageStore)(nil).ModTimeForParams), arg0, arg1, arg2)
+}
+
 // NmstatectlPathForParams mocks base method.
 func (m *MockImageStore) NmstatectlPathForParams(arg0, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
@@ -61,6 +78,21 @@ func (m *MockImageStore) NmstatectlPathForParams(arg0, arg1 string) (string, err
 func (mr *MockImageStoreMockRecorder) NmstatectlPathForParams(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NmstatectlPathForParams", reflect.TypeOf((*MockImageStore)(nil).NmstatectlPathForParams), arg0, arg1)
+}
+
+// OpenNmstatectlForParams mocks base method.
+func (m *MockImageStore) OpenNmstatectlForParams(arg0, arg1 string) (io.ReadSeekCloser, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OpenNmstatectlForParams", arg0, arg1)
+	ret0, _ := ret[0].(io.ReadSeekCloser)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OpenNmstatectlForParams indicates an expected call of OpenNmstatectlForParams.
+func (mr *MockImageStoreMockRecorder) OpenNmstatectlForParams(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenNmstatectlForParams", reflect.TypeOf((*MockImageStore)(nil).OpenNmstatectlForParams), arg0, arg1)
 }
 
 // PathForParams mocks base method.

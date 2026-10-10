@@ -150,8 +150,12 @@ func (or *overlayReader) Read(p []byte) (int, error) {
 }
 
 func (or *overlayReader) Close() error {
+	var closeErr error
 	if closer, hasClose := or.Base.(io.Closer); hasClose {
-		return closer.Close()
+		closeErr = errors.Join(closeErr, closer.Close())
 	}
-	return nil
+	if closer, hasClose := or.Overlay.Reader.(io.Closer); hasClose {
+		closeErr = errors.Join(closeErr, closer.Close())
+	}
+	return closeErr
 }
