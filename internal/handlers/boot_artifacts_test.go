@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -51,6 +52,7 @@ var _ = Describe("ServeHTTP", func() {
 			mockImageStore.EXPECT().HaveVersion(version, arch).Return(true).AnyTimes()
 			imageFile := fullImageFilename
 			mockImageStore.EXPECT().PathForParams(imageType, version, arch).Return(imageFile).AnyTimes()
+			mockImageStore.EXPECT().ModTimeForParams(imageType, version, arch).Return(time.Time{}, nil).AnyTimes()
 		}
 
 		expectSuccessfulResponse := func(resp *http.Response, content []byte, artifact string) {

@@ -174,13 +174,18 @@ func embedInitrdPlaceholders(extractDir string) error {
 
 // fixGrubConfig modifies grub.cfg and updates kargs config in place
 func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
+	root, err := os.OpenRoot(extractDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
 	availableGrubPaths := []string{"EFI/redhat/grub.cfg", "EFI/fedora/grub.cfg", "boot/grub/grub.cfg", "EFI/centos/grub.cfg"}
 	var foundGrubPath string
 	var fileEntry *kargsFileEntry
 	for _, pathSection := range availableGrubPaths {
-		path := filepath.Join(extractDir, pathSection)
-		if _, err := os.Stat(path); err == nil {
-			foundGrubPath = path
+		if _, statErr := root.Stat(pathSection); statErr == nil {
+			foundGrubPath = pathSection
 			fileEntry = kargs.FindFileByPath(pathSection)
 			break
 		}
@@ -190,7 +195,7 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kar
 	}
 
 	// Read the file content
-	content, err := os.ReadFile(foundGrubPath)
+	content, err := root.ReadFile(foundGrubPath)
 	if err != nil {
 		return err
 	}
@@ -220,16 +225,21 @@ func fixGrubConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kar
 	}
 
 	// Write the modified content back to the file
-	return os.WriteFile(foundGrubPath, []byte(contentStr), 0600)
+	return root.WriteFile(foundGrubPath, []byte(contentStr), 0600)
 }
 
 // fixIsolinuxConfig modifies isolinux.cfg and updates kargs config in place
 func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool, kargs *kargsConfig) error {
+	root, err := os.OpenRoot(extractDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
 	relativeIsolinuxPath := strings.TrimPrefix(defaultIsolinuxFilePath, "/")
-	isolinuxPath := filepath.Join(extractDir, relativeIsolinuxPath)
 
 	// Read the file content
-	content, err := os.ReadFile(isolinuxPath)
+	content, err := root.ReadFile(relativeIsolinuxPath)
 	if err != nil {
 		return err
 	}
@@ -261,7 +271,7 @@ func fixIsolinuxConfig(rootFSURL, extractDir string, includeNmstateRamDisk bool,
 	}
 
 	// Write the modified content back to the file
-	return os.WriteFile(isolinuxPath, []byte(contentStr), 0600)
+	return root.WriteFile(relativeIsolinuxPath, []byte(contentStr), 0600)
 }
 
 // editString applies a regex replacement to a string and returns the modified string
