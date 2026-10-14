@@ -749,7 +749,7 @@ var _ = Describe("PathForParams", func() {
 		}
 		_, err := NewImageStore(nil, "/tmp/some/dir", imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nil)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("duplicate openshift_version 4.22"))
+		Expect(err.Error()).To(ContainSubstring("duplicate disconnected ISOs for openshift_version 4.22"))
 	})
 
 	It("selects each disconnected image by its openshift z-stream even when RHCOS versions match", func() {
