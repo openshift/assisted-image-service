@@ -164,7 +164,7 @@ func validateVersions(versions []OSImage) error {
 	if len(versions) == 0 {
 		return fmt.Errorf("invalid versions: must not be empty")
 	}
-	seen := make(map[string]string, len(versions))
+	disonnectedIsoKeys := make(map[string]string)
 	for _, entry := range versions {
 		missingKeyFmt := "invalid version entry %+v: missing %s key"
 		if entry.OpenshiftVersion == "" {
@@ -180,18 +180,16 @@ func validateVersions(versions []OSImage) error {
 			return fmt.Errorf(missingKeyFmt, entry, "version")
 		}
 
-		imageType := entry.Type
-		if imageType == "" {
-			imageType = ImageTypeFull
+		if entry.Type == ImageTypeDisconnectedIso {
+			key := entry.OpenshiftVersion + "@" + entry.CPUArchitecture
+			if existingURL, ok := disonnectedIsoKeys[key]; ok {
+				return fmt.Errorf(
+					"invalid versions: duplicate disconnected ISOs for openshift_version %s and arch %s (urls %s and %s)",
+					entry.OpenshiftVersion, entry.CPUArchitecture, existingURL, entry.URL,
+				)
+			}
+			disonnectedIsoKeys[key] = entry.URL
 		}
-		key := entry.OpenshiftVersion + "@" + entry.CPUArchitecture + "@" + imageType
-		if existingURL, ok := seen[key]; ok {
-			return fmt.Errorf(
-				"invalid versions: duplicate openshift_version %s for arch %s and type %s (urls %s and %s)",
-				entry.OpenshiftVersion, entry.CPUArchitecture, imageType, existingURL, entry.URL,
-			)
-		}
-		seen[key] = entry.URL
 	}
 
 	return nil
