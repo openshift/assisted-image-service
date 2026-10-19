@@ -25,13 +25,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.2.noarch.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14714
+    checksum: sha256:9fa83444f3dcc5a0e59220b864b39aa2eaccf084cf3190e03ba15cf03da3102a
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.2
+    sourcerpm: emacs-27.2-18.el9_8.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/g/gcc-11.5.0-14.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 31291354
@@ -46,13 +46,13 @@ arches:
     name: glibc-devel
     evr: 2.34-275.el9_8
     sourcerpm: glibc-2.34-275.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-687.54.1.el9_8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 2927565
-    checksum: sha256:c950319c04fc9048501cd59da158858b9e4b2d173b98b3d8f56a97b56be89ca9
+    size: 2942913
+    checksum: sha256:ce1098a3559ec136e839c36a3e196251226d818ddb91b529534b8d86c01c3e67
     name: kernel-headers
-    evr: 5.14.0-687.54.1.el9_8
-    sourcerpm: kernel-5.14.0-687.54.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/libasan-11.5.0-14.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 409047
@@ -918,13 +918,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.2.noarch.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14714
+    checksum: sha256:9fa83444f3dcc5a0e59220b864b39aa2eaccf084cf3190e03ba15cf03da3102a
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.2
+    sourcerpm: emacs-27.2-18.el9_8.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/g/gcc-11.5.0-14.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 29072214
@@ -939,13 +939,13 @@ arches:
     name: glibc-devel
     evr: 2.34-275.el9_8
     sourcerpm: glibc-2.34-275.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-687.54.1.el9_8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 2951357
-    checksum: sha256:69203b9637bca61d1aafb9f54d9b8240b7a8f0df14a6d9c2df022ca25707b46f
+    size: 2966713
+    checksum: sha256:b9cb29dce8ef74a1536b0f2f5605a29a4977226a91ba466c478625df22cddbba
     name: kernel-headers
-    evr: 5.14.0-687.54.1.el9_8
-    sourcerpm: kernel-5.14.0-687.54.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/libasan-11.5.0-14.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 440756
@@ -1818,13 +1818,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.2.noarch.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14714
+    checksum: sha256:9fa83444f3dcc5a0e59220b864b39aa2eaccf084cf3190e03ba15cf03da3102a
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.2
+    sourcerpm: emacs-27.2-18.el9_8.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/gcc-11.5.0-14.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 26825105
@@ -1846,13 +1846,13 @@ arches:
     name: glibc-headers
     evr: 2.34-275.el9_8
     sourcerpm: glibc-2.34-275.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-687.54.1.el9_8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 2957557
-    checksum: sha256:24326fc5b7ef83ff374467b4ee2b832c5318d5b1e4c20541f4c81d66879c8427
+    size: 2972901
+    checksum: sha256:55b9f4edce9b140ca4a491b519dcb583de57ad296f06bbbe424667c5ce52178f
     name: kernel-headers
-    evr: 5.14.0-687.54.1.el9_8
-    sourcerpm: kernel-5.14.0-687.54.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/libasan-11.5.0-14.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 412888
@@ -2718,13 +2718,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.2.noarch.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14714
+    checksum: sha256:9fa83444f3dcc5a0e59220b864b39aa2eaccf084cf3190e03ba15cf03da3102a
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.2
+    sourcerpm: emacs-27.2-18.el9_8.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/gcc-11.5.0-14.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 33982584
@@ -2746,13 +2746,13 @@ arches:
     name: glibc-headers
     evr: 2.34-275.el9_8
     sourcerpm: glibc-2.34-275.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-687.54.1.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 2966865
-    checksum: sha256:33789c61f2d74ef1d0fd5b6a43e802d28e1b38a605f200b156050d0a7934f232
+    size: 2982193
+    checksum: sha256:2c29113a9f860f0e2a14c89ec3a399b3e3d0f9ff699d7f5b565ca5e73b0314a9
     name: kernel-headers
-    evr: 5.14.0-687.54.1.el9_8
-    sourcerpm: kernel-5.14.0-687.54.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libmpc-1.2.1-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 66075
