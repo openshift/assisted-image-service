@@ -31,6 +31,8 @@ import (
 )
 
 var (
+	t = true
+
 	versions = []imagestore.OSImage{
 		{
 			OpenshiftVersion: "4.17.0-ec.1",
@@ -91,6 +93,39 @@ var (
 			CPUArchitecture:  "x86_64",
 			URL:              "https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/4.18/4.18.1/rhcos-4.18.1-x86_64-live.x86_64.iso",
 			Version:          "x86_64-418",
+		},
+		{
+			OpenshiftVersion: "5.0",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-9.8/builds/9.8.20260921-0/x86_64/rhcos-9.8.20260921-0-live-iso.x86_64.iso",
+			Version:          "9.8.20260921-0",
+			OsStream:         "rhel-9",
+			DefaultOsStream:  &t,
+		},
+		{
+			OpenshiftVersion: "5.0",
+			CPUArchitecture:  "x86_64",
+			URL:              "https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-10.2/builds/10.2.20260922-0/x86_64/rhcos-10.2.20260922-0-live-iso.x86_64.iso",
+			Version:          "10.2.20260922-0",
+			OsStream:         "rhel-10",
+		},
+		{
+			OpenshiftVersion: "5.0",
+			CPUArchitecture:  "arm64",
+			URL:              "https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-10.2/builds/10.2.20260922-0/aarch64/rhcos-10.2.20260922-0-live-iso.aarch64.iso",
+			Version:          "10.2.20260922-0",
+		},
+		{
+			OpenshiftVersion: "5.0",
+			CPUArchitecture:  "ppc64le",
+			URL:              "https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-10.2/builds/10.2.20260922-0/ppc64le/rhcos-10.2.20260922-0-live-iso.ppc64le.iso",
+			Version:          "10.2.20260922-0",
+		},
+		{
+			OpenshiftVersion: "5.0",
+			CPUArchitecture:  "s390x",
+			URL:              "https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-10.2/builds/10.2.20260922-0/s390x/rhcos-10.2.20260922-0-live-iso.s390x.iso",
+			Version:          "10.2.20260922-0",
 		},
 	}
 
@@ -232,12 +267,12 @@ var _ = Describe("Image integration tests", func() {
 					}
 
 					By("getting an iso")
-					path := fmt.Sprintf("/byid/%s/%s/%s/%s", imageID, version.OpenshiftVersion, version.CPUArchitecture, tc.fileName)
+					path := fmt.Sprintf("/byid/%s/%s/%s/%s", imageID, version.Version, version.CPUArchitecture, tc.fileName)
 					resp, err := imageClient.Get(imageServer.URL + path)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
-					isoFile, err := os.CreateTemp("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version.OpenshiftVersion, tc.name, version.CPUArchitecture))
+					isoFile, err := os.CreateTemp("", fmt.Sprintf("imageTest-%s-%s.%s.iso", version.Version, tc.name, version.CPUArchitecture))
 					Expect(err).NotTo(HaveOccurred())
 					_, err = io.Copy(isoFile, resp.Body)
 					Expect(err).NotTo(HaveOccurred())
@@ -339,7 +374,7 @@ var _ = Describe("Image integration tests", func() {
 					}
 
 					path := fmt.Sprintf("/images/%s/pxe-initrd?version=%s&arch=%s",
-						imageID, version.OpenshiftVersion, version.CPUArchitecture)
+						imageID, version.Version, version.CPUArchitecture)
 					resp2, err := imageClient.Get(imageServer.URL + path)
 					Expect(err).NotTo(HaveOccurred())
 					defer resp2.Body.Close()
@@ -348,7 +383,7 @@ var _ = Describe("Image integration tests", func() {
 					initrdBytes, err := io.ReadAll(resp2.Body)
 					Expect(err).NotTo(HaveOccurred())
 
-					nmPath, exists, err := imageStore.NmstatectlPathForParams(version.OpenshiftVersion, version.CPUArchitecture)
+					nmPath, exists, err := imageStore.NmstatectlPathForParams(version.Version, version.CPUArchitecture)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(exists).To(BeTrue())
 					nmBytes, err := os.ReadFile(nmPath)
