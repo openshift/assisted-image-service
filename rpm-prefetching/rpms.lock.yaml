@@ -25,13 +25,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.3.noarch.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14873
+    checksum: sha256:1639502a970d4c49a7f3f8e56009f49a3476644d21719472c83b50d05784178e
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.3
+    sourcerpm: emacs-27.2-18.el9_8.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/g/gcc-11.5.0-14.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 31291354
@@ -46,13 +46,13 @@ arches:
     name: glibc-devel
     evr: 2.34-231.el9_7.2
     sourcerpm: glibc-2.34-231.el9_7.2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-687.47.1.el9_8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 2891257
-    checksum: sha256:67a169443a19a51b7595fa94f461d2b26552780ffda230f246495406164cc2f7
+    size: 2942913
+    checksum: sha256:ce1098a3559ec136e839c36a3e196251226d818ddb91b529534b8d86c01c3e67
     name: kernel-headers
-    evr: 5.14.0-687.47.1.el9_8
-    sourcerpm: kernel-5.14.0-687.47.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/libasan-11.5.0-14.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 409047
@@ -487,13 +487,20 @@ arches:
     name: perl-Time-Local
     evr: 2:1.300-7.el9
     sourcerpm: perl-Time-Local-1.300-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/perl-URI-5.09-3.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/perl-URI-5.09-3.el9_8.1.noarch.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 128279
-    checksum: sha256:1635b7d818e4f70445f7207f13e058c63c5d1f5aa081cfd2583912ae45f8e1bd
+    size: 130351
+    checksum: sha256:5dc2921a96c8dac9acbb3b2c36a45cf71c6c9bc81b12b01d08488692f7ff5bad
     name: perl-URI
-    evr: 5.09-3.el9
-    sourcerpm: perl-URI-5.09-3.el9.src.rpm
+    evr: 5.09-3.el9_8.1
+    sourcerpm: perl-URI-5.09-3.el9_8.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/perl-Unicode-Normalize-1.27-461.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 92474
+    checksum: sha256:7ca97e263d79d5a0e5f2093c54bcb73399532562e5bd15b30f1762cf8b1c3359
+    name: perl-Unicode-Normalize
+    evr: 1.27-461.el9
+    sourcerpm: perl-Unicode-Normalize-1.27-461.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/perl-base-2.27-484.el9_8.noarch.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 21601
@@ -799,13 +806,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.3.noarch.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14873
+    checksum: sha256:1639502a970d4c49a7f3f8e56009f49a3476644d21719472c83b50d05784178e
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.3
+    sourcerpm: emacs-27.2-18.el9_8.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/g/gcc-11.5.0-14.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 29072214
@@ -820,13 +827,13 @@ arches:
     name: glibc-devel
     evr: 2.34-231.el9_7.2
     sourcerpm: glibc-2.34-231.el9_7.2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-687.47.1.el9_8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 2915069
-    checksum: sha256:609bf0733c3ce117cca2393f4b7c3f906743e15269ae1ffa47fe54d5af1d3949
+    size: 2966713
+    checksum: sha256:b9cb29dce8ef74a1536b0f2f5605a29a4977226a91ba466c478625df22cddbba
     name: kernel-headers
-    evr: 5.14.0-687.47.1.el9_8
-    sourcerpm: kernel-5.14.0-687.47.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/libasan-11.5.0-14.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 440756
@@ -1261,13 +1268,20 @@ arches:
     name: perl-Time-Local
     evr: 2:1.300-7.el9
     sourcerpm: perl-Time-Local-1.300-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/p/perl-URI-5.09-3.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/p/perl-URI-5.09-3.el9_8.1.noarch.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 128279
-    checksum: sha256:1635b7d818e4f70445f7207f13e058c63c5d1f5aa081cfd2583912ae45f8e1bd
+    size: 130351
+    checksum: sha256:5dc2921a96c8dac9acbb3b2c36a45cf71c6c9bc81b12b01d08488692f7ff5bad
     name: perl-URI
-    evr: 5.09-3.el9
-    sourcerpm: perl-URI-5.09-3.el9.src.rpm
+    evr: 5.09-3.el9_8.1
+    sourcerpm: perl-URI-5.09-3.el9_8.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/p/perl-Unicode-Normalize-1.27-461.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-appstream-rpms
+    size: 95527
+    checksum: sha256:ee1b4f9b92a81d0ced5a3d45fb743d812505fb296889ea805a057ff158e9c2f2
+    name: perl-Unicode-Normalize
+    evr: 1.27-461.el9
+    sourcerpm: perl-Unicode-Normalize-1.27-461.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/p/perl-base-2.27-484.el9_8.noarch.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 21601
@@ -1573,13 +1587,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.3.noarch.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14873
+    checksum: sha256:1639502a970d4c49a7f3f8e56009f49a3476644d21719472c83b50d05784178e
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.3
+    sourcerpm: emacs-27.2-18.el9_8.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/g/gcc-11.5.0-14.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 26825105
@@ -1601,13 +1615,13 @@ arches:
     name: glibc-headers
     evr: 2.34-231.el9_7.2
     sourcerpm: glibc-2.34-231.el9_7.2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-687.47.1.el9_8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 2921233
-    checksum: sha256:e014e0fb6d1911466d1c0dc335bdc7d0eee209f1e7b5f90e372d663ab14e1630
+    size: 2972901
+    checksum: sha256:55b9f4edce9b140ca4a491b519dcb583de57ad296f06bbbe424667c5ce52178f
     name: kernel-headers
-    evr: 5.14.0-687.47.1.el9_8
-    sourcerpm: kernel-5.14.0-687.47.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/libasan-11.5.0-14.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 412888
@@ -2042,13 +2056,20 @@ arches:
     name: perl-Time-Local
     evr: 2:1.300-7.el9
     sourcerpm: perl-Time-Local-1.300-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/p/perl-URI-5.09-3.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/p/perl-URI-5.09-3.el9_8.1.noarch.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 128279
-    checksum: sha256:1635b7d818e4f70445f7207f13e058c63c5d1f5aa081cfd2583912ae45f8e1bd
+    size: 130351
+    checksum: sha256:5dc2921a96c8dac9acbb3b2c36a45cf71c6c9bc81b12b01d08488692f7ff5bad
     name: perl-URI
-    evr: 5.09-3.el9
-    sourcerpm: perl-URI-5.09-3.el9.src.rpm
+    evr: 5.09-3.el9_8.1
+    sourcerpm: perl-URI-5.09-3.el9_8.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/p/perl-Unicode-Normalize-1.27-461.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-rpms
+    size: 96377
+    checksum: sha256:be1da9f35d5c829879d150b3c8c025aec5d8255c6cf6301cf81555ece69a03ed
+    name: perl-Unicode-Normalize
+    evr: 1.27-461.el9
+    sourcerpm: perl-Unicode-Normalize-1.27-461.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/p/perl-base-2.27-484.el9_8.noarch.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 21601
@@ -2354,13 +2375,13 @@ arches:
     name: cpp
     evr: 11.5.0-14.el9
     sourcerpm: gcc-11.5.0-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/e/emacs-filesystem-27.2-18.el9_8.3.noarch.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 9495
-    checksum: sha256:49d7b88a05a72c15b78191a987e6def04fda8e2e4ff75711f715d0c0ecadc60f
+    size: 14873
+    checksum: sha256:1639502a970d4c49a7f3f8e56009f49a3476644d21719472c83b50d05784178e
     name: emacs-filesystem
-    evr: 1:27.2-18.el9
-    sourcerpm: emacs-27.2-18.el9.src.rpm
+    evr: 1:27.2-18.el9_8.3
+    sourcerpm: emacs-27.2-18.el9_8.3.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/g/gcc-11.5.0-14.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 33982584
@@ -2382,13 +2403,13 @@ arches:
     name: glibc-headers
     evr: 2.34-231.el9_7.2
     sourcerpm: glibc-2.34-231.el9_7.2.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-687.47.1.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/k/kernel-headers-5.14.0-687.58.1.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 2930517
-    checksum: sha256:3792c2da1dc9bdf4502825c29017d60d3a9dfd076c90018c9708f2cd98271db3
+    size: 2982193
+    checksum: sha256:2c29113a9f860f0e2a14c89ec3a399b3e3d0f9ff699d7f5b565ca5e73b0314a9
     name: kernel-headers
-    evr: 5.14.0-687.47.1.el9_8
-    sourcerpm: kernel-5.14.0-687.47.1.el9_8.src.rpm
+    evr: 5.14.0-687.58.1.el9_8
+    sourcerpm: kernel-5.14.0-687.58.1.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libmpc-1.2.1-4.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 66075
@@ -2809,13 +2830,20 @@ arches:
     name: perl-Time-Local
     evr: 2:1.300-7.el9
     sourcerpm: perl-Time-Local-1.300-7.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/perl-URI-5.09-3.el9.noarch.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/perl-URI-5.09-3.el9_8.1.noarch.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 128279
-    checksum: sha256:1635b7d818e4f70445f7207f13e058c63c5d1f5aa081cfd2583912ae45f8e1bd
+    size: 130351
+    checksum: sha256:5dc2921a96c8dac9acbb3b2c36a45cf71c6c9bc81b12b01d08488692f7ff5bad
     name: perl-URI
-    evr: 5.09-3.el9
-    sourcerpm: perl-URI-5.09-3.el9.src.rpm
+    evr: 5.09-3.el9_8.1
+    sourcerpm: perl-URI-5.09-3.el9_8.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/perl-Unicode-Normalize-1.27-461.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 96049
+    checksum: sha256:9254f16bef6a0598320196378370728a4881557f5bfeca1ef864a0a25c93f4c0
+    name: perl-Unicode-Normalize
+    evr: 1.27-461.el9
+    sourcerpm: perl-Unicode-Normalize-1.27-461.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/perl-base-2.27-484.el9_8.noarch.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 21601
