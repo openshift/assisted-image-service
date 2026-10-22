@@ -175,204 +175,78 @@ var _ = Context("with test files", func() {
 		})
 
 		Context("erofs", func() {
-			It("builds nmstate cpio archive with nested directory structure", func() {
-				// Simplified: nmstatectl is in /usr/bin directly
-				rootDirOutput := `Path : /
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        44    1  .aleph-version.json
-        51    2  usr`
+			var extractorDir string
 
-				usrDirOutput := `Path : /usr
-       NID TYPE  FILENAME
-       110    2  .
-       100    2  ..
-       130    2  bin`
-
-				binDirOutput := `Path : /usr/bin
-       NID TYPE  FILENAME
-       130    2  .
-       110    2  ..
-       150    1  bash
-       170    1  nmstatectl`
-
-				gomock.InOrder(
-					// First call: extract rootfs with cpio
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (erofs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					// Recursive directory listing calls
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(rootDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/usr --ls root.erofs"), gomock.Any()).Return(usrDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/usr/bin --ls root.erofs"), gomock.Any()).Return(binDirOutput, nil),
-					// Extract the nmstatectl binary
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/usr/bin/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				// Create the expected directory structure
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
+			BeforeEach(func() {
+				var err error
+				extractorDir, err = os.MkdirTemp("", "erofsExtractor")
 				Expect(err).NotTo(HaveOccurred())
-
-				// Create the extracted nmstatectl binary (simulating dump.erofs output)
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				nmstatectlContent := []byte("mock-nmstatectl-binary")
-				err = os.WriteFile(nmstatectlBinary, nmstatectlContent, 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
 			})
 
-			It("parses dump.erofs output with varying whitespace", func() {
-				// Test with different amounts of whitespace in dump.erofs output
-				// nmstatectl is in root directory (no subdirs to simplify the test)
-				dumpOutput := `Path : /
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-       123    1  file-with-spaces
-        10    1  nmstatectl
-       999    7  symlink`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				err = os.WriteFile(nmstatectlBinary, []byte("mock-binary"), 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
+			AfterEach(func() {
+				Expect(os.RemoveAll(extractorDir)).To(Succeed())
 			})
 
-			It("handles dump.erofs listing failure", func() {
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return("", errors.New("dump.erofs failed")),
-				)
+			copyFixture := func(name string) {
+				source, err := os.ReadFile(filepath.Join("testdata", name))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.WriteFile(filepath.Join(extractorDir, "root.erofs"), source, 0644)).To(Succeed())
+			}
 
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
+			It("extracts nmstatectl from an uncompressed EROFS image", func() {
+				copyFixture("nmstatectl.erofs")
 
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
+				extractor := &erofsExtractor{}
+				path, err := extractor.ExtractNmstatectl(extractorDir)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(path).To(Equal("nmstatectl"))
+
+				content, err := os.ReadFile(filepath.Join(extractorDir, path))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(content).To(Equal([]byte("mock-nmstatectl-binary")))
+
+				info, err := os.Stat(filepath.Join(extractorDir, path))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(info.Mode().Perm()).To(Equal(os.FileMode(0755)))
+			})
+
+			It("extracts nmstatectl from an LZMA-compressed EROFS image", func() {
+				copyFixture("nmstatectl-lzma.erofs")
+
+				extractor := &erofsExtractor{}
+				path, err := extractor.ExtractNmstatectl(extractorDir)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(path).To(Equal("nmstatectl"))
+
+				content, err := os.ReadFile(filepath.Join(extractorDir, path))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(content).To(Equal([]byte("mock-nmstatectl-binary")))
+			})
+
+			It("returns an error when root.erofs is missing", func() {
+				extractor := &erofsExtractor{}
+				_, err := extractor.ExtractNmstatectl(extractorDir)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("dump.erofs failed"))
+				Expect(err.Error()).To(ContainSubstring("failed to open root.erofs"))
 			})
 
-			It("handles nmstatectl not found in erofs", func() {
-				// Output without nmstatectl (no subdirectories to simplify test)
-				dumpOutput := `Path : /
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        44    1  other-file
-        45    1  another-file`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("nmstatectl not found in root.erofs"))
-			})
-
-			It("handles dump.erofs extraction failure", func() {
-				dumpOutput := `Path : /bin
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-       130    2  .
-       110    2  ..
-       170    1  nmstatectl`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", errors.New("extraction failed")),
-				)
-
+			It("builds the nmstate archive using the native EROFS reader", func() {
 				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(os.MkdirAll(extractDir, os.ModePerm)).To(Succeed())
 
-				rootErofsPath := filepath.Join(extractDir, "root.erofs")
-				err = os.WriteFile(rootErofsPath, []byte("dummy-erofs"), 0644) //nolint:gosec
+				fixture, err := os.ReadFile(filepath.Join("testdata", "nmstatectl-lzma.erofs"))
 				Expect(err).NotTo(HaveOccurred())
+				Expect(os.WriteFile(filepath.Join(extractDir, "root.erofs"), fixture, 0644)).To(Succeed())
+
+				mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil)
+				mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{}, nil)
 
 				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err = newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("extraction failed"))
-			})
-
-			It("skips directories with failed listing and continues search", func() {
-				rootOutput := `Path : /
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        51    2  bad-dir
-        63    2  good-dir`
-
-				goodDirOutput := `Path : /good-dir
-       NID TYPE  FILENAME
-        63    2  .
-        37    2  ..
-        70    1  nmstatectl`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(rootOutput, nil),
-					// bad-dir fails
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/bad-dir --ls root.erofs"), gomock.Any()).Return("", errors.New("permission denied")),
-					// good-dir succeeds
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/good-dir --ls root.erofs"), gomock.Any()).Return(goodDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/good-dir/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				rootErofsPath := filepath.Join(extractDir, "root.erofs")
-				err = os.WriteFile(rootErofsPath, []byte("dummy-erofs"), 0644) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				err = os.WriteFile(nmstatectlBinary, []byte("mock-binary"), 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
 				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(compressedCpio).NotTo(BeEmpty())
 			})
 		})
+
 	})
 })

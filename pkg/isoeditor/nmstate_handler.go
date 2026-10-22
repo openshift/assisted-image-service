@@ -3,12 +3,15 @@ package isoeditor
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/diskfs/go-diskfs/backend/file"
+	"github.com/diskfs/go-diskfs/filesystem/erofs"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -163,7 +166,7 @@ func (f *nmstatectlExtractorFactory) CreateNmstatectlExtractor(nmstateDir string
 	case "squashfs":
 		return &squashfsExtractor{executer: f.executer}, nil
 	case "erofs":
-		return &erofsExtractor{executer: f.executer}, nil
+		return &erofsExtractor{}, nil
 	case "":
 		return nil, errors.New("failed to find root file extension")
 	default:
@@ -205,76 +208,84 @@ func (e *squashfsExtractor) ExtractNmstatectl(nmstateDir string) (string, error)
 }
 
 type erofsExtractor struct {
-	executer Executer
 }
 
 func (e *erofsExtractor) ExtractNmstatectl(nmstateDir string) (string, error) {
-	nmstatectlPath, err := e.findFileInErofs(nmstateDir, "/", "nmstatectl")
+	rootErofsPath := filepath.Join(nmstateDir, "root.erofs")
+	rootErofsFile, err := os.Open(rootErofsPath)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to open root.erofs")
+	}
+	defer rootErofsFile.Close()
+
+	rootErofsInfo, err := rootErofsFile.Stat()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to stat root.erofs")
+	}
+
+	rootErofsStorage := file.New(rootErofsFile, true)
+	rootErofs, err := erofs.Read(rootErofsStorage, rootErofsInfo.Size(), 0, 0)
+	if err != nil {
+		log.Errorf("failed to read root.erofs: %v", err.Error())
+		return "", err
+	}
+	defer rootErofs.Close()
+
+	nmstatectlPath, err := findFileInErofs(rootErofs, "nmstatectl")
 	if err != nil {
 		log.Errorf("failed to search for nmstatectl in root.erofs: %v", err.Error())
 		return "", err
 	}
 
-	if nmstatectlPath == "" {
-		return "", errors.New("nmstatectl not found in root.erofs")
+	nmstatectlInfo, err := rootErofs.Stat(nmstatectlPath)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to stat %s in root.erofs", nmstatectlPath)
+	}
+	if !nmstatectlInfo.Mode().IsRegular() {
+		return "", errors.Errorf("%s in root.erofs is not a regular file", nmstatectlPath)
 	}
 
-	_, err = e.executer.Execute(fmt.Sprintf("dump.erofs --cat --path=%s root.erofs > nmstatectl", nmstatectlPath), nmstateDir)
+	nmstatectlContent, err := rootErofs.ReadFile(nmstatectlPath)
 	if err != nil {
-		log.Errorf("failed to copy nmstatectl from root.erofs: %v", err.Error())
-		return "", err
+		return "", errors.Wrapf(err, "failed to read %s from root.erofs", nmstatectlPath)
+	}
+
+	nmstatectlFile, err := os.OpenFile(filepath.Join(nmstateDir, "nmstatectl"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create nmstatectl")
+	}
+	defer nmstatectlFile.Close()
+
+	if _, err := nmstatectlFile.Write(nmstatectlContent); err != nil {
+		return "", errors.Wrap(err, "failed to write nmstatectl")
+	}
+	if err := nmstatectlFile.Chmod(nmstatectlInfo.Mode().Perm()); err != nil {
+		return "", errors.Wrap(err, "failed to set nmstatectl permissions")
 	}
 
 	return "nmstatectl", nil
 }
 
-// findFileInErofs recursively searches for a file in an EROFS image using dump.erofs
-func (e *erofsExtractor) findFileInErofs(nmstateDir, dirPath, filename string) (string, error) {
-	output, err := e.executer.Execute(fmt.Sprintf("dump.erofs --path=%s --ls root.erofs", dirPath), nmstateDir)
+func findFileInErofs(rootErofs *erofs.FileSystem, filename string) (string, error) {
+	var found string
+	err := fs.WalkDir(rootErofs, ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if found != "" {
+			return nil
+		}
+		if entry.Name() == filename && entry.Type().IsRegular() {
+			found = path
+			return fs.SkipAll
+		}
+		return nil
+	})
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to list directory %s", dirPath)
+		return "", err
 	}
-
-	// Parse the output to find entries
-	// Format: "       NID TYPE  FILENAME"
-	// Example: "        44    1  .aleph-version.json"
-	// Type 1 = regular file, Type 2 = directory
-	entryRegex := regexp.MustCompile(`^\s*(\d+)\s+(\d+)\s+(.+)$`)
-
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		matches := entryRegex.FindStringSubmatch(line)
-		if len(matches) != 4 {
-			continue
-		}
-
-		entryType := matches[2]
-		entryName := strings.TrimSpace(matches[3])
-
-		if entryName == "." || entryName == ".." {
-			continue
-		}
-
-		fullPath := filepath.Join(dirPath, entryName)
-
-		// Return if a regular file (entry type 1) matches
-		if entryName == filename && entryType == "1" {
-			return fullPath, nil
-		}
-
-		// Recurse into directories (type 2)
-		if entryType == "2" {
-			found, err := e.findFileInErofs(nmstateDir, fullPath, filename)
-			if err != nil {
-				// Log but continue searching other directories
-				log.Warnf("failed to search in %s: %v", fullPath, err)
-				continue
-			}
-			if found != "" {
-				return found, nil
-			}
-		}
+	if found == "" {
+		return "", errors.Errorf("%s not found in root.erofs", filename)
 	}
-
-	return "", nil
+	return found, nil
 }
