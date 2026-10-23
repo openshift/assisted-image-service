@@ -56,11 +56,17 @@ func copyAll(fileSystem filesystem.FileSystem, fsDir string, infos []fs.DirEntry
 		osName := filepath.Join(targetDir, info.Name())
 		fsName := filepath.Join(fsDir, info.Name())
 
-		if info.IsDir() {
-			fi, err := info.Info()
-			if err != nil {
-				return err
-			}
+		fi, err := info.Info()
+		if err != nil {
+			return err
+		}
+
+		// A Rock Ridge directory deeper than eight levels is relocated elsewhere on
+		// the ISO and left behind as a "child link" placeholder in its parent.
+		// Depending on how the ISO was authored the placeholder's directory flag may
+		// be unset, so fall back to the POSIX mode to recognize it as a directory
+		// whose contents still need to be recursed into.
+		if info.IsDir() || fi.Mode().IsDir() {
 			if err = os.Mkdir(osName, fi.Mode().Perm()|0o300); err != nil {
 				return err
 			}
