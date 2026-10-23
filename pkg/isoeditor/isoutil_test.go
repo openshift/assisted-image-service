@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -47,6 +48,33 @@ var _ = Context("with test files", func() {
 			validateFileContent(filepath.Join(dir, "EFI/redhat/grub.cfg"), testGrubConfig)
 			validateFileContent(filepath.Join(dir, "isolinux/isolinux.cfg"), testISOLinuxConfig)
 			validateFileContent(filepath.Join(dir, "isolinux/boot.cat"), "")
+		})
+
+		It("extracts a directory relocated by Rock Ridge (depth greater than eight)", func() {
+			srcDir, err := os.MkdirTemp("", "isodeepsrc")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(srcDir)
+
+			// A depth of nine forces the Rock Ridge deep-directory relocation,
+			// which leaves a "child link" placeholder in the original parent.
+			deepRelPath := filepath.Join("a", "b", "c", "d", "e", "f", "g", "h", "i")
+			Expect(os.MkdirAll(filepath.Join(srcDir, deepRelPath), 0755)).To(Succeed())
+			deepFileRelPath := filepath.Join(deepRelPath, "deep.txt")
+			Expect(os.WriteFile(filepath.Join(srcDir, deepFileRelPath), []byte("deep content"), 0600)).To(Succeed())
+
+			deepISO, err := os.CreateTemp("", "*deep.iso")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(deepISO.Close()).To(Succeed())
+			defer os.Remove(deepISO.Name())
+			cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", "DEEP", "-o", deepISO.Name(), srcDir) //#nosec G204
+			Expect(cmd.Run()).To(Succeed())
+
+			dir, err := os.MkdirTemp("", "isotest")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.RemoveAll(dir)
+
+			Expect(Extract(deepISO.Name(), dir)).To(Succeed())
+			validateFileContent(filepath.Join(dir, deepFileRelPath), "deep content")
 		})
 	})
 
