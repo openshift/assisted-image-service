@@ -66,7 +66,7 @@ var _ = Context("with test files", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(deepISO.Close()).To(Succeed())
 			defer os.Remove(deepISO.Name())
-			cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", "DEEP", "-o", deepISO.Name(), srcDir)
+			cmd := exec.Command("genisoimage", "-rational-rock", "-J", "-joliet-long", "-V", "DEEP", "-o", deepISO.Name(), srcDir) //#nosec G204
 			Expect(cmd.Run()).To(Succeed())
 
 			dir, err := os.MkdirTemp("", "isotest")
