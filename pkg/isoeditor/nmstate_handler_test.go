@@ -1,10 +1,12 @@
 package isoeditor
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/cavaliercoder/go-cpio"
 	"github.com/pkg/errors"
 	"go.uber.org/mock/gomock"
 
@@ -60,8 +62,10 @@ var _ = Context("with test files", func() {
 		})
 
 		It("handles cpio extraction failure", func() {
-			// Mock cpio extraction failure
-			mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("cpio extraction failed"))
+			gomock.InOrder(
+				mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
+				mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("cpio extraction failed")),
+			)
 
 			newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
 
@@ -71,12 +75,7 @@ var _ = Context("with test files", func() {
 		})
 
 		It("handles nmstate extractor creation failure", func() {
-			gomock.InOrder(
-				// First call succeeds (cpio extraction)
-				mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-				// Second call: create nmstate extractor (error returned)
-				mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(nil, errors.New("failed to create nmstate extractor")),
-			)
+			mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(nil, errors.New("failed to create nmstate extractor"))
 
 			newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
 
@@ -89,10 +88,10 @@ var _ = Context("with test files", func() {
 			It("builds nmstate cpio archive", func() {
 				// Mock the execution sequence for successful extraction
 				gomock.InOrder(
-					// First call: extract rootfs with cpio
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
+					// First call: create nmstate extractor (squashfs returned)
 					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
+					// Second call: extract rootfs with cpio
+					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
 					// Third call: list squashfs contents to find nmstatectl
 					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/ostree/deploy/rhcos/deploy/abc123/usr/bin/nmstatectl", nil),
 					// Fourth call: extract the nmstatectl binary
@@ -120,10 +119,10 @@ var _ = Context("with test files", func() {
 
 			It("handles squashfs listing failure", func() {
 				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
+					// First call: create nmstate extractor (squashfs returned)
 					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
+					// Second call succeeds (cpio extraction)
+					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
 					// Third call fails (squashfs listing)
 					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("squashfs listing failed")),
 				)
@@ -137,10 +136,10 @@ var _ = Context("with test files", func() {
 
 			It("handles nmstatectl binary not found", func() {
 				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
+					// First call: create nmstate extractor (squashfs returned)
 					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
+					// Second call succeeds (cpio extraction)
+					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
 					// Third call succeeds but doesn't return nmstatectl path
 					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/some/other/binary", nil),
 					// Fourth call should still be made with empty binary path
@@ -156,10 +155,10 @@ var _ = Context("with test files", func() {
 
 			It("handles squashfs extraction failure", func() {
 				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
+					// First call: create nmstate extractor (squashfs returned)
 					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
+					// Second call succeeds (cpio extraction)
+					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
 					// Third call succeeds (squashfs listing)
 					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/ostree/deploy/rhcos/deploy/abc123/usr/bin/nmstatectl", nil),
 					// Fourth call fails (squashfs extraction)
@@ -176,6 +175,7 @@ var _ = Context("with test files", func() {
 
 		Context("erofs", func() {
 			var extractorDir string
+			var rootfsPath string
 
 			BeforeEach(func() {
 				var err error
@@ -187,17 +187,32 @@ var _ = Context("with test files", func() {
 				Expect(os.RemoveAll(extractorDir)).To(Succeed())
 			})
 
-			copyFixture := func(name string) {
+			createErofsRootfs := func(name string) string {
 				source, err := os.ReadFile(filepath.Join("testdata", name))
 				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(extractorDir, "root.erofs"), source, 0644)).To(Succeed())
+
+				var archive bytes.Buffer
+				writer := cpio.NewWriter(&archive)
+				Expect(writer.WriteHeader(&cpio.Header{
+					Name: "root.erofs",
+					Mode: cpio.ModeRegular | 0644,
+					Size: int64(len(source)),
+				})).To(Succeed())
+				_, err = writer.Write(source)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(writer.Close()).To(Succeed())
+
+				path := filepath.Join(extractorDir, "rootfs.img")
+				Expect(os.WriteFile(path, archive.Bytes(), 0644)).To(Succeed())
+				return path
 			}
 
 			It("extracts nmstatectl from an uncompressed EROFS image", func() {
-				copyFixture("nmstatectl.erofs")
+				rootfsPath = createErofsRootfs("nmstatectl.erofs")
 
-				extractor := &erofsExtractor{}
-				path, err := extractor.ExtractNmstatectl(extractorDir)
+				extractor, err := NewNmstatectlExtractorFactory(&CommonExecuter{}).CreateNmstatectlExtractor(rootfsPath)
+				Expect(err).NotTo(HaveOccurred())
+				path, err := extractor.ExtractNmstatectl(rootfsPath, extractorDir)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(path).To(Equal("nmstatectl"))
 
@@ -211,10 +226,11 @@ var _ = Context("with test files", func() {
 			})
 
 			It("extracts nmstatectl from an LZMA-compressed EROFS image", func() {
-				copyFixture("nmstatectl-lzma.erofs")
+				rootfsPath = createErofsRootfs("nmstatectl-lzma.erofs")
 
-				extractor := &erofsExtractor{}
-				path, err := extractor.ExtractNmstatectl(extractorDir)
+				extractor, err := NewNmstatectlExtractorFactory(&CommonExecuter{}).CreateNmstatectlExtractor(rootfsPath)
+				Expect(err).NotTo(HaveOccurred())
+				path, err := extractor.ExtractNmstatectl(rootfsPath, extractorDir)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(path).To(Equal("nmstatectl"))
 
@@ -224,24 +240,18 @@ var _ = Context("with test files", func() {
 			})
 
 			It("returns an error when root.erofs is missing", func() {
-				extractor := &erofsExtractor{}
-				_, err := extractor.ExtractNmstatectl(extractorDir)
+				rootfsPath = filepath.Join(extractorDir, "rootfs.img")
+				Expect(os.WriteFile(rootfsPath, []byte("not-a-cpio-archive"), 0644)).To(Succeed())
+
+				_, err := NewNmstatectlExtractorFactory(&CommonExecuter{}).CreateNmstatectlExtractor(rootfsPath)
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to open root.erofs"))
+				Expect(err.Error()).To(ContainSubstring("failed to read rootfs.img CPIO header"))
 			})
 
 			It("builds the nmstate archive using the native EROFS reader", func() {
-				extractDir := filepath.Join(workDir, "nmstate")
-				Expect(os.MkdirAll(extractDir, os.ModePerm)).To(Succeed())
+				rootfsPath = createErofsRootfs("nmstatectl-lzma.erofs")
 
-				fixture, err := os.ReadFile(filepath.Join("testdata", "nmstatectl-lzma.erofs"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(filepath.Join(extractDir, "root.erofs"), fixture, 0644)).To(Succeed())
-
-				mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil)
-				mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{}, nil)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
+				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, NewNmstatectlExtractorFactory(&CommonExecuter{}))
 				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(compressedCpio).NotTo(BeEmpty())
