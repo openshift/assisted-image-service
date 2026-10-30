@@ -39,61 +39,38 @@ func NewNmstateHandler(workDir string, executer Executer, nmstatectlExtractorFac
 }
 
 func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
-	// Extract nmstatectl binary
-	var err error
-	nmstateDir := filepath.Join(n.workDir, "nmstate")
-	err = os.MkdirAll(nmstateDir, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-	// Remove temp dir
-	defer func() {
-		removeErr := os.RemoveAll(nmstateDir)
-		if removeErr != nil {
-			log.WithError(removeErr).Error("failed to remove nmstate temp dir")
-		}
-	}()
-
-	binaryPath, err := n.extractNmstatectl(rootfsPath, nmstateDir)
-	if err != nil {
-		return nil, err
-	}
-	nmstatectlPath := filepath.Join(nmstateDir, binaryPath)
-
-	// Check if nmstatectl binary file exists
-	if _, err = os.Stat(nmstatectlPath); os.IsNotExist(err) {
-		return nil, err
-	}
-
-	// Read binary
-	nmstateBinContent, err := os.ReadFile(nmstatectlPath)
+	artifact, err := n.extractNmstatectl(rootfsPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a compressed RAM disk image with the nmstatectl binary
-	compressedCpio, err := generateCompressedCPIO([]fileEntry{
+	mode := cpio.ModeRegular | cpio.FileMode(artifact.Mode.Perm())
+	if artifact.Mode&fs.ModeSetuid != 0 {
+		mode |= cpio.ModeSetuid
+	}
+	if artifact.Mode&fs.ModeSetgid != 0 {
+		mode |= cpio.ModeSetgid
+	}
+	if artifact.Mode&fs.ModeSticky != 0 {
+		mode |= cpio.ModeSticky
+	}
+	return generateCompressedCPIO([]fileEntry{
 		{
-			Content: nmstateBinContent,
+			Content: artifact.Content,
 			Path:    NmstatectlPathInRamdisk,
-			Mode:    0o100_755,
+			Mode:    mode,
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return compressedCpio, err
 }
 
-func (n *nmstateHandler) extractNmstatectl(rootfsPath, nmstateDir string) (string, error) {
+func (n *nmstateHandler) extractNmstatectl(rootfsPath string) (*NmstatectlArtifact, error) {
 	nmstatectlExtractor, err := n.nmstatectlExtractorFactory.CreateNmstatectlExtractor(rootfsPath)
 	if err != nil {
 		log.Errorf("failed to create nmstate extractor: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 
-	return nmstatectlExtractor.ExtractNmstatectl(rootfsPath, nmstateDir)
+	return nmstatectlExtractor.ExtractNmstatectl(rootfsPath, n.workDir)
 }
 
 //go:generate mockgen -package=isoeditor -destination=mock_executer.go . Executer
@@ -118,9 +95,15 @@ func (e *CommonExecuter) Execute(command, workDir string) (string, error) {
 	return strings.TrimSuffix(stdoutBytes.String(), "\n"), nil
 }
 
+// NmstatectlArtifact contains the executable bytes and source permissions.
+type NmstatectlArtifact struct {
+	Content []byte
+	Mode    fs.FileMode
+}
+
 //go:generate mockgen -package=isoeditor -destination=mock_nmstatectl_extractor.go . NmstatectlExtractor
 type NmstatectlExtractor interface {
-	ExtractNmstatectl(rootfsPath, nmstateDir string) (string, error)
+	ExtractNmstatectl(rootfsPath, workDir string) (*NmstatectlArtifact, error)
 }
 
 //go:generate mockgen -package=isoeditor -destination=mock_nmstatectl_extractor_factory.go . NmstatectlExtractorFactory
@@ -179,7 +162,7 @@ func inspectRootfs(rootfsPath string) (extension string, erofsOffset, erofsSize 
 			return "", 0, 0, errors.Wrap(headerErr, "failed to read rootfs.img CPIO header")
 		}
 
-		matches := rootFileRegex.FindStringSubmatch(header.Name)
+		matches := rootFileRegex.FindStringSubmatch(strings.TrimPrefix(header.Name, "./"))
 		if len(matches) != 2 {
 			continue
 		}
@@ -187,15 +170,17 @@ func inspectRootfs(rootfsPath string) (extension string, erofsOffset, erofsSize 
 			return "", 0, 0, errors.Errorf("root file %s in rootfs.img is not a regular file", header.Name)
 		}
 
-		if matches[1] != "erofs" {
-			return matches[1], 0, 0, nil
-		}
-
 		erofsOffset, headerErr = reader.Seek(0, io.SeekCurrent)
 		if headerErr != nil {
-			return "", 0, 0, errors.Wrap(headerErr, "failed to locate root.erofs data in rootfs.img")
+			return "", 0, 0, errors.Wrap(headerErr, "failed to locate root filesystem data in rootfs.img")
 		}
-		return "erofs", erofsOffset, header.Size, nil
+		if header.Size <= 0 {
+			return "", 0, 0, errors.Errorf("root file %s in rootfs.img has invalid size %d", header.Name, header.Size)
+		}
+		if erofsOffset > rootfsInfo.Size() || header.Size > rootfsInfo.Size()-erofsOffset {
+			return "", 0, 0, errors.Errorf("root file %s extends beyond rootfs.img", header.Name)
+		}
+		return matches[1], erofsOffset, header.Size, nil
 	}
 }
 
@@ -204,11 +189,21 @@ type squashfsExtractor struct {
 }
 
 // TODO: Update the code to utilize go-diskfs's squashfs instead of unsquashfs once go-diskfs supports the zstd compression format used by CoreOS - MGMT-19227
-func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, nmstateDir string) (string, error) {
-	_, err := e.executer.Execute(fmt.Sprintf("cat %s | cpio -i", rootfsPath), nmstateDir)
+func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, workDir string) (*NmstatectlArtifact, error) {
+	nmstateDir, err := os.MkdirTemp(workDir, "nmstate-")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create nmstate temp dir")
+	}
+	defer func() {
+		if removeErr := os.RemoveAll(nmstateDir); removeErr != nil {
+			log.WithError(removeErr).Error("failed to remove nmstate temp dir")
+		}
+	}()
+
+	_, err = e.executer.Execute(fmt.Sprintf("cat %s | cpio -i", rootfsPath), nmstateDir)
 	if err != nil {
 		log.Errorf("failed to extract rootfs.img using cpio command: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	// limiting files is needed on el<=9 due to https://github.com/plougher/squashfs-tools/issues/125
@@ -220,22 +215,34 @@ func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, nmstateDir string) (st
 	list, err := e.executer.Execute(fmt.Sprintf("%s ; unsquashfs -dest '' -lc %s", ulimit, "root.squashfs"), nmstateDir)
 	if err != nil {
 		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	r, err := regexp.Compile(".*nmstatectl")
 	if err != nil {
 		log.Errorf("failed to compile regexp: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 	binaryPath := r.FindString(list)
+	if binaryPath == "" {
+		return nil, errors.New("nmstatectl not found in root.squashfs")
+	}
 
 	_, err = e.executer.Execute(fmt.Sprintf("%s ; unsquashfs -no-xattrs %s -extract-file %s", ulimit, "root.squashfs", binaryPath), nmstateDir)
 	if err != nil {
 		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
-		return "", err
+		return nil, err
 	}
-	return filepath.Join("squashfs-root", binaryPath), nil
+	nmstatectlPath := filepath.Join(nmstateDir, "squashfs-root", binaryPath)
+	info, err := os.Stat(nmstatectlPath)
+	if err != nil {
+		return nil, err
+	}
+	content, err := os.ReadFile(nmstatectlPath)
+	if err != nil {
+		return nil, err
+	}
+	return &NmstatectlArtifact{Content: content, Mode: info.Mode()}, nil
 }
 
 type erofsExtractor struct {
@@ -243,10 +250,10 @@ type erofsExtractor struct {
 	size   int64
 }
 
-func (e *erofsExtractor) ExtractNmstatectl(rootfsPath, nmstateDir string) (string, error) {
+func (e *erofsExtractor) ExtractNmstatectl(rootfsPath, _ string) (*NmstatectlArtifact, error) {
 	rootfsFile, err := os.Open(rootfsPath)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to open rootfs.img")
+		return nil, errors.Wrap(err, "failed to open rootfs.img")
 	}
 	defer rootfsFile.Close()
 
@@ -255,43 +262,33 @@ func (e *erofsExtractor) ExtractNmstatectl(rootfsPath, nmstateDir string) (strin
 	rootErofs, err := erofs.Read(rootErofsStorage, e.size, 0, 0)
 	if err != nil {
 		log.Errorf("failed to read root.erofs: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 	defer rootErofs.Close()
 
 	nmstatectlPath, err := findFileInErofs(rootErofs, "nmstatectl")
 	if err != nil {
 		log.Errorf("failed to search for nmstatectl in root.erofs: %v", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	nmstatectlInfo, err := rootErofs.Stat(nmstatectlPath)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to stat %s in root.erofs", nmstatectlPath)
+		return nil, errors.Wrapf(err, "failed to stat %s in root.erofs", nmstatectlPath)
 	}
 	if !nmstatectlInfo.Mode().IsRegular() {
-		return "", errors.Errorf("%s in root.erofs is not a regular file", nmstatectlPath)
+		return nil, errors.Errorf("%s in root.erofs is not a regular file", nmstatectlPath)
 	}
 
 	nmstatectlContent, err := rootErofs.ReadFile(nmstatectlPath)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to read %s from root.erofs", nmstatectlPath)
+		return nil, errors.Wrapf(err, "failed to read %s from root.erofs", nmstatectlPath)
+	}
+	if int64(len(nmstatectlContent)) != nmstatectlInfo.Size() {
+		return nil, errors.Errorf("incomplete read of %s from root.erofs: got %d bytes, expected %d", nmstatectlPath, len(nmstatectlContent), nmstatectlInfo.Size())
 	}
 
-	nmstatectlFile, err := os.OpenFile(filepath.Join(nmstateDir, "nmstatectl"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create nmstatectl")
-	}
-	defer nmstatectlFile.Close()
-
-	if _, err := nmstatectlFile.Write(nmstatectlContent); err != nil {
-		return "", errors.Wrap(err, "failed to write nmstatectl")
-	}
-	if err := nmstatectlFile.Chmod(nmstatectlInfo.Mode().Perm()); err != nil {
-		return "", errors.Wrap(err, "failed to set nmstatectl permissions")
-	}
-
-	return "nmstatectl", nil
+	return &NmstatectlArtifact{Content: nmstatectlContent, Mode: nmstatectlInfo.Mode()}, nil
 }
 
 func findFileInErofs(rootErofs *erofs.FileSystem, filename string) (string, error) {
