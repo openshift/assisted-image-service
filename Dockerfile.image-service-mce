@@ -1,30 +1,3 @@
-# Used to build external packages:
-FROM --platform=$BUILDPLATFORM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:3e009398a8aa8eec621393fbf308c5e622f174900e44e8d5fe224c637920924a AS packages
-
-# Install the build tools and the required libraries:
-RUN \
-  microdnf install -y \
-  \
-  gcc \
-  gzip \
-  libtool \
-  make \
-  tar \
-  \
-  libselinux-devel \
-  libuuid-devel \
-  libzstd-devel \
-  lz4-devel \
-  zlib-devel \
-  \
-  && \
-  microdnf clean all
-
-# Build the packages:
-COPY packages /packages
-RUN cd /packages && ./build.sh
-
-
 # Used to build the service:
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1.26 AS builder
 ARG TARGETOS
@@ -66,11 +39,6 @@ ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
 
 # Install runtime packages directly with microdnf (rpm-prefetching makes them available)
 RUN microdnf install -y cpio squashfs-tools && microdnf clean all
-
-# Copy the very minimum that we need from the external packages container. That is the 'dump.erofs'
-# binary and the compression library (from the 'xz' package) that it needs.
-COPY --from=packages /usr/local/lib/liblzma.so.5 /usr/local/lib
-COPY --from=packages /usr/local/bin/dump.erofs /usr/local/bin
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-image-service /assisted-image-service

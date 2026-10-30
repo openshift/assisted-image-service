@@ -1,378 +1,336 @@
 package isoeditor
 
 import (
-	"fmt"
+	"bytes"
+	"compress/gzip"
+	"errors"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"testing"
 
-	"github.com/pkg/errors"
+	"github.com/cavaliercoder/go-cpio"
 	"go.uber.org/mock/gomock"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Context("with test files", func() {
-	var (
-		isoFile  string
-		filesDir string
-		workDir  string
-		volumeID = "Assisted123"
-	)
+func readNmstateArchive(t *testing.T, archive, content []byte, mode fs.FileMode) {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+	gz.Multistream(false)
+	reader := cpio.NewReader(gz)
+	header, err := reader.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if header.Name != NmstatectlPathInRamdisk || header.Size != int64(len(content)) || header.FileInfo().Mode() != mode {
+		t.Fatalf("unexpected nmstatectl header: %+v, mode %v", header, header.FileInfo().Mode())
+	}
+	actual, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(actual, content) {
+		t.Fatal("archive content does not match nmstatectl")
+	}
+	if _, err = reader.Next(); !errors.Is(err, io.EOF) {
+		t.Fatalf("expected archive trailer, got %v", err)
+	}
+	remaining, err := io.Copy(io.Discard, io.LimitReader(gz, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if remaining > 3 {
+		t.Fatal("unexpected data after the CPIO trailer")
+	}
+}
 
-	BeforeEach(func() {
-		filesDir, isoFile = createTestFiles(volumeID)
+func writeRootfsArchive(t *testing.T, headers []cpio.Header, contents [][]byte) string {
+	t.Helper()
+	var archive bytes.Buffer
+	writer := cpio.NewWriter(&archive)
+	for i := range headers {
+		if err := writer.WriteHeader(&headers[i]); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writer.Write(contents[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "rootfs.img")
+	if err := os.WriteFile(path, archive.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
-		var err error
-		workDir, err = os.MkdirTemp("", "testisoeditor")
-		Expect(err).NotTo(HaveOccurred())
+func erofsRootfs(t *testing.T, fixture string) string {
+	t.Helper()
+	image, err := os.ReadFile(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return writeRootfsArchive(t, []cpio.Header{
+		{Name: "metadata", Mode: cpio.ModeRegular | 0644, Size: 3},
+		{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))},
+	}, [][]byte{[]byte("abc"), image})
+}
+
+func TestBuildNmstateCpioArchive(t *testing.T) {
+	for _, mode := range []fs.FileMode{0751, fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky | 0755} {
+		t.Run(mode.String(), func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			factory := NewMockNmstatectlExtractorFactory(ctrl)
+			extractor := NewMockNmstatectlExtractor(ctrl)
+			content := []byte("mock-nmstatectl-binary")
+			workDir := filepath.Join(t.TempDir(), "absent")
+			factory.EXPECT().CreateNmstatectlExtractor("rootfs.img").Return(extractor, nil)
+			extractor.EXPECT().ExtractNmstatectl("rootfs.img", workDir).Return(&NmstatectlArtifact{Content: content, Mode: mode}, nil)
+			archive, err := NewNmstateHandler(workDir, NewMockExecuter(ctrl), factory).BuildNmstateCpioArchive("rootfs.img")
+			if err != nil {
+				t.Fatal(err)
+			}
+			readNmstateArchive(t, archive, content, mode)
+		})
+	}
+	t.Run("factory error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		factory := NewMockNmstatectlExtractorFactory(ctrl)
+		expected := errors.New("factory failed")
+		factory.EXPECT().CreateNmstatectlExtractor("rootfs.img").Return(nil, expected)
+		_, err := NewNmstateHandler(t.TempDir(), NewMockExecuter(ctrl), factory).BuildNmstateCpioArchive("rootfs.img")
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected factory error, got %v", err)
+		}
 	})
-
-	AfterEach(func() {
-		Expect(os.RemoveAll(filesDir)).To(Succeed())
-		Expect(os.Remove(isoFile)).To(Succeed())
-		Expect(os.RemoveAll(workDir)).To(Succeed())
+	t.Run("extraction error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		factory := NewMockNmstatectlExtractorFactory(ctrl)
+		extractor := NewMockNmstatectlExtractor(ctrl)
+		expected := errors.New("extraction failed")
+		factory.EXPECT().CreateNmstatectlExtractor("rootfs.img").Return(extractor, nil)
+		extractor.EXPECT().ExtractNmstatectl("rootfs.img", gomock.Any()).Return(nil, expected)
+		_, err := NewNmstateHandler(t.TempDir(), NewMockExecuter(ctrl), factory).BuildNmstateCpioArchive("rootfs.img")
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected extraction error, got %v", err)
+		}
 	})
+}
 
-	Describe("BuildNmstateCpioArchive", func() {
-		var (
-			rootfsPath                     string
-			newNmstateHandler              NmstateHandler
-			ctrl                           *gomock.Controller
-			mockExecuter                   *MockExecuter
-			mockNmstatectlExtractorFactory *MockNmstatectlExtractorFactory
-		)
-
-		BeforeEach(func() {
-			rootfsPath = filepath.Join(workDir, "rootfs.img")
-
-			// Create a dummy rootfs file
-			err := os.WriteFile(rootfsPath, []byte("dummy-rootfs"), 0644) //nolint:gosec
-			Expect(err).NotTo(HaveOccurred())
-
-			ctrl = gomock.NewController(GinkgoT())
-			mockExecuter = NewMockExecuter(ctrl)
-			mockNmstatectlExtractorFactory = NewMockNmstatectlExtractorFactory(ctrl)
+func TestNativeErofsNmstateArchive(t *testing.T) {
+	for _, tc := range []struct {
+		fixture string
+		content []byte
+		mode    fs.FileMode
+	}{
+		{"nmstatectl.erofs", []byte("mock-nmstatectl-binary"), 0755},
+		{"nmstatectl-lzma.erofs", bytes.Repeat([]byte("mock-nmstatectl-binary\n"), 8192), 0751},
+		{"nmstatectl-lzma-64k.erofs", bytes.Repeat([]byte("mock-nmstatectl-binary\n"), 8192), 0751},
+	} {
+		t.Run(tc.fixture, func(t *testing.T) {
+			rootfs := erofsRootfs(t, tc.fixture)
+			// Any shell command is an unexpected mock call and fails the test.
+			executer := NewMockExecuter(gomock.NewController(t))
+			workDir := filepath.Join(t.TempDir(), "absent")
+			archive, err := NewNmstateHandler(workDir, executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			readNmstateArchive(t, archive, tc.content, tc.mode)
+			if _, err := os.Stat(workDir); !errors.Is(err, fs.ErrNotExist) {
+				t.Fatalf("native extraction created a temporary directory: %v", err)
+			}
 		})
+	}
+}
 
-		AfterEach(func() {
-			ctrl.Finish()
+func TestErofsExtractionErrors(t *testing.T) {
+	for _, fixture := range []string{"nmstatectl-missing.erofs", "nmstatectl-nonregular.erofs"} {
+		t.Run(fixture, func(t *testing.T) {
+			executer := NewMockExecuter(gomock.NewController(t))
+			handler := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer))
+			if _, err := handler.BuildNmstateCpioArchive(erofsRootfs(t, fixture)); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+				t.Fatalf("expected missing regular binary error, got %v", err)
+			}
 		})
-
-		It("handles cpio extraction failure", func() {
-			// Mock cpio extraction failure
-			mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("cpio extraction failed"))
-
-			newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-			_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("cpio extraction failed"))
-		})
-
-		It("handles nmstate extractor creation failure", func() {
-			gomock.InOrder(
-				// First call succeeds (cpio extraction)
-				mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-				// Second call: create nmstate extractor (error returned)
-				mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(nil, errors.New("failed to create nmstate extractor")),
-			)
-
-			newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-			_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to create nmstate extractor"))
-		})
-
-		Context("squashfs", func() {
-			It("builds nmstate cpio archive", func() {
-				// Mock the execution sequence for successful extraction
-				gomock.InOrder(
-					// First call: extract rootfs with cpio
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
-					// Third call: list squashfs contents to find nmstatectl
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/ostree/deploy/rhcos/deploy/abc123/usr/bin/nmstatectl", nil),
-					// Fourth call: extract the nmstatectl binary
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-				)
-
-				// Create the expected directory structure and nmstatectl binary
-				extractDir := filepath.Join(workDir, "nmstate")
-				squashfsRoot := filepath.Join(extractDir, "squashfs-root")
-				nmstatectlDir := filepath.Join(squashfsRoot, "ostree", "deploy", "rhcos", "deploy", "abc123", "usr", "bin")
-				err := os.MkdirAll(nmstatectlDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				nmstatectlBinary := filepath.Join(nmstatectlDir, "nmstatectl")
-				nmstatectlContent := []byte("mock-nmstatectl-binary")
-				err = os.WriteFile(nmstatectlBinary, nmstatectlContent, 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
-			})
-
-			It("handles squashfs listing failure", func() {
-				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
-					// Third call fails (squashfs listing)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("squashfs listing failed")),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("squashfs listing failed"))
-			})
-
-			It("handles nmstatectl binary not found", func() {
-				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
-					// Third call succeeds but doesn't return nmstatectl path
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/some/other/binary", nil),
-					// Fourth call should still be made with empty binary path
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no such file or directory"))
-			})
-
-			It("handles squashfs extraction failure", func() {
-				gomock.InOrder(
-					// First call succeeds (cpio extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (squashfs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&squashfsExtractor{executer: mockExecuter}, nil),
-					// Third call succeeds (squashfs listing)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("/ostree/deploy/rhcos/deploy/abc123/usr/bin/nmstatectl", nil),
-					// Fourth call fails (squashfs extraction)
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("squashfs extraction failed")),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("squashfs extraction failed"))
-			})
-		})
-
-		Context("erofs", func() {
-			It("builds nmstate cpio archive with nested directory structure", func() {
-				// Simplified: nmstatectl is in /usr/bin directly
-				rootDirOutput := `Path : /
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        44    1  .aleph-version.json
-        51    2  usr`
-
-				usrDirOutput := `Path : /usr
-       NID TYPE  FILENAME
-       110    2  .
-       100    2  ..
-       130    2  bin`
-
-				binDirOutput := `Path : /usr/bin
-       NID TYPE  FILENAME
-       130    2  .
-       110    2  ..
-       150    1  bash
-       170    1  nmstatectl`
-
-				gomock.InOrder(
-					// First call: extract rootfs with cpio
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					// Second call: create nmstate extractor (erofs returned)
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					// Recursive directory listing calls
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(rootDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/usr --ls root.erofs"), gomock.Any()).Return(usrDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/usr/bin --ls root.erofs"), gomock.Any()).Return(binDirOutput, nil),
-					// Extract the nmstatectl binary
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/usr/bin/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				// Create the expected directory structure
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				// Create the extracted nmstatectl binary (simulating dump.erofs output)
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				nmstatectlContent := []byte("mock-nmstatectl-binary")
-				err = os.WriteFile(nmstatectlBinary, nmstatectlContent, 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
-			})
-
-			It("parses dump.erofs output with varying whitespace", func() {
-				// Test with different amounts of whitespace in dump.erofs output
-				// nmstatectl is in root directory (no subdirs to simplify the test)
-				dumpOutput := `Path : /
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-       123    1  file-with-spaces
-        10    1  nmstatectl
-       999    7  symlink`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				err = os.WriteFile(nmstatectlBinary, []byte("mock-binary"), 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
-			})
-
-			It("handles dump.erofs listing failure", func() {
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return("", errors.New("dump.erofs failed")),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("dump.erofs failed"))
-			})
-
-			It("handles nmstatectl not found in erofs", func() {
-				// Output without nmstatectl (no subdirectories to simplify test)
-				dumpOutput := `Path : /
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        44    1  other-file
-        45    1  another-file`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-				)
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("nmstatectl not found in root.erofs"))
-			})
-
-			It("handles dump.erofs extraction failure", func() {
-				dumpOutput := `Path : /bin
-Size: 100  On-disk size: 100  directory
-
-       NID TYPE  FILENAME
-       130    2  .
-       110    2  ..
-       170    1  nmstatectl`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(dumpOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", errors.New("extraction failed")),
-				)
-
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				rootErofsPath := filepath.Join(extractDir, "root.erofs")
-				err = os.WriteFile(rootErofsPath, []byte("dummy-erofs"), 0644) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				_, err = newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("extraction failed"))
-			})
-
-			It("skips directories with failed listing and continues search", func() {
-				rootOutput := `Path : /
-       NID TYPE  FILENAME
-        37    2  .
-        37    2  ..
-        51    2  bad-dir
-        63    2  good-dir`
-
-				goodDirOutput := `Path : /good-dir
-       NID TYPE  FILENAME
-        63    2  .
-        37    2  ..
-        70    1  nmstatectl`
-
-				gomock.InOrder(
-					mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("", nil),
-					mockNmstatectlExtractorFactory.EXPECT().CreateNmstatectlExtractor(gomock.Any()).Return(&erofsExtractor{executer: mockExecuter}, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/ --ls root.erofs"), gomock.Any()).Return(rootOutput, nil),
-					// bad-dir fails
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/bad-dir --ls root.erofs"), gomock.Any()).Return("", errors.New("permission denied")),
-					// good-dir succeeds
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --path=/good-dir --ls root.erofs"), gomock.Any()).Return(goodDirOutput, nil),
-					mockExecuter.EXPECT().Execute(gomock.Eq("dump.erofs --cat --path=/good-dir/nmstatectl root.erofs > nmstatectl"), gomock.Any()).Return("", nil),
-				)
-
-				extractDir := filepath.Join(workDir, "nmstate")
-				err := os.MkdirAll(extractDir, os.ModePerm)
-				Expect(err).NotTo(HaveOccurred())
-
-				rootErofsPath := filepath.Join(extractDir, "root.erofs")
-				err = os.WriteFile(rootErofsPath, []byte("dummy-erofs"), 0644) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				nmstatectlBinary := filepath.Join(extractDir, "nmstatectl")
-				err = os.WriteFile(nmstatectlBinary, []byte("mock-binary"), 0755) //nolint:gosec
-				Expect(err).NotTo(HaveOccurred())
-
-				newNmstateHandler = NewNmstateHandler(workDir, mockExecuter, mockNmstatectlExtractorFactory)
-
-				compressedCpio, err := newNmstateHandler.BuildNmstateCpioArchive(rootfsPath)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(compressedCpio).NotTo(BeEmpty())
-			})
-		})
+	}
+	t.Run("malformed EROFS", func(t *testing.T) {
+		image := make([]byte, 4096)
+		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
+		executer := NewMockExecuter(gomock.NewController(t))
+		if _, err := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "magic") {
+			t.Fatalf("expected EROFS reader error, got %v", err)
+		}
 	})
-})
+	t.Run("rootfs removed after inspection", func(t *testing.T) {
+		rootfs := erofsRootfs(t, "nmstatectl.erofs")
+		extractor, err := NewNmstatectlExtractorFactory(nil).CreateNmstatectlExtractor(rootfs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(rootfs); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := extractor.ExtractNmstatectl(rootfs, t.TempDir()); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("expected missing rootfs error, got %v", err)
+		}
+	})
+}
+
+func TestInspectRootfs(t *testing.T) {
+	for _, name := range []string{"root.erofs", "./root.erofs", "root.squashfs"} {
+		t.Run(name, func(t *testing.T) {
+			content := []byte("filesystem")
+			rootfs := writeRootfsArchive(t, []cpio.Header{{Name: name, Mode: cpio.ModeRegular | 0644, Size: int64(len(content))}}, [][]byte{content})
+			extension, offset, size, err := inspectRootfs(rootfs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if extension != strings.TrimPrefix(filepath.Ext(name), ".") || size != int64(len(content)) {
+				t.Fatalf("unexpected root member: %s %d", extension, size)
+			}
+			archive, err := os.ReadFile(rootfs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(archive[offset:offset+size], content) {
+				t.Fatal("incorrect root filesystem offset")
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name    string
+		header  cpio.Header
+		content []byte
+		want    string
+	}{
+		{"missing root", cpio.Header{Name: "metadata", Mode: cpio.ModeRegular | 0644, Size: 3}, []byte("abc"), "failed to find root file"},
+		{"directory root", cpio.Header{Name: "root.erofs", Mode: cpio.ModeDir | 0755}, nil, "not a regular file"},
+		{"symlink root", cpio.Header{Name: "root.erofs", Mode: cpio.ModeSymlink | 0777, Size: 5}, []byte("other"), "not a regular file"},
+		{"empty root", cpio.Header{Name: "root.erofs", Mode: cpio.ModeRegular | 0644}, nil, "invalid size"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootfs := writeRootfsArchive(t, []cpio.Header{tc.header}, [][]byte{tc.content})
+			if _, err := NewNmstatectlExtractorFactory(nil).CreateNmstatectlExtractor(rootfs); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q, got %v", tc.want, err)
+			}
+		})
+	}
+	t.Run("unsupported filesystem", func(t *testing.T) {
+		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.ext4", Mode: cpio.ModeRegular | 0644, Size: 3}}, [][]byte{[]byte("abc")})
+		if _, err := NewNmstatectlExtractorFactory(nil).CreateNmstatectlExtractor(rootfs); err == nil || !strings.Contains(err.Error(), "unknown extension") {
+			t.Fatalf("expected unsupported filesystem error, got %v", err)
+		}
+	})
+	t.Run("malformed CPIO", func(t *testing.T) {
+		rootfs := filepath.Join(t.TempDir(), "rootfs.img")
+		if err := os.WriteFile(rootfs, []byte("not a CPIO archive"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, _, err := inspectRootfs(rootfs); !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("expected CPIO parsing error, got %v", err)
+		}
+	})
+	t.Run("missing rootfs", func(t *testing.T) {
+		if _, _, _, err := inspectRootfs(filepath.Join(t.TempDir(), "absent")); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("expected missing rootfs error, got %v", err)
+		}
+	})
+	t.Run("member extends beyond EOF", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/nmstatectl.erofs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var archive bytes.Buffer
+		writer := cpio.NewWriter(&archive)
+		if err := writer.WriteHeader(&cpio.Header{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(2 * len(image))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writer.Write(image); err != nil {
+			t.Fatal(err)
+		}
+		rootfs := filepath.Join(t.TempDir(), "rootfs.img")
+		if err := os.WriteFile(rootfs, archive.Bytes(), 0600); err != nil {
+			t.Fatal(err)
+		}
+		executer := NewMockExecuter(gomock.NewController(t))
+		if _, err := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
+			t.Fatalf("expected truncated member error, got %v", err)
+		}
+	})
+}
+
+func TestSquashfsNmstateExtraction(t *testing.T) {
+	for _, failure := range []string{"success", "cpio", "listing", "missing binary", "extraction"} {
+		t.Run(failure, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			executer := NewMockExecuter(ctrl)
+			rootfs := filepath.Join(t.TempDir(), "rootfs.img")
+			workDir := t.TempDir()
+			var extractionDir string
+			expected := errors.New(failure + " failed")
+			executer.EXPECT().Execute("cat "+rootfs+" | cpio -i", gomock.Any()).DoAndReturn(func(_ string, dir string) (string, error) {
+				extractionDir = dir
+				if failure == "cpio" {
+					return "", expected
+				}
+				return "", nil
+			})
+			binaryPath := "/ostree/deploy/rhcos/deploy/abc123/usr/bin/nmstatectl"
+			content := []byte("mock-nmstatectl-binary")
+			if failure != "cpio" {
+				executer.EXPECT().Execute("ulimit -n 1024 ; unsquashfs -dest '' -lc root.squashfs", gomock.Any()).DoAndReturn(func(_ string, _ string) (string, error) {
+					switch failure {
+					case "listing":
+						return "", expected
+					case "missing binary":
+						return "/usr/bin/other", nil
+					default:
+						return binaryPath, nil
+					}
+				})
+			}
+			if failure == "success" || failure == "extraction" {
+				executer.EXPECT().Execute("ulimit -n 1024 ; unsquashfs -no-xattrs root.squashfs -extract-file "+binaryPath, gomock.Any()).DoAndReturn(func(_ string, dir string) (string, error) {
+					if failure == "extraction" {
+						return "", expected
+					}
+					path := filepath.Join(dir, "squashfs-root", binaryPath)
+					if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, content, 0600); err != nil {
+						return "", err
+					}
+					return "", os.Chmod(path, 0751)
+				})
+			}
+			factory := NewMockNmstatectlExtractorFactory(ctrl)
+			factory.EXPECT().CreateNmstatectlExtractor(rootfs).Return(&squashfsExtractor{executer: executer}, nil)
+			archive, err := NewNmstateHandler(workDir, executer, factory).BuildNmstateCpioArchive(rootfs)
+			if failure == "success" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				readNmstateArchive(t, archive, content, 0751)
+			} else if failure == "missing binary" {
+				if err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+					t.Fatalf("expected missing binary error, got %v", err)
+				}
+			} else if !errors.Is(err, expected) {
+				t.Fatalf("expected command error, got %v", err)
+			}
+			if _, err := os.Stat(extractionDir); !errors.Is(err, fs.ErrNotExist) {
+				t.Fatalf("temporary extraction directory was not removed: %v", err)
+			}
+		})
+	}
+}

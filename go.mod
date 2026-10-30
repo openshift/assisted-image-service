@@ -50,3 +50,5 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
+
+replace github.com/diskfs/go-diskfs => github.com/carbonin/go-diskfs v1.1.2-0.20261030201354-306cfd9adccb
