@@ -243,6 +243,40 @@ var _ = Describe("HTTPListeners", func() {
 	})
 })
 
+var _ = Describe("ApplyTLSProfile", func() {
+	It("sets curve preferences from numeric curve IDs", func() {
+		listeners := New("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners.ApplyTLSProfile("VersionTLS12", "", fmt.Sprintf(" %d , %d ", tls.X25519, tls.CurveP256))
+
+		Expect(listeners.HTTPS.TLSConfig.MinVersion).To(Equal(uint16(tls.VersionTLS12)))
+		Expect(listeners.HTTPS.TLSConfig.CurvePreferences).To(Equal([]tls.CurveID{tls.X25519, tls.CurveP256}))
+	})
+
+	It("applies curve preferences for TLS 1.3 and ignores cipher suites", func() {
+		listeners := New("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners.ApplyTLSProfile("VersionTLS13", "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", fmt.Sprintf("%d", tls.X25519))
+
+		Expect(listeners.HTTPS.TLSConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
+		Expect(listeners.HTTPS.TLSConfig.CipherSuites).To(BeEmpty())
+		Expect(listeners.HTTPS.TLSConfig.CurvePreferences).To(Equal([]tls.CurveID{tls.X25519}))
+	})
+
+	It("skips unsupported curve preferences", func() {
+		listeners := New("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners.ApplyTLSProfile("VersionTLS12", "", fmt.Sprintf("%d,not-a-curve,0", tls.CurveP384))
+
+		Expect(listeners.HTTPS.TLSConfig.CurvePreferences).To(Equal([]tls.CurveID{tls.CurveP384}))
+	})
+
+	It("leaves curve preferences unset when none are provided", func() {
+		listeners := New("", "8443", httpsKeyFile.Name(), httpsCertFile.Name())
+		listeners.ApplyTLSProfile("VersionTLS12", "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "")
+
+		Expect(listeners.HTTPS.TLSConfig.CipherSuites).To(Equal([]uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}))
+		Expect(listeners.HTTPS.TLSConfig.CurvePreferences).To(BeEmpty())
+	})
+})
+
 func TestServers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	log.SetOutput(io.Discard)
