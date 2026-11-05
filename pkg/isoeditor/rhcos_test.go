@@ -28,7 +28,6 @@ var _ = Context("with test files", func() {
 		volumeID           = "Assisted123"
 		ctrl               *gomock.Controller
 		mockNmstateHandler *MockNmstateHandler
-		mockExecuter       *MockExecuter
 	)
 
 	validateFileContainsLine := func(filename string, content string) {
@@ -55,8 +54,6 @@ var _ = Context("with test files", func() {
 		nmstatectlPath = filepath.Join(workDir, "nmstatectl-for-caching")
 		ctrl = gomock.NewController(GinkgoT())
 		mockNmstateHandler = NewMockNmstateHandler(ctrl)
-		mockExecuter = NewMockExecuter(ctrl)
-		mockExecuter.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("some string", nil).Times(3)
 	})
 
 	AfterEach(func() {

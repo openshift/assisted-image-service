@@ -1,12 +1,10 @@
 package isoeditor
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 
@@ -26,14 +24,12 @@ type NmstateHandler interface {
 
 type nmstateHandler struct {
 	workDir                    string
-	executer                   Executer
 	nmstatectlExtractorFactory NmstatectlExtractorFactory
 }
 
-func NewNmstateHandler(workDir string, executer Executer, nmstatectlExtractorFactory NmstatectlExtractorFactory) NmstateHandler {
+func NewNmstateHandler(workDir string, nmstatectlExtractorFactory NmstatectlExtractorFactory) NmstateHandler {
 	return &nmstateHandler{
 		workDir:                    workDir,
-		executer:                   executer,
 		nmstatectlExtractorFactory: nmstatectlExtractorFactory,
 	}
 }
@@ -63,28 +59,6 @@ func (n *nmstateHandler) extractNmstatectl(rootfsPath string) ([]byte, error) {
 	return nmstatectlExtractor.ExtractNmstatectl(rootfsPath, n.workDir)
 }
 
-//go:generate mockgen -package=isoeditor -destination=mock_executer.go . Executer
-type Executer interface {
-	Execute(command, workDir string) (string, error)
-}
-
-type CommonExecuter struct{}
-
-func (e *CommonExecuter) Execute(command, workDir string) (string, error) {
-	var stdoutBytes, stderrBytes bytes.Buffer
-	cmd := exec.Command("bash", "-c", command)
-	cmd.Stdout = &stdoutBytes
-	cmd.Stderr = &stderrBytes
-	log.Infof("Running cmd: %s", command)
-	cmd.Dir = workDir
-	err := cmd.Run()
-	if err != nil {
-		return "", errors.Wrapf(err, "Failed to execute cmd (%s): %s", cmd, stderrBytes.String())
-	}
-
-	return strings.TrimSuffix(stdoutBytes.String(), "\n"), nil
-}
-
 //go:generate mockgen -package=isoeditor -destination=mock_nmstatectl_extractor.go . NmstatectlExtractor
 type NmstatectlExtractor interface {
 	ExtractNmstatectl(rootfsPath, workDir string) ([]byte, error)
@@ -96,13 +70,10 @@ type NmstatectlExtractorFactory interface {
 }
 
 type nmstatectlExtractorFactory struct {
-	executer Executer
 }
 
-func NewNmstatectlExtractorFactory(executer Executer) NmstatectlExtractorFactory {
-	return &nmstatectlExtractorFactory{
-		executer: executer,
-	}
+func NewNmstatectlExtractorFactory() NmstatectlExtractorFactory {
+	return &nmstatectlExtractorFactory{}
 }
 
 func (f *nmstatectlExtractorFactory) CreateNmstatectlExtractor(rootfsPath string) (NmstatectlExtractor, error) {
@@ -181,37 +152,15 @@ func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, _ string) ([]byte, err
 	defer rootfsFile.Close()
 
 	rootfsStorage := file.New(rootfsFile, true)
-	rootSquashfsStorage := backend.Sub(rootfsStorage, e.offset, e.size)
-	rootSquashfs, err := squashfs.Read(rootSquashfsStorage, e.size, 0, 0)
+	rootStorage := backend.Sub(rootfsStorage, e.offset, e.size)
+	rootFS, err := squashfs.Read(rootStorage, e.size, 0, 0)
 	if err != nil {
 		log.Errorf("failed to read root.squashfs: %v", err.Error())
 		return nil, err
 	}
-	defer rootSquashfs.Close()
+	defer rootFS.Close()
 
-	nmstatectlPath, err := findFileInSquashfs(rootSquashfs, "nmstatectl")
-	if err != nil {
-		log.Errorf("failed to search for nmstatectl in root.squashfs: %v", err.Error())
-		return nil, err
-	}
-
-	nmstatectlInfo, err := rootSquashfs.Stat(nmstatectlPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to stat %s in root.squashfs", nmstatectlPath)
-	}
-	if !nmstatectlInfo.Mode().IsRegular() {
-		return nil, errors.Errorf("%s in root.squashfs is not a regular file", nmstatectlPath)
-	}
-
-	nmstatectlContent, err := rootSquashfs.ReadFile(nmstatectlPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %s from root.squashfs", nmstatectlPath)
-	}
-	if int64(len(nmstatectlContent)) != nmstatectlInfo.Size() {
-		return nil, errors.Errorf("incomplete read of %s from root.squashfs: got %d bytes, expected %d", nmstatectlPath, len(nmstatectlContent), nmstatectlInfo.Size())
-	}
-
-	return nmstatectlContent, nil
+	return extractNmstatectl(rootFS, "root.squashfs")
 }
 
 type erofsExtractor struct {
@@ -227,42 +176,52 @@ func (e *erofsExtractor) ExtractNmstatectl(rootfsPath, _ string) ([]byte, error)
 	defer rootfsFile.Close()
 
 	rootfsStorage := file.New(rootfsFile, true)
-	rootErofsStorage := backend.Sub(rootfsStorage, e.offset, e.size)
-	rootErofs, err := erofs.Read(rootErofsStorage, e.size, 0, 0)
+	rootStorage := backend.Sub(rootfsStorage, e.offset, e.size)
+	rootFS, err := erofs.Read(rootStorage, e.size, 0, 0)
 	if err != nil {
 		log.Errorf("failed to read root.erofs: %v", err.Error())
 		return nil, err
 	}
-	defer rootErofs.Close()
+	defer rootFS.Close()
 
-	nmstatectlPath, err := findFileInErofs(rootErofs, "nmstatectl")
+	return extractNmstatectl(rootFS, "root.erofs")
+}
+
+type rootFilesystem interface {
+	fs.FS
+	Stat(name string) (fs.FileInfo, error)
+	ReadFile(name string) ([]byte, error)
+}
+
+func extractNmstatectl(rootFS rootFilesystem, rootName string) ([]byte, error) {
+	nmstatectlPath, err := findFileInRootfs(rootFS, "nmstatectl", rootName)
 	if err != nil {
-		log.Errorf("failed to search for nmstatectl in root.erofs: %v", err.Error())
+		log.Errorf("failed to search for nmstatectl in %s: %v", rootName, err.Error())
 		return nil, err
 	}
 
-	nmstatectlInfo, err := rootErofs.Stat(nmstatectlPath)
+	nmstatectlInfo, err := rootFS.Stat(nmstatectlPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to stat %s in root.erofs", nmstatectlPath)
+		return nil, errors.Wrapf(err, "failed to stat %s in %s", nmstatectlPath, rootName)
 	}
 	if !nmstatectlInfo.Mode().IsRegular() {
-		return nil, errors.Errorf("%s in root.erofs is not a regular file", nmstatectlPath)
+		return nil, errors.Errorf("%s in %s is not a regular file", nmstatectlPath, rootName)
 	}
 
-	nmstatectlContent, err := rootErofs.ReadFile(nmstatectlPath)
+	nmstatectlContent, err := rootFS.ReadFile(nmstatectlPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %s from root.erofs", nmstatectlPath)
+		return nil, errors.Wrapf(err, "failed to read %s from %s", nmstatectlPath, rootName)
 	}
 	if int64(len(nmstatectlContent)) != nmstatectlInfo.Size() {
-		return nil, errors.Errorf("incomplete read of %s from root.erofs: got %d bytes, expected %d", nmstatectlPath, len(nmstatectlContent), nmstatectlInfo.Size())
+		return nil, errors.Errorf("incomplete read of %s from %s: got %d bytes, expected %d", nmstatectlPath, rootName, len(nmstatectlContent), nmstatectlInfo.Size())
 	}
 
 	return nmstatectlContent, nil
 }
 
-func findFileInErofs(rootErofs *erofs.FileSystem, filename string) (string, error) {
+func findFileInRootfs(rootFS fs.FS, filename, rootName string) (string, error) {
 	var found string
-	err := fs.WalkDir(rootErofs, ".", func(path string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(rootFS, ".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -279,31 +238,7 @@ func findFileInErofs(rootErofs *erofs.FileSystem, filename string) (string, erro
 		return "", err
 	}
 	if found == "" {
-		return "", errors.Errorf("%s not found in root.erofs", filename)
-	}
-	return found, nil
-}
-
-func findFileInSquashfs(rootSquashfs *squashfs.FileSystem, filename string) (string, error) {
-	var found string
-	err := fs.WalkDir(rootSquashfs, ".", func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if found != "" {
-			return nil
-		}
-		if entry.Name() == filename && entry.Type().IsRegular() {
-			found = path
-			return fs.SkipAll
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	if found == "" {
-		return "", errors.Errorf("%s not found in root.squashfs", filename)
+		return "", errors.Errorf("%s not found in %s", filename, rootName)
 	}
 	return found, nil
 }
