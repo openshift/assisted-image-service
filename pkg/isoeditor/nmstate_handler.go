@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/diskfs/go-diskfs/backend"
 	"github.com/diskfs/go-diskfs/backend/file"
 	"github.com/diskfs/go-diskfs/filesystem/erofs"
+	"github.com/diskfs/go-diskfs/filesystem/squashfs"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -106,22 +106,22 @@ func NewNmstatectlExtractorFactory(executer Executer) NmstatectlExtractorFactory
 }
 
 func (f *nmstatectlExtractorFactory) CreateNmstatectlExtractor(rootfsPath string) (NmstatectlExtractor, error) {
-	extension, erofsOffset, erofsSize, err := inspectRootfs(rootfsPath)
+	extension, rootOffset, rootSize, err := inspectRootfs(rootfsPath)
 	if err != nil {
 		return nil, err
 	}
 
 	switch extension {
 	case "squashfs":
-		return &squashfsExtractor{executer: f.executer}, nil
+		return &squashfsExtractor{offset: rootOffset, size: rootSize}, nil
 	case "erofs":
-		return &erofsExtractor{offset: erofsOffset, size: erofsSize}, nil
+		return &erofsExtractor{offset: rootOffset, size: rootSize}, nil
 	default:
 		return nil, fmt.Errorf("unknown extension for root file: %s", extension)
 	}
 }
 
-func inspectRootfs(rootfsPath string) (extension string, erofsOffset, erofsSize int64, err error) {
+func inspectRootfs(rootfsPath string) (extension string, rootOffset, rootSize int64, err error) {
 	rootfsFile, err := os.Open(rootfsPath)
 	if err != nil {
 		return "", 0, 0, errors.Wrap(err, "failed to open rootfs.img")
@@ -154,76 +154,64 @@ func inspectRootfs(rootfsPath string) (extension string, erofsOffset, erofsSize 
 			return "", 0, 0, errors.Errorf("root file %s in rootfs.img is not a regular file", header.Name)
 		}
 
-		erofsOffset, headerErr = reader.Seek(0, io.SeekCurrent)
+		rootOffset, headerErr = reader.Seek(0, io.SeekCurrent)
 		if headerErr != nil {
 			return "", 0, 0, errors.Wrap(headerErr, "failed to locate root filesystem data in rootfs.img")
 		}
 		if header.Size <= 0 {
 			return "", 0, 0, errors.Errorf("root file %s in rootfs.img has invalid size %d", header.Name, header.Size)
 		}
-		if erofsOffset > rootfsInfo.Size() || header.Size > rootfsInfo.Size()-erofsOffset {
+		if rootOffset > rootfsInfo.Size() || header.Size > rootfsInfo.Size()-rootOffset {
 			return "", 0, 0, errors.Errorf("root file %s extends beyond rootfs.img", header.Name)
 		}
-		return matches[1], erofsOffset, header.Size, nil
+		return matches[1], rootOffset, header.Size, nil
 	}
 }
 
 type squashfsExtractor struct {
-	executer Executer
+	offset int64
+	size   int64
 }
 
-// TODO: Update the code to utilize go-diskfs's squashfs instead of unsquashfs once go-diskfs supports the zstd compression format used by CoreOS - MGMT-19227
-func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, workDir string) ([]byte, error) {
-	if workDir != "" {
-		if err := os.MkdirAll(workDir, os.ModePerm); err != nil {
-			return nil, errors.Wrap(err, "failed to create nmstate work dir")
-		}
-	}
-	nmstateDir, err := os.MkdirTemp(workDir, "nmstate-")
+func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, _ string) ([]byte, error) {
+	rootfsFile, err := os.Open(rootfsPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create nmstate temp dir")
+		return nil, errors.Wrap(err, "failed to open rootfs.img")
 	}
-	defer func() {
-		if removeErr := os.RemoveAll(nmstateDir); removeErr != nil {
-			log.WithError(removeErr).Error("failed to remove nmstate temp dir")
-		}
-	}()
+	defer rootfsFile.Close()
 
-	_, err = e.executer.Execute(fmt.Sprintf("cat %s | cpio -i", rootfsPath), nmstateDir)
+	rootfsStorage := file.New(rootfsFile, true)
+	rootSquashfsStorage := backend.Sub(rootfsStorage, e.offset, e.size)
+	rootSquashfs, err := squashfs.Read(rootSquashfsStorage, e.size, 0, 0)
 	if err != nil {
-		log.Errorf("failed to extract rootfs.img using cpio command: %v", err.Error())
+		log.Errorf("failed to read root.squashfs: %v", err.Error())
+		return nil, err
+	}
+	defer rootSquashfs.Close()
+
+	nmstatectlPath, err := findFileInSquashfs(rootSquashfs, "nmstatectl")
+	if err != nil {
+		log.Errorf("failed to search for nmstatectl in root.squashfs: %v", err.Error())
 		return nil, err
 	}
 
-	// limiting files is needed on el<=9 due to https://github.com/plougher/squashfs-tools/issues/125
-	ulimit := "ulimit -n 1024"
-
-	// Listing the filesystem concisely, displaying only files (using `-lc` option).
-	// Each file in the output won't include any prefix before `/ostree` (by using `-dest ''` option),
-	// which is useful when invoking `-extract-file` (after finding the `nmstatectl` binary path).
-	list, err := e.executer.Execute(fmt.Sprintf("%s ; unsquashfs -dest '' -lc %s", ulimit, "root.squashfs"), nmstateDir)
+	nmstatectlInfo, err := rootSquashfs.Stat(nmstatectlPath)
 	if err != nil {
-		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to stat %s in root.squashfs", nmstatectlPath)
+	}
+	if !nmstatectlInfo.Mode().IsRegular() {
+		return nil, errors.Errorf("%s in root.squashfs is not a regular file", nmstatectlPath)
 	}
 
-	r, err := regexp.Compile(".*nmstatectl")
+	nmstatectlContent, err := rootSquashfs.ReadFile(nmstatectlPath)
 	if err != nil {
-		log.Errorf("failed to compile regexp: %v", err.Error())
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to read %s from root.squashfs", nmstatectlPath)
 	}
-	binaryPath := r.FindString(list)
-	if binaryPath == "" {
-		return nil, errors.New("nmstatectl not found in root.squashfs")
+	if int64(len(nmstatectlContent)) != nmstatectlInfo.Size() {
+		return nil, errors.Errorf("incomplete read of %s from root.squashfs: got %d bytes, expected %d", nmstatectlPath, len(nmstatectlContent), nmstatectlInfo.Size())
 	}
 
-	_, err = e.executer.Execute(fmt.Sprintf("%s ; unsquashfs -no-xattrs %s -extract-file %s", ulimit, "root.squashfs", binaryPath), nmstateDir)
-	if err != nil {
-		log.Errorf("failed to unsquashfs root.squashfs: %v", err.Error())
-		return nil, err
-	}
-	nmstatectlPath := filepath.Join(nmstateDir, "squashfs-root", binaryPath)
-	return os.ReadFile(nmstatectlPath)
+	return nmstatectlContent, nil
 }
 
 type erofsExtractor struct {
@@ -292,6 +280,30 @@ func findFileInErofs(rootErofs *erofs.FileSystem, filename string) (string, erro
 	}
 	if found == "" {
 		return "", errors.Errorf("%s not found in root.erofs", filename)
+	}
+	return found, nil
+}
+
+func findFileInSquashfs(rootSquashfs *squashfs.FileSystem, filename string) (string, error) {
+	var found string
+	err := fs.WalkDir(rootSquashfs, ".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if found != "" {
+			return nil
+		}
+		if entry.Name() == filename && entry.Type().IsRegular() {
+			found = path
+			return fs.SkipAll
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if found == "" {
+		return "", errors.Errorf("%s not found in root.squashfs", filename)
 	}
 	return found, nil
 }
