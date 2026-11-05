@@ -16,8 +16,6 @@ RUN dnf install -y podman \
     openssl-devel \
     gcc \
     git \
-    cpio \
-    squashfs-tools \
     && dnf clean all && \
     update-crypto-policies --set DEFAULT:PQ
 

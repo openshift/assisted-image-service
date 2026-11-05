@@ -41,23 +41,6 @@ LABEL url https://github.com/openshift/assisted-image-service
 LABEL vendor "Red Hat, Inc."
 LABEL maintainer "Red Hat"
 
-# Install cpio directly with microdnf (available in UBI minimal)
-RUN microdnf install -y cpio && microdnf clean all
-
-# Install dnf for external repository management
-RUN microdnf install -y dnf && microdnf clean all
-
-# Add CentOS Stream repositories for packages not available in UBI
-RUN dnf install -y 'dnf-command(config-manager)' && \
-    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/ && \
-    dnf config-manager --add-repo http://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/
-
-# Import CentOS GPG keys for secure package verification
-RUN rpm --import https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
-
-# Install squashfs-tools from CentOS Stream repositories
-RUN dnf install -y squashfs-tools && dnf clean all
-
 # Ensure UID can write in data dir (e.g.: when using podman, docker, ...)
 # Ensure root group can write in data dir when deployed on OCP
 # https://docs.openshift.com/container-platform/4.16/openshift_images/create-images.html#use-uid_create-images

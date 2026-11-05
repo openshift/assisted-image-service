@@ -37,9 +37,6 @@ RUN mkdir $DATA_TEMP_DIR && chmod 775 $DATA_TEMP_DIR
 VOLUME $DATA_TEMP_DIR
 ENV DATA_TEMP_DIR=$DATA_TEMP_DIR
 
-# Install runtime packages directly with microdnf (rpm-prefetching makes them available)
-RUN microdnf install -y cpio squashfs-tools && microdnf clean all
-
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-image-service /assisted-image-service
 
