@@ -84,6 +84,18 @@ func erofsRootfs(t *testing.T, fixture string) string {
 	}, [][]byte{[]byte("abc"), image})
 }
 
+func squashfsRootfs(t *testing.T, fixture string) string {
+	t.Helper()
+	image, err := os.ReadFile(filepath.Join("testdata", fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return writeRootfsArchive(t, []cpio.Header{
+		{Name: "metadata", Mode: cpio.ModeRegular | 0644, Size: 3},
+		{Name: "root.squashfs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))},
+	}, [][]byte{[]byte("abc"), image})
+}
+
 func TestBuildNmstateCpioArchive(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -182,6 +194,104 @@ func TestErofsExtractionErrors(t *testing.T) {
 	})
 }
 
+func TestNativeSquashfsNmstateArchive(t *testing.T) {
+	rootfs := squashfsRootfs(t, "nmstatectl-zstd.squashfs")
+	// Any shell command is an unexpected mock call and fails the test.
+	executer := NewMockExecuter(gomock.NewController(t))
+	workDir := filepath.Join(t.TempDir(), "absent")
+	archive, err := NewNmstateHandler(workDir, executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readNmstateArchive(t, archive, bytes.Repeat([]byte("mock-nmstatectl-binary\n"), 8192))
+	if _, err := os.Stat(workDir); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("native extraction created a temporary directory: %v", err)
+	}
+}
+
+func TestSquashfsExtractionErrors(t *testing.T) {
+	for _, fixture := range []string{"nmstatectl-missing.squashfs", "nmstatectl-nonregular.squashfs"} {
+		t.Run(fixture, func(t *testing.T) {
+			executer := NewMockExecuter(gomock.NewController(t))
+			handler := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer))
+			if _, err := handler.BuildNmstateCpioArchive(squashfsRootfs(t, fixture)); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+				t.Fatalf("expected missing regular binary error, got %v", err)
+			}
+		})
+	}
+	t.Run("malformed SquashFS", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/nmstatectl-malformed.squashfs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.squashfs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
+		executer := NewMockExecuter(gomock.NewController(t))
+		if _, err := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs); err == nil {
+			t.Fatal("expected SquashFS reader error")
+		}
+	})
+	t.Run("rootfs removed after inspection", func(t *testing.T) {
+		rootfs := squashfsRootfs(t, "nmstatectl-zstd.squashfs")
+		extractor, err := NewNmstatectlExtractorFactory(nil).CreateNmstatectlExtractor(rootfs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(rootfs); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := extractor.ExtractNmstatectl(rootfs, t.TempDir()); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("expected missing rootfs error, got %v", err)
+		}
+	})
+}
+
+func TestNmstatectlExtractorFactory(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		rootName string
+		fixture  string
+	}{
+		{"squashfs", "root.squashfs", "nmstatectl-zstd.squashfs"},
+		{"erofs", "root.erofs", "nmstatectl.erofs"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			image, err := os.ReadFile(filepath.Join("testdata", tc.fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			rootfs := writeRootfsArchive(t, []cpio.Header{
+				{Name: "metadata", Mode: cpio.ModeRegular | 0644, Size: 3},
+				{Name: tc.rootName, Mode: cpio.ModeRegular | 0644, Size: int64(len(image))},
+			}, [][]byte{[]byte("abc"), image})
+			archive, err := os.ReadFile(rootfs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			offset := bytes.Index(archive, image)
+			if offset < 0 {
+				t.Fatal("root filesystem not found in archive")
+			}
+
+			extractor, err := NewNmstatectlExtractorFactory(nil).CreateNmstatectlExtractor(rootfs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch typedExtractor := extractor.(type) {
+			case *squashfsExtractor:
+				if typedExtractor.offset != int64(offset) || typedExtractor.size != int64(len(image)) {
+					t.Fatalf("unexpected SquashFS extractor bounds: %d %d", typedExtractor.offset, typedExtractor.size)
+				}
+			case *erofsExtractor:
+				if typedExtractor.offset != int64(offset) || typedExtractor.size != int64(len(image)) {
+					t.Fatalf("unexpected EROFS extractor bounds: %d %d", typedExtractor.offset, typedExtractor.size)
+				}
+			default:
+				t.Fatalf("unexpected extractor type: %T", extractor)
+			}
+		})
+	}
+}
+
 func TestInspectRootfs(t *testing.T) {
 	for _, name := range []string{"root.erofs", "./root.erofs", "root.squashfs"} {
 		t.Run(name, func(t *testing.T) {
@@ -241,26 +351,35 @@ func TestInspectRootfs(t *testing.T) {
 			t.Fatalf("expected missing rootfs error, got %v", err)
 		}
 	})
-	t.Run("member extends beyond EOF", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/nmstatectl.erofs")
-		if err != nil {
-			t.Fatal(err)
-		}
-		var archive bytes.Buffer
-		writer := cpio.NewWriter(&archive)
-		if err := writer.WriteHeader(&cpio.Header{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(2 * len(image))}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := writer.Write(image); err != nil {
-			t.Fatal(err)
-		}
-		rootfs := filepath.Join(t.TempDir(), "rootfs.img")
-		if err := os.WriteFile(rootfs, archive.Bytes(), 0600); err != nil {
-			t.Fatal(err)
-		}
-		executer := NewMockExecuter(gomock.NewController(t))
-		if _, err := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
-			t.Fatalf("expected truncated member error, got %v", err)
-		}
-	})
+	for _, tc := range []struct {
+		name     string
+		rootName string
+		fixture  string
+	}{
+		{"squashfs member extends beyond EOF", "root.squashfs", "nmstatectl-zstd.squashfs"},
+		{"erofs member extends beyond EOF", "root.erofs", "nmstatectl.erofs"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			image, err := os.ReadFile(filepath.Join("testdata", tc.fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var archive bytes.Buffer
+			writer := cpio.NewWriter(&archive)
+			if err := writer.WriteHeader(&cpio.Header{Name: tc.rootName, Mode: cpio.ModeRegular | 0644, Size: int64(2 * len(image))}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := writer.Write(image); err != nil {
+				t.Fatal(err)
+			}
+			rootfs := filepath.Join(t.TempDir(), "rootfs.img")
+			if err := os.WriteFile(rootfs, archive.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			executer := NewMockExecuter(gomock.NewController(t))
+			if _, err := NewNmstateHandler(t.TempDir(), executer, NewNmstatectlExtractorFactory(executer)).BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
+				t.Fatalf("expected truncated member error, got %v", err)
+			}
+		})
+	}
 }
