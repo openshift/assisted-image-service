@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -97,10 +98,12 @@ func (s *ServerInfo) Shutdown() bool {
 }
 
 // ApplyTLSProfile configures the HTTPS server with the given TLS minimum
-// version and cipher suites. The version should be a Go TLS version name
-// (e.g., "VersionTLS12"). Cipher suites should be comma-separated IANA names.
-// If minVersion is empty, no TLS configuration is applied.
-func (s *ServerInfo) ApplyTLSProfile(minVersion, cipherSuites string) {
+// version, cipher suites, and curve preferences. The version should be a Go
+// TLS version name (e.g., "VersionTLS12"). Cipher suites should be
+// comma-separated IANA names. Curve preferences should be comma-separated
+// numeric Go crypto/tls CurveID values. If minVersion is empty, no TLS
+// configuration is applied.
+func (s *ServerInfo) ApplyTLSProfile(minVersion, cipherSuites, curvePreferences string) {
 	if s.HTTPS == nil || minVersion == "" {
 		return
 	}
@@ -128,8 +131,41 @@ func (s *ServerInfo) ApplyTLSProfile(minVersion, cipherSuites string) {
 		}
 	}
 
+	if curvePreferences != "" {
+		var unsupported []string
+		for _, raw := range strings.Split(curvePreferences, ",") {
+			raw = strings.TrimSpace(raw)
+			if raw == "" {
+				continue
+			}
+			if id, ok := curvePreferenceID(raw); ok {
+				cfg.CurvePreferences = append(cfg.CurvePreferences, id)
+			} else {
+				unsupported = append(unsupported, raw)
+			}
+		}
+		if len(unsupported) > 0 {
+			log.Infof("TLS profile contains curve preferences that Go does not implement, ignoring: %s", strings.Join(unsupported, ", "))
+		}
+	}
+
 	s.HTTPS.TLSConfig = cfg
-	log.Infof("TLS profile applied: MinVersion=%s", minVersion)
+	log.Infof("TLS profile applied: MinVersion=%s CipherSuites=%d CurvePreferences=%d", minVersion, len(cfg.CipherSuites), len(cfg.CurvePreferences))
+}
+
+// curvePreferenceID resolves a numeric Go crypto/tls CurveID. Values that this
+// Go version does not implement are rejected, matching kube-apiserver's
+// --tls-curve-preferences flag.
+func curvePreferenceID(raw string) (tls.CurveID, bool) {
+	id, err := strconv.ParseUint(raw, 10, 16)
+	if err != nil || id == 0 {
+		return 0, false
+	}
+	curve := tls.CurveID(id)
+	if strings.HasPrefix(curve.String(), "CurveID(") {
+		return 0, false
+	}
+	return curve, true
 }
 
 // cipherSuiteID resolves an IANA cipher suite name to its Go identifier. Both

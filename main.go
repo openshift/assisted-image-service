@@ -31,6 +31,7 @@ var Options struct {
 	HTTPSCertFile         string `envconfig:"HTTPS_CERT_FILE"`
 	TLSMinVersion         string `envconfig:"TLS_MIN_VERSION"`
 	TLSCipherSuites       string `envconfig:"TLS_CIPHER_SUITES"`
+	TLSCurvePreferences   string `envconfig:"TLS_CURVE_PREFERENCES"`
 
 	// Deprecated - use ASSISTED_SERVICE_API_TRUSTED_CA_FILE instead
 	HTTPSCAFile string `envconfig:"HTTPS_CA_FILE"`
@@ -193,7 +194,7 @@ func main() {
 	http.Handle("/bytoken/", imageHandler)
 	http.Handle("/s390x-initrd-addrsize", imageHandler)
 
-	serverInfo.ApplyTLSProfile(Options.TLSMinVersion, Options.TLSCipherSuites)
+	serverInfo.ApplyTLSProfile(Options.TLSMinVersion, Options.TLSCipherSuites, Options.TLSCurvePreferences)
 	serverInfo.ListenAndServe()
 	<-stop
 	serverInfo.Shutdown()
