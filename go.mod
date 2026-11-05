@@ -6,7 +6,7 @@ toolchain go1.26.7
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
-	github.com/diskfs/go-diskfs v1.9.4
+	github.com/diskfs/go-diskfs v1.9.5-0.20261103130516-f6fbf0b9b4f2
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
