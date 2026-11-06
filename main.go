@@ -114,8 +114,7 @@ func main() {
 		log.Fatalf("Failed to unmarshal OSImageDownloadQueryParams: %v\n", err)
 	}
 
-	nmstatectlExtractorFactory := isoeditor.NewNmstatectlExtractorFactory()
-	nmstateHandler := isoeditor.NewNmstateHandler(Options.DataTempDir, nmstatectlExtractorFactory)
+	nmstateHandler := isoeditor.NewNmstateHandler(Options.DataTempDir)
 	is, err := imagestore.NewImageStore(
 		isoeditor.NewEditor(Options.DataTempDir, nmstateHandler),
 		Options.DataDir,

@@ -403,8 +403,7 @@ var _ = BeforeSuite(func() {
 	imageDir, err = os.MkdirTemp("", "imagesTest")
 	Expect(err).To(BeNil())
 
-	nmstatectlExtractorFactory := isoeditor.NewNmstatectlExtractorFactory()
-	nmstateHandler := isoeditor.NewNmstateHandler(imageDir, nmstatectlExtractorFactory)
+	nmstateHandler := isoeditor.NewNmstateHandler(imageDir)
 	imageStore, err = imagestore.NewImageStore(isoeditor.NewEditor(imageDir, nmstateHandler), imageDir, imageServiceBaseURL, false, versions, "", map[string]string{}, map[string]string{}, nmstateHandler)
 	Expect(err).NotTo(HaveOccurred())
 

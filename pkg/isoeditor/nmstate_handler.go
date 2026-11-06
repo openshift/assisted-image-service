@@ -23,14 +23,12 @@ type NmstateHandler interface {
 }
 
 type nmstateHandler struct {
-	workDir                    string
-	nmstatectlExtractorFactory NmstatectlExtractorFactory
+	workDir string
 }
 
-func NewNmstateHandler(workDir string, nmstatectlExtractorFactory NmstatectlExtractorFactory) NmstateHandler {
+func NewNmstateHandler(workDir string) NmstateHandler {
 	return &nmstateHandler{
-		workDir:                    workDir,
-		nmstatectlExtractorFactory: nmstatectlExtractorFactory,
+		workDir: workDir,
 	}
 }
 
@@ -50,7 +48,7 @@ func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, err
 }
 
 func (n *nmstateHandler) extractNmstatectl(rootfsPath string) ([]byte, error) {
-	nmstatectlExtractor, err := n.nmstatectlExtractorFactory.CreateNmstatectlExtractor(rootfsPath)
+	nmstatectlExtractor, err := createNmstatectlExtractor(rootfsPath)
 	if err != nil {
 		log.Errorf("failed to create nmstate extractor: %v", err.Error())
 		return nil, err
@@ -59,24 +57,11 @@ func (n *nmstateHandler) extractNmstatectl(rootfsPath string) ([]byte, error) {
 	return nmstatectlExtractor.ExtractNmstatectl(rootfsPath, n.workDir)
 }
 
-//go:generate mockgen -package=isoeditor -destination=mock_nmstatectl_extractor.go . NmstatectlExtractor
-type NmstatectlExtractor interface {
+type nmstatectlExtractor interface {
 	ExtractNmstatectl(rootfsPath, workDir string) ([]byte, error)
 }
 
-//go:generate mockgen -package=isoeditor -destination=mock_nmstatectl_extractor_factory.go . NmstatectlExtractorFactory
-type NmstatectlExtractorFactory interface {
-	CreateNmstatectlExtractor(rootfsPath string) (NmstatectlExtractor, error)
-}
-
-type nmstatectlExtractorFactory struct {
-}
-
-func NewNmstatectlExtractorFactory() NmstatectlExtractorFactory {
-	return &nmstatectlExtractorFactory{}
-}
-
-func (f *nmstatectlExtractorFactory) CreateNmstatectlExtractor(rootfsPath string) (NmstatectlExtractor, error) {
+func createNmstatectlExtractor(rootfsPath string) (nmstatectlExtractor, error) {
 	extension, rootOffset, rootSize, err := inspectRootfs(rootfsPath)
 	if err != nil {
 		return nil, err
