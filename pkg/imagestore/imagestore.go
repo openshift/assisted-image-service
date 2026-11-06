@@ -514,15 +514,24 @@ func (s *rhcosStore) extractAndCacheNmstatectl(imageInfo OSImage) error {
 
 	log.Debugf("Extracting and caching nmstatectl from %s to %s", fullPath, nmstatectlPath)
 
-	compressedCpio, err := s.nmstateHandler.BuildNmstateCpioArchiveFromISO(fullPath, isoeditor.RootfsImagePath)
+	cacheFile, err := os.OpenFile(nmstatectlPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to build nmstate cpio archive: %v", err)
+		return fmt.Errorf("failed to create nmstatectl cache: %v", err)
+	}
+	buildErr := s.nmstateHandler.BuildNmstateCpioArchiveFromISO(fullPath, isoeditor.RootfsImagePath, cacheFile)
+	closeErr := cacheFile.Close()
+	if buildErr != nil {
+		_ = os.Remove(nmstatectlPath)
+		return fmt.Errorf("failed to build nmstate cpio archive: %v", buildErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(nmstatectlPath)
+		return fmt.Errorf("failed to close nmstatectl cache: %v", closeErr)
 	}
 
-	// Write to cache
-	err = os.WriteFile(nmstatectlPath, compressedCpio, 0755) //nolint:gosec
-	if err != nil {
-		return fmt.Errorf("failed to cache nmstatectl: %v", err)
+	if err := os.Chmod(nmstatectlPath, 0755); err != nil { //nolint:gosec
+		_ = os.Remove(nmstatectlPath)
+		return fmt.Errorf("failed to set nmstatectl cache permissions: %v", err)
 	}
 
 	log.Infof("Successfully cached nmstatectl for %s-%s", imageVersion, arch)

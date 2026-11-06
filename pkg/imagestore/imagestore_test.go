@@ -601,7 +601,7 @@ var _ = Context("with a data directory configured", func() {
 				// If arch is s390x, CreateMinimalISOTemplate must not be called.
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				// If nmstatectl is cached, it must not be extracted from the ISO.
-				mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any()).Times(0)
+				mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 				Expect(is.Populate(ctx)).To(Succeed())
 
 			})
@@ -637,7 +637,7 @@ var _ = Context("with a data directory configured", func() {
 					expectedRootfs := fmt.Sprintf("http://images.example.com/boot-artifacts/rootfs?arch=%s&version=%s", arch, archVersion.Version)
 					mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), expectedRootfs, arch, gomock.Any(), archVersion.OpenshiftVersion, nmstatectlPath).Return(nil)
 					// If nmstatectl is cached, it must not be extracted from the ISO.
-					mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any()).Times(0)
+					mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					Expect(is.Populate(ctx)).To(Succeed())
 				},
 				Entry("x86_64 architecture", "x86_64"),
@@ -666,7 +666,7 @@ var _ = Context("with a data directory configured", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				mockEditor.EXPECT().CreateMinimalISOTemplate(gomock.Any(), gomock.Any(), "x86_64", gomock.Any(), oldVersion.OpenshiftVersion, nmstatectlPath).Return(nil)
-				mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any()).Times(0)
+				mockNmstateHandler.EXPECT().BuildNmstateCpioArchiveFromISO(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 				Expect(is.Populate(ctx)).To(Succeed())
 			})

@@ -142,11 +142,12 @@ func TestNativeErofsNmstateArchive(t *testing.T) {
 	} {
 		t.Run(tc.fixture, func(t *testing.T) {
 			rootfs := erofsRootfs(t, tc.fixture)
-			archive, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath)
+			var archive bytes.Buffer
+			err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &archive)
 			if err != nil {
 				t.Fatal(err)
 			}
-			readNmstateArchive(t, archive, tc.content)
+			readNmstateArchive(t, archive.Bytes(), tc.content)
 		})
 	}
 }
@@ -155,7 +156,7 @@ func TestErofsExtractionErrors(t *testing.T) {
 	for _, fixture := range []string{"nmstatectl-missing.erofs", "nmstatectl-nonregular.erofs"} {
 		t.Run(fixture, func(t *testing.T) {
 			handler := NewNmstateHandler()
-			if _, err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, erofsRootfs(t, fixture)), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+			if err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, erofsRootfs(t, fixture)), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
 				t.Fatalf("expected missing regular binary error, got %v", err)
 			}
 		})
@@ -163,12 +164,12 @@ func TestErofsExtractionErrors(t *testing.T) {
 	t.Run("malformed EROFS", func(t *testing.T) {
 		image := make([]byte, 4096)
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "magic") {
+		if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "magic") {
 			t.Fatalf("expected EROFS reader error, got %v", err)
 		}
 	})
 	t.Run("missing ISO", func(t *testing.T) {
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "does not exist") {
 			t.Fatalf("expected missing ISO error, got %v", err)
 		}
 	})
@@ -176,18 +177,19 @@ func TestErofsExtractionErrors(t *testing.T) {
 
 func TestNativeSquashfsNmstateArchive(t *testing.T) {
 	rootfs := squashfsRootfs(t, "nmstatectl-zstd.squashfs")
-	archive, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath)
+	var archive bytes.Buffer
+	err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &archive)
 	if err != nil {
 		t.Fatal(err)
 	}
-	readNmstateArchive(t, archive, bytes.Repeat([]byte("mock-nmstatectl-binary\n"), 8192))
+	readNmstateArchive(t, archive.Bytes(), bytes.Repeat([]byte("mock-nmstatectl-binary\n"), 8192))
 }
 
 func TestSquashfsExtractionErrors(t *testing.T) {
 	for _, fixture := range []string{"nmstatectl-missing.squashfs", "nmstatectl-nonregular.squashfs"} {
 		t.Run(fixture, func(t *testing.T) {
 			handler := NewNmstateHandler()
-			if _, err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, squashfsRootfs(t, fixture)), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+			if err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, squashfsRootfs(t, fixture)), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
 				t.Fatalf("expected missing regular binary error, got %v", err)
 			}
 		})
@@ -198,12 +200,12 @@ func TestSquashfsExtractionErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.squashfs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil {
+		if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &bytes.Buffer{}); err == nil {
 			t.Fatal("expected SquashFS reader error")
 		}
 	})
 	t.Run("missing ISO", func(t *testing.T) {
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "does not exist") {
 			t.Fatalf("expected missing ISO error, got %v", err)
 		}
 	})
@@ -250,7 +252,7 @@ func TestInspectRootfs(t *testing.T) {
 	}
 	t.Run("unsupported filesystem", func(t *testing.T) {
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.ext4", Mode: cpio.ModeRegular | 0644, Size: 3}}, [][]byte{[]byte("abc")})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "unknown extension") {
+		if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "unknown extension") {
 			t.Fatalf("expected unsupported filesystem error, got %v", err)
 		}
 	})
@@ -293,7 +295,7 @@ func TestInspectRootfs(t *testing.T) {
 			if err := os.WriteFile(rootfs, archive.Bytes(), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
+			if err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
 				t.Fatalf("expected truncated member error, got %v", err)
 			}
 		})

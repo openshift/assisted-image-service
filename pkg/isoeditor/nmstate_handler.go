@@ -17,7 +17,7 @@ import (
 
 //go:generate mockgen -package=isoeditor -destination=mock_nmstate_handler.go . NmstateHandler
 type NmstateHandler interface {
-	BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error)
+	BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string, output io.Writer) error
 }
 
 type nmstateHandler struct {
@@ -27,32 +27,21 @@ func NewNmstateHandler() NmstateHandler {
 	return &nmstateHandler{}
 }
 
-func (n *nmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error) {
+func (n *nmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string, output io.Writer) error {
 	rootfsStorage, rootfsSize, err := GetISOFileStorage(isoPath, rootfsPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rootfsStorage.Close()
 
-	content, err := n.extractNmstatectlFromStorage(rootfsStorage, rootfsSize)
-	if err != nil {
-		return nil, err
-	}
-
-	return generateCompressedCPIO([]fileEntry{
-		{
-			Content: content,
-			Path:    NmstatectlPathInRamdisk,
-			Mode:    0o100_755,
-		},
-	})
+	return n.writeNmstatectlCpioArchive(rootfsStorage, rootfsSize, output)
 }
 
-func (n *nmstateHandler) extractNmstatectlFromStorage(rootfsStorage backend.Storage, rootfsSize int64) ([]byte, error) {
+func (n *nmstateHandler) writeNmstatectlCpioArchive(rootfsStorage backend.Storage, rootfsSize int64, output io.Writer) error {
 	root, err := inspectRootfs(rootfsStorage, rootfsSize)
 	if err != nil {
 		log.Errorf("failed to inspect rootfs.img: %v", err.Error())
-		return nil, err
+		return err
 	}
 
 	rootStorage := backend.Sub(rootfsStorage, root.Offset, root.Size)
@@ -63,15 +52,42 @@ func (n *nmstateHandler) extractNmstatectlFromStorage(rootfsStorage backend.Stor
 	case "erofs":
 		rootFS, err = erofs.Read(rootStorage, root.Size, 0, 0)
 	default:
-		return nil, fmt.Errorf("unknown extension for root file: %s", root.Name)
+		return fmt.Errorf("unknown extension for root file: %s", root.Name)
 	}
 	if err != nil {
 		log.Errorf("failed to read %s: %v", root.Name, err.Error())
-		return nil, err
+		return err
 	}
 	defer rootFS.Close()
 
-	return extractNmstatectl(rootFS, root.Name)
+	nmstatectlPath, err := findFileInRootfs(rootFS, "nmstatectl", root.Name)
+	if err != nil {
+		log.Errorf("failed to search for nmstatectl in %s: %v", root.Name, err.Error())
+		return err
+	}
+
+	nmstatectlInfo, err := rootFS.Stat(nmstatectlPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to stat %s in %s", nmstatectlPath, root.Name)
+	}
+	if !nmstatectlInfo.Mode().IsRegular() {
+		return errors.Errorf("%s in %s is not a regular file", nmstatectlPath, root.Name)
+	}
+
+	nmstatectlFile, err := rootFS.Open(nmstatectlPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open %s from %s", nmstatectlPath, root.Name)
+	}
+	defer nmstatectlFile.Close()
+
+	return writeCompressedCPIO(output, []fileEntry{
+		{
+			Reader: nmstatectlFile,
+			Path:   NmstatectlPathInRamdisk,
+			Mode:   0o100_755,
+			Size:   nmstatectlInfo.Size(),
+		},
+	})
 }
 
 type rootfsMember struct {
@@ -125,34 +141,7 @@ func inspectRootfs(rootfsStorage backend.Storage, rootfsSize int64) (rootfsMembe
 type rootFilesystem interface {
 	fs.FS
 	Stat(name string) (fs.FileInfo, error)
-	ReadFile(name string) ([]byte, error)
 	Close() error
-}
-
-func extractNmstatectl(rootFS rootFilesystem, rootName string) ([]byte, error) {
-	nmstatectlPath, err := findFileInRootfs(rootFS, "nmstatectl", rootName)
-	if err != nil {
-		log.Errorf("failed to search for nmstatectl in %s: %v", rootName, err.Error())
-		return nil, err
-	}
-
-	nmstatectlInfo, err := rootFS.Stat(nmstatectlPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to stat %s in %s", nmstatectlPath, rootName)
-	}
-	if !nmstatectlInfo.Mode().IsRegular() {
-		return nil, errors.Errorf("%s in %s is not a regular file", nmstatectlPath, rootName)
-	}
-
-	nmstatectlContent, err := rootFS.ReadFile(nmstatectlPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %s from %s", nmstatectlPath, rootName)
-	}
-	if int64(len(nmstatectlContent)) != nmstatectlInfo.Size() {
-		return nil, errors.Errorf("incomplete read of %s from %s: got %d bytes, expected %d", nmstatectlPath, rootName, len(nmstatectlContent), nmstatectlInfo.Size())
-	}
-
-	return nmstatectlContent, nil
 }
 
 func findFileInRootfs(rootFS fs.FS, filename, rootName string) (string, error) {

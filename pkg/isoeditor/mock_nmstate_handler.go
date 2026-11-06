@@ -10,6 +10,7 @@
 package isoeditor
 
 import (
+	io "io"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -40,16 +41,15 @@ func (m *MockNmstateHandler) EXPECT() *MockNmstateHandlerMockRecorder {
 }
 
 // BuildNmstateCpioArchiveFromISO mocks base method.
-func (m *MockNmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error) {
+func (m *MockNmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string, output io.Writer) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildNmstateCpioArchiveFromISO", isoPath, rootfsPath)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "BuildNmstateCpioArchiveFromISO", isoPath, rootfsPath, output)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // BuildNmstateCpioArchiveFromISO indicates an expected call of BuildNmstateCpioArchiveFromISO.
-func (mr *MockNmstateHandlerMockRecorder) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath any) *gomock.Call {
+func (mr *MockNmstateHandlerMockRecorder) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath, output any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildNmstateCpioArchiveFromISO", reflect.TypeOf((*MockNmstateHandler)(nil).BuildNmstateCpioArchiveFromISO), isoPath, rootfsPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildNmstateCpioArchiveFromISO", reflect.TypeOf((*MockNmstateHandler)(nil).BuildNmstateCpioArchiveFromISO), isoPath, rootfsPath, output)
 }

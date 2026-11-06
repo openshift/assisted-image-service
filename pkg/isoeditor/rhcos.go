@@ -3,6 +3,7 @@ package isoeditor
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -119,25 +120,25 @@ func (e *rhcosEditor) CreateMinimalISOTemplate(fullISOPath, rootFSURL, arch, min
 	}
 
 	if versionOK {
-		var compressedCpio []byte
-		var readErr error
-
-		if _, err = os.Stat(nmstatectlPath); err == nil {
-			// Read and return the cached content
-			compressedCpio, readErr = os.ReadFile(nmstatectlPath)
-			if readErr != nil {
-				return fmt.Errorf("failed to read cached nmstatectl: %v", readErr)
-			}
-		} else if os.IsNotExist(err) {
-			// File doesn't exist - this should be an error condition
-			return fmt.Errorf("nmstatectl cache file not found: %s", nmstatectlPath)
-		} else {
-			// Some other error occurred
-			return fmt.Errorf("failed to stat nmstatectl cache file: %v", err)
-		}
-
-		err = os.WriteFile(ramDiskPath, compressedCpio, 0755) //nolint:gosec
+		nmstatectlFile, err := os.Open(nmstatectlPath)
 		if err != nil {
+			return fmt.Errorf("failed to open cached nmstatectl: %v", err)
+		}
+		defer nmstatectlFile.Close()
+
+		ramDiskFile, err := os.OpenFile(ramDiskPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(ramDiskFile, nmstatectlFile)
+		closeErr := ramDiskFile.Close()
+		if copyErr != nil {
+			return fmt.Errorf("failed to copy cached nmstatectl: %v", copyErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("failed to write cached nmstatectl: %v", closeErr)
+		}
+		if err := os.Chmod(ramDiskPath, 0755); err != nil { //nolint:gosec
 			return err
 		}
 	}

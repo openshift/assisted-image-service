@@ -403,45 +403,66 @@ func GetISO9660FileSystem(d *disk.Disk) (filesystem.FileSystem, error) {
 
 // fileEntry represents a single file to be added to a CPIO archive
 type fileEntry struct {
-	Content []byte
-	Path    string
-	Mode    cpio.FileMode
+	Reader io.Reader
+	Path   string
+	Mode   cpio.FileMode
+	Size   int64
 }
 
 func generateCompressedCPIO(files []fileEntry) ([]byte, error) {
-	// Run gzip compression
-	compressedBuffer := new(bytes.Buffer)
-	gzipWriter := gzip.NewWriter(compressedBuffer)
-	// Create CPIO archive
+	var compressedBuffer bytes.Buffer
+	if err := writeCompressedCPIO(&compressedBuffer, files); err != nil {
+		return nil, err
+	}
+	return compressedBuffer.Bytes(), nil
+}
+
+type countingWriter struct {
+	writer  io.Writer
+	written int64
+}
+
+func (w *countingWriter) Write(data []byte) (int, error) {
+	written, err := w.writer.Write(data)
+	w.written += int64(written)
+	return written, err
+}
+
+func writeCompressedCPIO(output io.Writer, files []fileEntry) error {
+	countingOutput := &countingWriter{writer: output}
+	gzipWriter := gzip.NewWriter(countingOutput)
 	cpioWriter := cpio.NewWriter(gzipWriter)
 
-	// Add each file to the archive
 	for _, file := range files {
 		if err := cpioWriter.WriteHeader(&cpio.Header{
 			Name: file.Path,
 			Mode: file.Mode,
-			Size: int64(len(file.Content)),
+			Size: file.Size,
 		}); err != nil {
-			return nil, errors.Wrap(err, "Failed to write CPIO header")
+			return errors.Wrap(err, "Failed to write CPIO header")
 		}
-		if _, err := cpioWriter.Write(file.Content); err != nil {
-			return nil, errors.Wrap(err, "Failed to write CPIO archive")
+		written, err := io.Copy(cpioWriter, file.Reader)
+		if err != nil {
+			return errors.Wrap(err, "Failed to write CPIO archive")
+		}
+		if written != file.Size {
+			return errors.Errorf("Failed to write CPIO archive: copied %d bytes, expected %d", written, file.Size)
 		}
 	}
 
 	if err := cpioWriter.Close(); err != nil {
-		return nil, errors.Wrap(err, "Failed to close CPIO archive")
+		return errors.Wrap(err, "Failed to close CPIO archive")
 	}
 	if err := gzipWriter.Close(); err != nil {
-		return nil, errors.Wrap(err, "Failed to gzip ignition config")
+		return errors.Wrap(err, "Failed to gzip ignition config")
 	}
 
-	padSize := (4 - (compressedBuffer.Len() % 4)) % 4
-	for i := 0; i < padSize; i++ {
-		if err := compressedBuffer.WriteByte(0); err != nil {
-			return nil, err
+	padSize := (4 - (countingOutput.written % 4)) % 4
+	if padSize > 0 {
+		if _, err := output.Write(make([]byte, padSize)); err != nil {
+			return errors.Wrap(err, "Failed to pad CPIO archive")
 		}
 	}
 
-	return compressedBuffer.Bytes(), nil
+	return nil
 }

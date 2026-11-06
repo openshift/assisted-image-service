@@ -17,9 +17,10 @@ func (ic *IgnitionContent) Archive() (*bytes.Reader, error) {
 
 	if len(ic.Config) > 0 {
 		files = append(files, fileEntry{
-			Content: ic.Config,
-			Path:    "config.ign",
-			Mode:    0o100_644,
+			Reader: bytes.NewReader(ic.Config),
+			Path:   "config.ign",
+			Mode:   0o100_644,
+			Size:   int64(len(ic.Config)),
 		})
 	}
 
@@ -28,9 +29,10 @@ func (ic *IgnitionContent) Archive() (*bytes.Reader, error) {
 			return nil, fmt.Errorf("system config filename %q contains path separators", filename)
 		}
 		files = append(files, fileEntry{
-			Content: content,
-			Path:    path.Join("usr", "lib", "ignition", "base.d", filename),
-			Mode:    0o100_644,
+			Reader: bytes.NewReader(content),
+			Path:   path.Join("usr", "lib", "ignition", "base.d", filename),
+			Mode:   0o100_644,
+			Size:   int64(len(content)),
 		})
 	}
 
