@@ -23,13 +23,10 @@ type NmstateHandler interface {
 }
 
 type nmstateHandler struct {
-	workDir string
 }
 
-func NewNmstateHandler(workDir string) NmstateHandler {
-	return &nmstateHandler{
-		workDir: workDir,
-	}
+func NewNmstateHandler() NmstateHandler {
+	return &nmstateHandler{}
 }
 
 func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
@@ -48,45 +45,54 @@ func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, err
 }
 
 func (n *nmstateHandler) extractNmstatectl(rootfsPath string) ([]byte, error) {
-	nmstatectlExtractor, err := createNmstatectlExtractor(rootfsPath)
+	root, err := inspectRootfs(rootfsPath)
 	if err != nil {
-		log.Errorf("failed to create nmstate extractor: %v", err.Error())
+		log.Errorf("failed to inspect rootfs.img: %v", err.Error())
 		return nil, err
 	}
 
-	return nmstatectlExtractor.ExtractNmstatectl(rootfsPath, n.workDir)
-}
-
-type nmstatectlExtractor interface {
-	ExtractNmstatectl(rootfsPath, workDir string) ([]byte, error)
-}
-
-func createNmstatectlExtractor(rootfsPath string) (nmstatectlExtractor, error) {
-	extension, rootOffset, rootSize, err := inspectRootfs(rootfsPath)
-	if err != nil {
-		return nil, err
-	}
-
-	switch extension {
-	case "squashfs":
-		return &squashfsExtractor{offset: rootOffset, size: rootSize}, nil
-	case "erofs":
-		return &erofsExtractor{offset: rootOffset, size: rootSize}, nil
-	default:
-		return nil, fmt.Errorf("unknown extension for root file: %s", extension)
-	}
-}
-
-func inspectRootfs(rootfsPath string) (extension string, rootOffset, rootSize int64, err error) {
 	rootfsFile, err := os.Open(rootfsPath)
 	if err != nil {
-		return "", 0, 0, errors.Wrap(err, "failed to open rootfs.img")
+		return nil, errors.Wrap(err, "failed to open rootfs.img")
+	}
+	defer rootfsFile.Close()
+
+	rootStorage := backend.Sub(file.New(rootfsFile, true), root.Offset, root.Size)
+	var rootFS rootFilesystem
+	switch root.Extension {
+	case "squashfs":
+		rootFS, err = squashfs.Read(rootStorage, root.Size, 0, 0)
+	case "erofs":
+		rootFS, err = erofs.Read(rootStorage, root.Size, 0, 0)
+	default:
+		return nil, fmt.Errorf("unknown extension for root file: %s", root.Name)
+	}
+	if err != nil {
+		log.Errorf("failed to read %s: %v", root.Name, err.Error())
+		return nil, err
+	}
+	defer rootFS.Close()
+
+	return extractNmstatectl(rootFS, root.Name)
+}
+
+type rootfsMember struct {
+	Name      string
+	Extension string
+	Offset    int64
+	Size      int64
+}
+
+func inspectRootfs(rootfsPath string) (rootfsMember, error) {
+	rootfsFile, err := os.Open(rootfsPath)
+	if err != nil {
+		return rootfsMember{}, errors.Wrap(err, "failed to open rootfs.img")
 	}
 	defer rootfsFile.Close()
 
 	rootfsInfo, err := rootfsFile.Stat()
 	if err != nil {
-		return "", 0, 0, errors.Wrap(err, "failed to stat rootfs.img")
+		return rootfsMember{}, errors.Wrap(err, "failed to stat rootfs.img")
 	}
 
 	reader := io.NewSectionReader(rootfsFile, 0, rootfsInfo.Size())
@@ -96,10 +102,10 @@ func inspectRootfs(rootfsPath string) (extension string, rootOffset, rootSize in
 	for {
 		header, headerErr := archive.Next()
 		if errors.Is(headerErr, io.EOF) {
-			return "", 0, 0, errors.New("failed to find root file in rootfs.img")
+			return rootfsMember{}, errors.New("failed to find root file in rootfs.img")
 		}
 		if headerErr != nil {
-			return "", 0, 0, errors.Wrap(headerErr, "failed to read rootfs.img CPIO header")
+			return rootfsMember{}, errors.Wrap(headerErr, "failed to read rootfs.img CPIO header")
 		}
 
 		matches := rootFileRegex.FindStringSubmatch(strings.TrimPrefix(header.Name, "./"))
@@ -107,75 +113,33 @@ func inspectRootfs(rootfsPath string) (extension string, rootOffset, rootSize in
 			continue
 		}
 		if !header.Mode.IsRegular() {
-			return "", 0, 0, errors.Errorf("root file %s in rootfs.img is not a regular file", header.Name)
+			return rootfsMember{}, errors.Errorf("root file %s in rootfs.img is not a regular file", header.Name)
 		}
 
-		rootOffset, headerErr = reader.Seek(0, io.SeekCurrent)
+		rootOffset, headerErr := reader.Seek(0, io.SeekCurrent)
 		if headerErr != nil {
-			return "", 0, 0, errors.Wrap(headerErr, "failed to locate root filesystem data in rootfs.img")
+			return rootfsMember{}, errors.Wrap(headerErr, "failed to locate root filesystem data in rootfs.img")
 		}
 		if header.Size <= 0 {
-			return "", 0, 0, errors.Errorf("root file %s in rootfs.img has invalid size %d", header.Name, header.Size)
+			return rootfsMember{}, errors.Errorf("root file %s in rootfs.img has invalid size %d", header.Name, header.Size)
 		}
 		if rootOffset > rootfsInfo.Size() || header.Size > rootfsInfo.Size()-rootOffset {
-			return "", 0, 0, errors.Errorf("root file %s extends beyond rootfs.img", header.Name)
+			return rootfsMember{}, errors.Errorf("root file %s extends beyond rootfs.img", header.Name)
 		}
-		return matches[1], rootOffset, header.Size, nil
+		return rootfsMember{
+			Name:      header.Name,
+			Extension: matches[1],
+			Offset:    rootOffset,
+			Size:      header.Size,
+		}, nil
 	}
-}
-
-type squashfsExtractor struct {
-	offset int64
-	size   int64
-}
-
-func (e *squashfsExtractor) ExtractNmstatectl(rootfsPath, _ string) ([]byte, error) {
-	rootfsFile, err := os.Open(rootfsPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open rootfs.img")
-	}
-	defer rootfsFile.Close()
-
-	rootfsStorage := file.New(rootfsFile, true)
-	rootStorage := backend.Sub(rootfsStorage, e.offset, e.size)
-	rootFS, err := squashfs.Read(rootStorage, e.size, 0, 0)
-	if err != nil {
-		log.Errorf("failed to read root.squashfs: %v", err.Error())
-		return nil, err
-	}
-	defer rootFS.Close()
-
-	return extractNmstatectl(rootFS, "root.squashfs")
-}
-
-type erofsExtractor struct {
-	offset int64
-	size   int64
-}
-
-func (e *erofsExtractor) ExtractNmstatectl(rootfsPath, _ string) ([]byte, error) {
-	rootfsFile, err := os.Open(rootfsPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open rootfs.img")
-	}
-	defer rootfsFile.Close()
-
-	rootfsStorage := file.New(rootfsFile, true)
-	rootStorage := backend.Sub(rootfsStorage, e.offset, e.size)
-	rootFS, err := erofs.Read(rootStorage, e.size, 0, 0)
-	if err != nil {
-		log.Errorf("failed to read root.erofs: %v", err.Error())
-		return nil, err
-	}
-	defer rootFS.Close()
-
-	return extractNmstatectl(rootFS, "root.erofs")
 }
 
 type rootFilesystem interface {
 	fs.FS
 	Stat(name string) (fs.FileInfo, error)
 	ReadFile(name string) ([]byte, error)
+	Close() error
 }
 
 func extractNmstatectl(rootFS rootFilesystem, rootName string) ([]byte, error) {
