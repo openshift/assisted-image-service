@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"regexp"
 	"strings"
 
 	"github.com/cavaliercoder/go-cpio"
 	"github.com/diskfs/go-diskfs/backend"
-	"github.com/diskfs/go-diskfs/backend/file"
 	"github.com/diskfs/go-diskfs/filesystem/erofs"
 	"github.com/diskfs/go-diskfs/filesystem/squashfs"
 	"github.com/pkg/errors"
@@ -19,7 +17,7 @@ import (
 
 //go:generate mockgen -package=isoeditor -destination=mock_nmstate_handler.go . NmstateHandler
 type NmstateHandler interface {
-	BuildNmstateCpioArchive(rootfsPath string) ([]byte, error)
+	BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error)
 }
 
 type nmstateHandler struct {
@@ -29,8 +27,14 @@ func NewNmstateHandler() NmstateHandler {
 	return &nmstateHandler{}
 }
 
-func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
-	content, err := n.extractNmstatectl(rootfsPath)
+func (n *nmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error) {
+	rootfsStorage, rootfsSize, err := GetISOFileStorage(isoPath, rootfsPath)
+	if err != nil {
+		return nil, err
+	}
+	defer rootfsStorage.Close()
+
+	content, err := n.extractNmstatectlFromStorage(rootfsStorage, rootfsSize)
 	if err != nil {
 		return nil, err
 	}
@@ -44,20 +48,14 @@ func (n *nmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, err
 	})
 }
 
-func (n *nmstateHandler) extractNmstatectl(rootfsPath string) ([]byte, error) {
-	root, err := inspectRootfs(rootfsPath)
+func (n *nmstateHandler) extractNmstatectlFromStorage(rootfsStorage backend.Storage, rootfsSize int64) ([]byte, error) {
+	root, err := inspectRootfs(rootfsStorage, rootfsSize)
 	if err != nil {
 		log.Errorf("failed to inspect rootfs.img: %v", err.Error())
 		return nil, err
 	}
 
-	rootfsFile, err := os.Open(rootfsPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open rootfs.img")
-	}
-	defer rootfsFile.Close()
-
-	rootStorage := backend.Sub(file.New(rootfsFile, true), root.Offset, root.Size)
+	rootStorage := backend.Sub(rootfsStorage, root.Offset, root.Size)
 	var rootFS rootFilesystem
 	switch root.Extension {
 	case "squashfs":
@@ -83,19 +81,8 @@ type rootfsMember struct {
 	Size      int64
 }
 
-func inspectRootfs(rootfsPath string) (rootfsMember, error) {
-	rootfsFile, err := os.Open(rootfsPath)
-	if err != nil {
-		return rootfsMember{}, errors.Wrap(err, "failed to open rootfs.img")
-	}
-	defer rootfsFile.Close()
-
-	rootfsInfo, err := rootfsFile.Stat()
-	if err != nil {
-		return rootfsMember{}, errors.Wrap(err, "failed to stat rootfs.img")
-	}
-
-	reader := io.NewSectionReader(rootfsFile, 0, rootfsInfo.Size())
+func inspectRootfs(rootfsStorage backend.Storage, rootfsSize int64) (rootfsMember, error) {
+	reader := io.NewSectionReader(rootfsStorage, 0, rootfsSize)
 	archive := cpio.NewReader(reader)
 	rootFileRegex := regexp.MustCompile(`^root\.([^.]+)$`)
 
@@ -123,7 +110,7 @@ func inspectRootfs(rootfsPath string) (rootfsMember, error) {
 		if header.Size <= 0 {
 			return rootfsMember{}, errors.Errorf("root file %s in rootfs.img has invalid size %d", header.Name, header.Size)
 		}
-		if rootOffset > rootfsInfo.Size() || header.Size > rootfsInfo.Size()-rootOffset {
+		if rootOffset > rootfsSize || header.Size > rootfsSize-rootOffset {
 			return rootfsMember{}, errors.Errorf("root file %s extends beyond rootfs.img", header.Name)
 		}
 		return rootfsMember{

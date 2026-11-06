@@ -39,17 +39,17 @@ func (m *MockNmstateHandler) EXPECT() *MockNmstateHandlerMockRecorder {
 	return m.recorder
 }
 
-// BuildNmstateCpioArchive mocks base method.
-func (m *MockNmstateHandler) BuildNmstateCpioArchive(rootfsPath string) ([]byte, error) {
+// BuildNmstateCpioArchiveFromISO mocks base method.
+func (m *MockNmstateHandler) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath string) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildNmstateCpioArchive", rootfsPath)
+	ret := m.ctrl.Call(m, "BuildNmstateCpioArchiveFromISO", isoPath, rootfsPath)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// BuildNmstateCpioArchive indicates an expected call of BuildNmstateCpioArchive.
-func (mr *MockNmstateHandlerMockRecorder) BuildNmstateCpioArchive(rootfsPath any) *gomock.Call {
+// BuildNmstateCpioArchiveFromISO indicates an expected call of BuildNmstateCpioArchiveFromISO.
+func (mr *MockNmstateHandlerMockRecorder) BuildNmstateCpioArchiveFromISO(isoPath, rootfsPath any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildNmstateCpioArchive", reflect.TypeOf((*MockNmstateHandler)(nil).BuildNmstateCpioArchive), rootfsPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildNmstateCpioArchiveFromISO", reflect.TypeOf((*MockNmstateHandler)(nil).BuildNmstateCpioArchiveFromISO), isoPath, rootfsPath)
 }

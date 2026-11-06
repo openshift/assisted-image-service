@@ -13,6 +13,7 @@ import (
 
 	"github.com/cavaliercoder/go-cpio"
 	diskfs "github.com/diskfs/go-diskfs"
+	"github.com/diskfs/go-diskfs/backend"
 	"github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/filesystem"
 	"github.com/diskfs/go-diskfs/filesystem/iso9660"
@@ -324,6 +325,42 @@ func GetISOFileInfo(filePath, isoPath string) (int64, int64, error) {
 	isoFile := fsFile.(*iso9660.File)
 	defaultSectorSize := uint32(2 * 1024)
 	return int64(isoFile.Location() * defaultSectorSize), isoFile.Size(), nil
+}
+
+// GetISOFileStorage returns a view of a contiguous file stored in an ISO image.
+// The caller must close the returned storage.
+func GetISOFileStorage(isoPath, filePath string) (backend.Storage, int64, error) {
+	d, err := diskfs.Open(isoPath, diskfs.WithOpenMode(diskfs.ReadOnly))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fs, err := GetISO9660FileSystem(d)
+	if err != nil {
+		_ = d.Close()
+		return nil, 0, err
+	}
+
+	file, err := fs.OpenFile(filePath, os.O_RDONLY)
+	if err != nil {
+		_ = d.Close()
+		return nil, 0, errors.Wrapf(err, "Failed to open file %s", filePath)
+	}
+
+	isoFile, ok := file.(*iso9660.File)
+	if !ok {
+		_ = file.Close()
+		_ = d.Close()
+		return nil, 0, fmt.Errorf("file %s in %s is not an ISO file", filePath, isoPath)
+	}
+	size := isoFile.Size()
+	offset := int64(isoFile.Location()) * 2048
+	if err := file.Close(); err != nil {
+		_ = d.Close()
+		return nil, 0, err
+	}
+
+	return backend.Sub(d.Backend, offset, size), size, nil
 }
 
 // Gets a readWrite seeker of a specific file from the ISO image

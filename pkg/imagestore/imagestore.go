@@ -512,39 +512,9 @@ func (s *rhcosStore) extractAndCacheNmstatectl(imageInfo OSImage) error {
 	// Get the path to the full ISO
 	fullPath := s.PathForParams(ImageTypeFull, imageVersion, arch)
 
-	// Read rootfs directly from ISO
-	rootfsFile, err := isoeditor.GetFileFromISO(fullPath, isoeditor.RootfsImagePath)
-	if err != nil {
-		return fmt.Errorf("failed to open rootfs from ISO: %v", err)
-	}
-	defer rootfsFile.Close()
+	log.Debugf("Extracting and caching nmstatectl from %s to %s", fullPath, nmstatectlPath)
 
-	// Create a temporary rootfs file for processing
-	tempRootfs, err := os.CreateTemp(s.dataDir, "rootfs-*.img")
-	if err != nil {
-		return fmt.Errorf("failed to create temp rootfs file: %v", err)
-	}
-	defer func() {
-		tempRootfs.Close()
-		if removeErr := os.Remove(tempRootfs.Name()); removeErr != nil {
-			log.WithError(removeErr).Errorf("Failed to remove temp rootfs file %s", tempRootfs.Name())
-		}
-	}()
-
-	// Stream copy from ISO file to temp file
-	if _, err = io.Copy(tempRootfs, rootfsFile); err != nil {
-		return fmt.Errorf("failed to copy rootfs content: %v", err)
-	}
-
-	// Ensure data is written to disk before nmstateHandler reads it
-	if err = tempRootfs.Sync(); err != nil {
-		return fmt.Errorf("failed to sync rootfs file: %v", err)
-	}
-
-	// Extract nmstatectl from rootfs and cache it
-	log.Debugf("Extracting and caching nmstatectl from %s to %s", tempRootfs.Name(), nmstatectlPath)
-
-	compressedCpio, err := s.nmstateHandler.BuildNmstateCpioArchive(tempRootfs.Name())
+	compressedCpio, err := s.nmstateHandler.BuildNmstateCpioArchiveFromISO(fullPath, isoeditor.RootfsImagePath)
 	if err != nil {
 		return fmt.Errorf("failed to build nmstate cpio archive: %v", err)
 	}

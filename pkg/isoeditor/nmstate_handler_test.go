@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cavaliercoder/go-cpio"
+	"github.com/diskfs/go-diskfs/backend/file"
 )
 
 func readNmstateArchive(t *testing.T, archive, content []byte) {
@@ -95,6 +96,41 @@ func squashfsRootfs(t *testing.T, fixture string) string {
 	}, [][]byte{[]byte("abc"), image})
 }
 
+func inspectRootfsPath(rootfsPath string) (rootfsMember, error) {
+	rootfsFile, err := os.Open(rootfsPath)
+	if err != nil {
+		return rootfsMember{}, err
+	}
+	rootfsStorage := file.New(rootfsFile, true)
+	rootfsInfo, err := rootfsStorage.Stat()
+	if err != nil {
+		_ = rootfsStorage.Close()
+		return rootfsMember{}, err
+	}
+	defer rootfsStorage.Close()
+	return inspectRootfs(rootfsStorage, rootfsInfo.Size())
+}
+
+func rootfsISO(t *testing.T, rootfsPath string) string {
+	t.Helper()
+	rootfs, err := os.ReadFile(rootfsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sourceDir, "images", "pxeboot"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, RootfsImagePath), rootfs, 0600); err != nil {
+		t.Fatal(err)
+	}
+	isoPath := filepath.Join(t.TempDir(), "rhcos-test.iso")
+	if err := Create(isoPath, sourceDir, "rhcos-test"); err != nil {
+		t.Fatal(err)
+	}
+	return isoPath
+}
+
 func TestNativeErofsNmstateArchive(t *testing.T) {
 	for _, tc := range []struct {
 		fixture string
@@ -106,7 +142,7 @@ func TestNativeErofsNmstateArchive(t *testing.T) {
 	} {
 		t.Run(tc.fixture, func(t *testing.T) {
 			rootfs := erofsRootfs(t, tc.fixture)
-			archive, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs)
+			archive, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,7 +155,7 @@ func TestErofsExtractionErrors(t *testing.T) {
 	for _, fixture := range []string{"nmstatectl-missing.erofs", "nmstatectl-nonregular.erofs"} {
 		t.Run(fixture, func(t *testing.T) {
 			handler := NewNmstateHandler()
-			if _, err := handler.BuildNmstateCpioArchive(erofsRootfs(t, fixture)); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+			if _, err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, erofsRootfs(t, fixture)), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
 				t.Fatalf("expected missing regular binary error, got %v", err)
 			}
 		})
@@ -127,27 +163,20 @@ func TestErofsExtractionErrors(t *testing.T) {
 	t.Run("malformed EROFS", func(t *testing.T) {
 		image := make([]byte, 4096)
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.erofs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "magic") {
+		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "magic") {
 			t.Fatalf("expected EROFS reader error, got %v", err)
 		}
 	})
-	t.Run("rootfs removed after inspection", func(t *testing.T) {
-		rootfs := erofsRootfs(t, "nmstatectl.erofs")
-		if _, err := inspectRootfs(rootfs); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Remove(rootfs); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("expected missing rootfs error, got %v", err)
+	t.Run("missing ISO", func(t *testing.T) {
+		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "does not exist") {
+			t.Fatalf("expected missing ISO error, got %v", err)
 		}
 	})
 }
 
 func TestNativeSquashfsNmstateArchive(t *testing.T) {
 	rootfs := squashfsRootfs(t, "nmstatectl-zstd.squashfs")
-	archive, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs)
+	archive, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +187,7 @@ func TestSquashfsExtractionErrors(t *testing.T) {
 	for _, fixture := range []string{"nmstatectl-missing.squashfs", "nmstatectl-nonregular.squashfs"} {
 		t.Run(fixture, func(t *testing.T) {
 			handler := NewNmstateHandler()
-			if _, err := handler.BuildNmstateCpioArchive(squashfsRootfs(t, fixture)); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
+			if _, err := handler.BuildNmstateCpioArchiveFromISO(rootfsISO(t, squashfsRootfs(t, fixture)), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "nmstatectl not found") {
 				t.Fatalf("expected missing regular binary error, got %v", err)
 			}
 		})
@@ -169,20 +198,13 @@ func TestSquashfsExtractionErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.squashfs", Mode: cpio.ModeRegular | 0644, Size: int64(len(image))}}, [][]byte{image})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); err == nil {
+		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil {
 			t.Fatal("expected SquashFS reader error")
 		}
 	})
-	t.Run("rootfs removed after inspection", func(t *testing.T) {
-		rootfs := squashfsRootfs(t, "nmstatectl-zstd.squashfs")
-		if _, err := inspectRootfs(rootfs); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Remove(rootfs); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); !errors.Is(err, fs.ErrNotExist) {
-			t.Fatalf("expected missing rootfs error, got %v", err)
+	t.Run("missing ISO", func(t *testing.T) {
+		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(filepath.Join(t.TempDir(), "absent.iso"), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "does not exist") {
+			t.Fatalf("expected missing ISO error, got %v", err)
 		}
 	})
 }
@@ -192,7 +214,7 @@ func TestInspectRootfs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			content := []byte("filesystem")
 			rootfs := writeRootfsArchive(t, []cpio.Header{{Name: name, Mode: cpio.ModeRegular | 0644, Size: int64(len(content))}}, [][]byte{content})
-			root, err := inspectRootfs(rootfs)
+			root, err := inspectRootfsPath(rootfs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -221,14 +243,14 @@ func TestInspectRootfs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rootfs := writeRootfsArchive(t, []cpio.Header{tc.header}, [][]byte{tc.content})
-			if _, err := inspectRootfs(rootfs); err == nil || !strings.Contains(err.Error(), tc.want) {
+			if _, err := inspectRootfsPath(rootfs); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("expected %q, got %v", tc.want, err)
 			}
 		})
 	}
 	t.Run("unsupported filesystem", func(t *testing.T) {
 		rootfs := writeRootfsArchive(t, []cpio.Header{{Name: "root.ext4", Mode: cpio.ModeRegular | 0644, Size: 3}}, [][]byte{[]byte("abc")})
-		if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "unknown extension") {
+		if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "unknown extension") {
 			t.Fatalf("expected unsupported filesystem error, got %v", err)
 		}
 	})
@@ -237,12 +259,12 @@ func TestInspectRootfs(t *testing.T) {
 		if err := os.WriteFile(rootfs, []byte("not a CPIO archive"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := inspectRootfs(rootfs); !errors.Is(err, io.ErrUnexpectedEOF) {
+		if _, err := inspectRootfsPath(rootfs); !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf("expected CPIO parsing error, got %v", err)
 		}
 	})
 	t.Run("missing rootfs", func(t *testing.T) {
-		if _, err := inspectRootfs(filepath.Join(t.TempDir(), "absent")); !errors.Is(err, fs.ErrNotExist) {
+		if _, err := inspectRootfsPath(filepath.Join(t.TempDir(), "absent")); !errors.Is(err, fs.ErrNotExist) {
 			t.Fatalf("expected missing rootfs error, got %v", err)
 		}
 	})
@@ -271,7 +293,7 @@ func TestInspectRootfs(t *testing.T) {
 			if err := os.WriteFile(rootfs, archive.Bytes(), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := NewNmstateHandler().BuildNmstateCpioArchive(rootfs); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
+			if _, err := NewNmstateHandler().BuildNmstateCpioArchiveFromISO(rootfsISO(t, rootfs), RootfsImagePath); err == nil || !strings.Contains(err.Error(), "extends beyond rootfs.img") {
 				t.Fatalf("expected truncated member error, got %v", err)
 			}
 		})
