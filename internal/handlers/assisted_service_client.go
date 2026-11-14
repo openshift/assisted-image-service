@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -160,19 +161,32 @@ func (c *AssistedServiceClient) discoveryKernelArguments(imageServiceRequest *ht
 	var infraEnv struct {
 		// JSON formatted string array representing the discovery image kernel arguments.
 		KernelArguments *string `json:"kernel_arguments,omitempty"`
+		// Whether the image should boot in FIPS mode.
+		FipsEnabled *bool `json:"fips_enabled,omitempty"`
 	}
 	if err = d.Decode(&infraEnv); err != nil {
 		return nil, http.StatusInternalServerError, fmt.Errorf("failed to decode infra-env input: %v", err)
 	}
+	fipsEnabled := infraEnv.FipsEnabled != nil && *infraEnv.FipsEnabled
+	if infraEnv.KernelArguments == nil && !fipsEnabled {
+		return nil, 0, nil
+	}
+	var kargs []string
 	if infraEnv.KernelArguments != nil {
-		kargs, err := isoeditor.StrToKargs(*infraEnv.KernelArguments)
+		kargs, err = isoeditor.StrToKargs(*infraEnv.KernelArguments)
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		return []byte(" " + strings.Join(kargs, " ") + "\n"), 0, nil
 	}
-	return nil, 0, nil
+	// FIPS mode is fixed when the kernel boots, so it is applied as a kernel
+	// argument. It is skipped if the user already added it themselves.
+	if fipsEnabled && !slices.Contains(kargs, fipsKernelArgument) {
+		kargs = append(kargs, fipsKernelArgument)
+	}
+	return []byte(" " + strings.Join(kargs, " ") + "\n"), 0, nil
 }
+
+const fipsKernelArgument = "fips=1"
 
 func setRequestAuth(imageRequest, assistedRequest *http.Request) {
 	queryValues := imageRequest.URL.Query()
