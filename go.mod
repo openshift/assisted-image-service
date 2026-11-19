@@ -6,7 +6,7 @@ toolchain go1.26.7
 
 require (
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
-	github.com/diskfs/go-diskfs v1.9.5-0.20261103130516-f6fbf0b9b4f2
+	github.com/diskfs/go-diskfs v1.9.5-0.20261119144536-caaa5de9fb95
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
@@ -32,7 +32,7 @@ require (
 	github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
