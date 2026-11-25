@@ -177,11 +177,11 @@ var _ = Context("with test files", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(string(content)).To(Equal("this is rootfs"))
 
-			f, err = fs.OpenFile("/isolinux/boot.cat", os.O_RDONLY)
+			f, err = fs.OpenFile("/isolinux/isolinux.cfg", os.O_RDONLY)
 			Expect(err).ToNot(HaveOccurred())
 			content, err = io.ReadAll(f)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(content)).To(Equal(""))
+			Expect(string(content)).To(Equal(testISOLinuxConfig))
 		})
 
 		It("generates an iso - single boot file (efi)", func() {
