@@ -133,9 +133,24 @@ parameters:
   value: "6Gi"
 - name: PDB_MIN_AVAILABLE
   value: "2"
-- name: OS_IMAGES_REQUEST_HEADERS
-  value: ''
-  required: false
+- name: OS_IMAGES_REQUEST_HEADERS_SECRET_NAME
+  value: assisted-image-service-os-images-request-headers
+  description: Secret containing OS_IMAGES_REQUEST_HEADERS; must be created outside this template
+- name: OS_IMAGES_REQUEST_HEADERS_SECRET_KEY
+  value: OS_IMAGES_REQUEST_HEADERS
+  description: Key in OS_IMAGES_REQUEST_HEADERS_SECRET_NAME for OS_IMAGES_REQUEST_HEADERS
+- name: PROXY_SECRET_NAME
+  value: assisted-image-service-proxy
+  description: Secret containing proxy env vars; must be created outside this template
+- name: HTTP_PROXY_SECRET_KEY
+  value: HTTP_PROXY
+  description: Key in PROXY_SECRET_NAME for HTTP_PROXY
+- name: HTTPS_PROXY_SECRET_KEY
+  value: HTTPS_PROXY
+  description: Key in PROXY_SECRET_NAME for HTTPS_PROXY
+- name: NO_PROXY_SECRET_KEY
+  value: NO_PROXY
+  description: Key in PROXY_SECRET_NAME for NO_PROXY
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
@@ -180,8 +195,6 @@ objects:
             value: "8080"
           - name: RHCOS_VERSIONS
             value: ${OS_IMAGES}
-          - name: OS_IMAGES_REQUEST_HEADERS
-            value: ${OS_IMAGES_REQUEST_HEADERS}
           - name: ASSISTED_SERVICE_SCHEME
             value: http
           - name: ASSISTED_SERVICE_HOST
@@ -194,6 +207,30 @@ objects:
             value: "/data"
           - name: DATA_TEMP_DIR
             value: "/data_temp"
+          - name: OS_IMAGES_REQUEST_HEADERS
+            valueFrom:
+              secretKeyRef:
+                name: ${OS_IMAGES_REQUEST_HEADERS_SECRET_NAME}
+                key: ${OS_IMAGES_REQUEST_HEADERS_SECRET_KEY}
+                optional: true
+          - name: HTTP_PROXY
+            valueFrom:
+              secretKeyRef:
+                name: ${PROXY_SECRET_NAME}
+                key: ${HTTP_PROXY_SECRET_KEY}
+                optional: true
+          - name: HTTPS_PROXY
+            valueFrom:
+              secretKeyRef:
+                name: ${PROXY_SECRET_NAME}
+                key: ${HTTPS_PROXY_SECRET_KEY}
+                optional: true
+          - name: NO_PROXY
+            valueFrom:
+              secretKeyRef:
+                name: ${PROXY_SECRET_NAME}
+                key: ${NO_PROXY_SECRET_KEY}
+                optional: true
           ports:
           - protocol: TCP
             containerPort: 8080
